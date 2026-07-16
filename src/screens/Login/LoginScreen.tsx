@@ -1,18 +1,26 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Text } from 'react-native-paper';
 
+import { userRepository } from '@/data/repositories/userRepository';
+import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
-import type { Role } from '@/types/enums';
 
-const DEMO_ROLES: { role: Role; label: string }[] = [
-  { role: 'warehouse', label: 'Bodega' },
-  { role: 'supervisor', label: 'Supervisor' },
-  { role: 'hse', label: 'HSE' },
-];
+const ROLE_LABELS: Record<User['role'], string> = {
+  warehouse: 'Bodega',
+  supervisor: 'Supervisor',
+  hse: 'HSE',
+};
 
-// TODO(Fase 3): reemplazar por selección real de usuario (seed local) + persistencia de sesión.
+// TODO(Fase 3): reemplazar por un flujo de login real; hoy solo lista los usuarios
+// sembrados en seedData.ts y persiste la sesión únicamente en memoria.
 export function LoginScreen() {
   const login = useSessionStore((state) => state.login);
+  const [demoUsers, setDemoUsers] = useState<User[] | null>(null);
+
+  useEffect(() => {
+    userRepository.findAll().then(setDemoUsers);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -20,18 +28,17 @@ export function LoginScreen() {
         SUSPEL
       </Text>
       <Text variant="bodyMedium" style={styles.subtitle}>
-        Selecciona un rol para continuar
+        Selecciona un usuario para continuar
       </Text>
-      {DEMO_ROLES.map(({ role, label }) => (
-        <Button
-          key={role}
-          mode="contained"
-          style={styles.button}
-          onPress={() => login({ id: role, name: label, role })}
-        >
-          {label}
-        </Button>
-      ))}
+      {demoUsers === null ? (
+        <ActivityIndicator />
+      ) : (
+        demoUsers.map((user) => (
+          <Button key={user.id} mode="contained" style={styles.button} onPress={() => login(user)}>
+            {user.name} ({ROLE_LABELS[user.role]})
+          </Button>
+        ))
+      )}
     </View>
   );
 }
