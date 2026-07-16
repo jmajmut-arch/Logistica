@@ -6,7 +6,7 @@ import { AlertsScreen } from '@/screens/Alerts/AlertsScreen';
 import { CompatibilityMatrixScreen } from '@/screens/CompatibilityMatrix/CompatibilityMatrixScreen';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { StorageLimitsScreen } from '@/screens/StorageLimits/StorageLimitsScreen';
-import { SubstanceListScreen } from '@/screens/Substances/SubstanceListScreen';
+import { SubstancesStack } from '@/screens/Substances/SubstancesStack';
 
 export type AppTabsParamList = {
   Dashboard: undefined;
@@ -43,8 +43,8 @@ export function AppTabs() {
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen
         name="Substances"
-        component={SubstanceListScreen}
-        options={{ title: 'Sustancias' }}
+        component={SubstancesStack}
+        options={{ title: 'Sustancias', headerShown: false }}
       />
       <Tab.Screen
         name="CompatibilityMatrix"

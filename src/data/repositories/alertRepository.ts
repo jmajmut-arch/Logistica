@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { alerts } from '@/data/db/schema';
 import type { Alert } from '@/domain/entities/Alert';
-import type { AlertStatus } from '@/types/enums';
+import type { AlertSeverity, AlertStatus } from '@/types/enums';
 
 export type NewAlert = Omit<Alert, 'id' | 'createdAt' | 'resolvedAt' | 'resolvedBy'>;
 
@@ -24,7 +24,16 @@ export const alertRepository = {
     return created;
   },
 
-  async resolve(id: number, resolvedBy: number): Promise<Alert> {
+  async updateContent(
+    id: number,
+    content: { severity: AlertSeverity; message: string },
+  ): Promise<Alert> {
+    const [updated] = await db.update(alerts).set(content).where(eq(alerts.id, id)).returning();
+    return updated;
+  },
+
+  /** resolvedBy null indica que el sistema la resolvió automáticamente (ya no aplica), no una persona. */
+  async resolve(id: number, resolvedBy: number | null): Promise<Alert> {
     const [updated] = await db
       .update(alerts)
       .set({ status: 'resolved', resolvedAt: Date.now(), resolvedBy })

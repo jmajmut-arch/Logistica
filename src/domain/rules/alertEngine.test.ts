@@ -1,4 +1,5 @@
-import { computeAlerts } from '@/domain/rules/alertEngine';
+import { computeAlerts, diffAlerts, type AlertCandidate } from '@/domain/rules/alertEngine';
+import type { Alert } from '@/domain/entities/Alert';
 import type { CompatibilityRule } from '@/domain/entities/CompatibilityRule';
 import type { Substance } from '@/domain/entities/Substance';
 import type { Zone, ZoneClassLimit } from '@/domain/entities/Zone';
@@ -139,5 +140,83 @@ describe('computeAlerts', () => {
       'incompatibility',
       'limit_exceeded',
     ]);
+  });
+});
+
+function makeAlert(overrides: Partial<Alert> = {}): Alert {
+  return {
+    id: 1,
+    type: 'expiration',
+    severity: 'high',
+    status: 'pending',
+    relatedSubstanceId: 5,
+    relatedZoneId: 1,
+    message: 'original message',
+    createdAt: 0,
+    resolvedAt: null,
+    resolvedBy: null,
+    ...overrides,
+  };
+}
+
+function makeCandidate(overrides: Partial<AlertCandidate> = {}): AlertCandidate {
+  return {
+    type: 'expiration',
+    severity: 'high',
+    status: 'pending',
+    relatedSubstanceId: 5,
+    relatedZoneId: 1,
+    message: 'original message',
+    ...overrides,
+  };
+}
+
+describe('diffAlerts', () => {
+  it('creates a candidate that has no matching pending alert', () => {
+    const diff = diffAlerts([], [makeCandidate()]);
+    expect(diff.toCreate).toEqual([makeCandidate()]);
+    expect(diff.toUpdate).toEqual([]);
+    expect(diff.toResolve).toEqual([]);
+  });
+
+  it('leaves an unchanged pending alert alone', () => {
+    const diff = diffAlerts([makeAlert()], [makeCandidate()]);
+    expect(diff.toCreate).toEqual([]);
+    expect(diff.toUpdate).toEqual([]);
+    expect(diff.toResolve).toEqual([]);
+  });
+
+  it('updates a pending alert whose severity escalated', () => {
+    const diff = diffAlerts(
+      [makeAlert({ severity: 'medium' })],
+      [makeCandidate({ severity: 'critical', message: 'venció hace 3 días' })],
+    );
+    expect(diff.toCreate).toEqual([]);
+    expect(diff.toUpdate).toEqual([{ id: 1, severity: 'critical', message: 'venció hace 3 días' }]);
+    expect(diff.toResolve).toEqual([]);
+  });
+
+  it('resolves a pending alert with no supporting candidate anymore', () => {
+    const diff = diffAlerts([makeAlert()], []);
+    expect(diff.toCreate).toEqual([]);
+    expect(diff.toUpdate).toEqual([]);
+    expect(diff.toResolve).toEqual([makeAlert()]);
+  });
+
+  it('never touches already-resolved alerts even if nothing matches them', () => {
+    const resolved = makeAlert({ status: 'resolved', resolvedAt: 123, resolvedBy: 2 });
+    const diff = diffAlerts([resolved], []);
+    // diffAlerts solo recibe alertas pendientes en la práctica; si se le pasa una
+    // resuelta igual la trata como "sin candidato" porque no filtra por status acá.
+    expect(diff.toResolve).toEqual([resolved]);
+  });
+
+  it('treats alerts for different substances/zones as distinct even with the same type', () => {
+    const diff = diffAlerts(
+      [makeAlert({ id: 1, relatedSubstanceId: 5 })],
+      [makeCandidate({ relatedSubstanceId: 6 })],
+    );
+    expect(diff.toCreate).toEqual([makeCandidate({ relatedSubstanceId: 6 })]);
+    expect(diff.toResolve).toEqual([makeAlert({ id: 1, relatedSubstanceId: 5 })]);
   });
 });

@@ -8,6 +8,7 @@ import {
   findIncompatibilities,
   type IncompatibilityFinding,
 } from '@/domain/rules/compatibilityRules';
+import type { Alert } from '@/domain/entities/Alert';
 import type { CompatibilityRule } from '@/domain/entities/CompatibilityRule';
 import type { Substance } from '@/domain/entities/Substance';
 import type { Zone, ZoneClassLimit } from '@/domain/entities/Zone';
@@ -106,4 +107,56 @@ function buildIncompatibilityMessage(
   zoneLabel: (zoneId: number) => string,
 ): string {
   return `${zoneLabel(finding.zoneId)}: ${HAZARD_CLASS_LABELS[finding.classA]} y ${HAZARD_CLASS_LABELS[finding.classB]} son incompatibles y están en la misma zona.`;
+}
+
+export interface AlertUpdate {
+  id: number;
+  severity: AlertSeverity;
+  message: string;
+}
+
+export interface AlertDiff {
+  toCreate: AlertCandidate[];
+  toUpdate: AlertUpdate[];
+  toResolve: Alert[];
+}
+
+/**
+ * Reconcilia las alertas pendientes ya persistidas contra los candidatos recién
+ * calculados, para que recalcular no duplique alertas ni pierda el historial:
+ * - un candidato sin alerta pendiente equivalente → toCreate
+ * - una alerta pendiente cuyo candidato cambió de severidad/mensaje → toUpdate
+ * - una alerta pendiente sin candidato que la sostenga → toResolve (ya no aplica)
+ * Dos alertas se consideran "la misma" si comparten type + sustancia/zona relacionada;
+ * alertas ya resueltas nunca entran acá, quedan como registro histórico/de auditoría.
+ */
+export function diffAlerts(pendingAlerts: Alert[], candidates: AlertCandidate[]): AlertDiff {
+  const pendingByKey = new Map(pendingAlerts.map((alert) => [alertKey(alert), alert]));
+  const candidateKeys = new Set<string>();
+
+  const toCreate: AlertCandidate[] = [];
+  const toUpdate: AlertUpdate[] = [];
+
+  for (const candidate of candidates) {
+    const key = alertKey(candidate);
+    candidateKeys.add(key);
+    const existing = pendingByKey.get(key);
+    if (!existing) {
+      toCreate.push(candidate);
+    } else if (existing.severity !== candidate.severity || existing.message !== candidate.message) {
+      toUpdate.push({ id: existing.id, severity: candidate.severity, message: candidate.message });
+    }
+  }
+
+  const toResolve = pendingAlerts.filter((alert) => !candidateKeys.has(alertKey(alert)));
+
+  return { toCreate, toUpdate, toResolve };
+}
+
+function alertKey(alert: {
+  type: AlertType;
+  relatedSubstanceId: number | null;
+  relatedZoneId: number | null;
+}): string {
+  return `${alert.type}:${alert.relatedSubstanceId ?? '-'}:${alert.relatedZoneId ?? '-'}`;
 }
