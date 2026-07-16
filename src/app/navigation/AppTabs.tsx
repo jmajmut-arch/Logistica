@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
 import { AlertsScreen } from '@/screens/Alerts/AlertsScreen';
 import { CompatibilityMatrixScreen } from '@/screens/CompatibilityMatrix/CompatibilityMatrixScreen';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
@@ -36,6 +37,7 @@ export function AppTabs() {
             size={size}
           />
         ),
+        headerRight: () => <SessionHeaderRight />,
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />

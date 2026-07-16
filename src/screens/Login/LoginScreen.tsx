@@ -12,8 +12,9 @@ const ROLE_LABELS: Record<User['role'], string> = {
   hse: 'HSE',
 };
 
-// TODO(Fase 3): reemplazar por un flujo de login real; hoy solo lista los usuarios
-// sembrados en seedData.ts y persiste la sesión únicamente en memoria.
+// Selección de usuario local (sin password/backend), tal como define el MVP: la sesión
+// elegida acá persiste en AsyncStorage vía sessionStore para no perder el rol activo
+// al reabrir la app.
 export function LoginScreen() {
   const login = useSessionStore((state) => state.login);
   const [demoUsers, setDemoUsers] = useState<User[] | null>(null);
