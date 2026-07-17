@@ -7,6 +7,18 @@
 -- "anon" tiene lectura/escritura total sobre estas tablas. Aceptable para una herramienta
 -- interna de equipo; si en algún momento se necesita restringir acceso, hay que sumar
 -- Supabase Auth real y políticas de RLS.
+--
+-- Este script es re-corrible: primero borra las tablas si ya existen (por ejemplo, de una
+-- corrida anterior) y las vuelve a crear desde cero.
+
+drop table if exists field_verification_items cascade;
+drop table if exists field_verifications cascade;
+drop table if exists alerts cascade;
+drop table if exists substances cascade;
+drop table if exists compatibility_rules cascade;
+drop table if exists zone_class_limits cascade;
+drop table if exists zones cascade;
+drop table if exists users cascade;
 
 create table users (
   id bigint generated always as identity primary key,
