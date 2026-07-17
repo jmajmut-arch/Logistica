@@ -18,8 +18,15 @@ if (typeof window === 'undefined') {
       return;
     }
 
+    // El documento HTML (navegación) referencia el bundle JS por nombre con hash de
+    // contenido — si el navegador sirve una copia cacheada del propio HTML, queda
+    // apuntando para siempre al bundle viejo aunque haya una versión nueva desplegada.
+    // Los demás recursos (JS/wasm/fuentes) sí pueden cachearse normal: su URL cambia
+    // en cada build.
+    const fetchOptions = request.mode === 'navigate' ? { cache: 'no-store' } : undefined;
+
     event.respondWith(
-      fetch(request)
+      fetch(request, fetchOptions)
         .then((response) => {
           // Respuesta opaca (cross-origin sin CORS): no se puede leer ni reescribir, se deja pasar tal cual.
           if (response.status === 0) {
