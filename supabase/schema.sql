@@ -115,6 +115,25 @@ create table field_verification_items (
 );
 create index field_verification_items_verification_idx on field_verification_items (verification_id);
 
+-- Supabase activa RLS por defecto en tablas nuevas del schema public (para evitar
+-- exponer datos por accidente) incluso sin pedirlo explícitamente. Sin esto, la consulta
+-- directa en el SQL Editor (corre como superusuario, bypassea RLS) ve los datos bien, pero
+-- la API pública que usa la app (clave anon, sí respeta RLS) los ve vacíos aunque existan.
+-- Coherente con la decisión de arriba de no usar RLS: se desactiva explícito acá.
+alter table users disable row level security;
+alter table zones disable row level security;
+alter table zone_class_limits disable row level security;
+alter table compatibility_rules disable row level security;
+alter table substances disable row level security;
+alter table alerts disable row level security;
+alter table field_verifications disable row level security;
+alter table field_verification_items disable row level security;
+
+-- Por si el rol anon no tiene privilegios sobre tablas creadas por SQL directo (la UI de
+-- Supabase los otorga sola, una tabla creada a mano no necesariamente).
+grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+grant usage, select on all sequences in schema public to anon, authenticated;
+
 -- Datos de ejemplo (usuarios demo, zonas, límites, matriz de compatibilidad).
 insert into users (name, role) values
   ('Bodega Demo', 'warehouse'),
