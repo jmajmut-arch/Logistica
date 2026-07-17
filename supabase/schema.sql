@@ -1,16 +1,3 @@
--- SUSPEL — esquema Postgres para Supabase (reemplaza la base SQLite local).
--- Correr una sola vez en el SQL Editor de Supabase (panel del proyecto → SQL Editor → New query).
---
--- RLS (Row Level Security) queda deliberadamente DESACTIVADA: el login actual es solo
--- "elegir un usuario de una lista" sin contraseña, así que no hay una identidad real de
--- Postgres/Supabase Auth contra la que escribir políticas. Esto significa que la clave
--- "anon" tiene lectura/escritura total sobre estas tablas. Aceptable para una herramienta
--- interna de equipo; si en algún momento se necesita restringir acceso, hay que sumar
--- Supabase Auth real y políticas de RLS.
---
--- Este script es re-corrible: primero borra las tablas si ya existen (por ejemplo, de una
--- corrida anterior) y las vuelve a crear desde cero.
-
 drop table if exists field_verification_items cascade;
 drop table if exists field_verifications cascade;
 drop table if exists alerts cascade;
@@ -115,11 +102,6 @@ create table field_verification_items (
 );
 create index field_verification_items_verification_idx on field_verification_items (verification_id);
 
--- Supabase activa RLS por defecto en tablas nuevas del schema public (para evitar
--- exponer datos por accidente) incluso sin pedirlo explícitamente. Sin esto, la consulta
--- directa en el SQL Editor (corre como superusuario, bypassea RLS) ve los datos bien, pero
--- la API pública que usa la app (clave anon, sí respeta RLS) los ve vacíos aunque existan.
--- Coherente con la decisión de arriba de no usar RLS: se desactiva explícito acá.
 alter table users disable row level security;
 alter table zones disable row level security;
 alter table zone_class_limits disable row level security;
@@ -129,12 +111,9 @@ alter table alerts disable row level security;
 alter table field_verifications disable row level security;
 alter table field_verification_items disable row level security;
 
--- Por si el rol anon no tiene privilegios sobre tablas creadas por SQL directo (la UI de
--- Supabase los otorga sola, una tabla creada a mano no necesariamente).
 grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;
 
--- Datos de ejemplo (usuarios demo, zonas, límites, matriz de compatibilidad).
 insert into users (name, role) values
   ('Bodega Demo', 'warehouse'),
   ('Supervisor Demo', 'supervisor');
