@@ -2,6 +2,11 @@ name: Deploy web build to GitHub Pages
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - claude/hazmat-registry-chile-0qprdx
+    paths:
+      - .github/workflows/deploy-pages.yml
 
 permissions:
   contents: read
