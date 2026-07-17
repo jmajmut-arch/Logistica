@@ -48,7 +48,11 @@ jobs:
       # cualquier carpeta que empiece con '_' — como _expo/, donde Metro deja el JS bundleado.
       - run: touch dist/.nojekyll
 
+      # enablement: true crea el sitio de Pages si el repo todavía no lo tiene habilitado —
+      # sin esto configure-pages solo verifica que exista y falla si nunca se activó.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
