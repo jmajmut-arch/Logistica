@@ -1,0 +1,60 @@
+name: Deploy web build to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      # GitHub Pages sirve un repo (que no sea <usuario>.github.io) bajo /<repo>/, no en la
+      # raíz. Se parchea app.json solo en este checkout efímero de CI para que las rutas de
+      # assets generadas por Expo incluyan ese subpath — no se toca el app.json del repo, que
+      # debe seguir apuntando a la raíz para `expo start`/`export` en desarrollo local.
+      - name: Set baseUrl for the GitHub Pages subpath
+        run: |
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            config.expo.experiments = { ...(config.expo.experiments || {}), baseUrl: '/${{ github.event.repository.name }}' };
+            fs.writeFileSync('app.json', JSON.stringify(config, null, 2));
+          "
+
+      - run: npx expo export --platform web
+
+      # Sin esto, GitHub Pages procesa el sitio con Jekyll, que ignora por convención
+      # cualquier carpeta que empiece con '_' — como _expo/, donde Metro deja el JS bundleado.
+      - run: touch dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
