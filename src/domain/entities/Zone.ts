@@ -1,4 +1,4 @@
-import type { HazardClass } from '@/types/enums';
+import type { HazardClass, Unit } from '@/types/enums';
 
 export interface Zone {
   id: number;
@@ -11,5 +11,5 @@ export interface ZoneClassLimit {
   zoneId: number;
   hazardClass: HazardClass;
   maxQuantity: number;
-  unit: string;
+  unit: Unit;
 }

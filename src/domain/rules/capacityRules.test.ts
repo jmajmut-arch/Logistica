@@ -17,6 +17,7 @@ function makeSubstance(overrides: Partial<Substance> = {}): Substance {
     zoneId: 1,
     expirationDate: '2026-06-01',
     sdsUri: null,
+    sdsFileName: null,
     createdBy: 1,
     createdAt: 0,
     updatedAt: 0,

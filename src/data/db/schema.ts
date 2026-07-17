@@ -9,6 +9,7 @@ import type {
   CompatibilityStatus,
   HazardClass,
   Role,
+  Unit,
   VerificationResult,
 } from '@/types/enums';
 
@@ -33,7 +34,7 @@ export const zoneClassLimits = sqliteTable(
       .references(() => zones.id, { onDelete: 'cascade' }),
     hazardClass: text('hazard_class').$type<HazardClass>().notNull(),
     maxQuantity: real('max_quantity').notNull(),
-    unit: text('unit').notNull(),
+    unit: text('unit').$type<Unit>().notNull(),
   },
   (table) => [uniqueIndex('zone_class_limits_zone_class_idx').on(table.zoneId, table.hazardClass)],
 );
@@ -58,12 +59,13 @@ export const substances = sqliteTable(
     name: text('name').notNull(),
     hazardClass: text('hazard_class').$type<HazardClass>().notNull(),
     quantity: real('quantity').notNull(),
-    unit: text('unit').notNull(),
+    unit: text('unit').$type<Unit>().notNull(),
     zoneId: integer('zone_id')
       .notNull()
       .references(() => zones.id, { onDelete: 'restrict' }),
     expirationDate: text('expiration_date').notNull(), // ISO 8601 (YYYY-MM-DD)
     sdsUri: text('sds_uri'),
+    sdsFileName: text('sds_file_name'),
     createdBy: integer('created_by')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),

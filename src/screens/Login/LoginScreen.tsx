@@ -9,7 +9,6 @@ import { useSessionStore } from '@/store/sessionStore';
 const ROLE_LABELS: Record<User['role'], string> = {
   warehouse: 'Bodega',
   supervisor: 'Supervisor',
-  hse: 'HSE',
 };
 
 // Selección de usuario local (sin password/backend), tal como define el MVP: la sesión

@@ -9,12 +9,12 @@ import {
 } from '@/data/db/schema';
 import { normalizeClassPair } from '@/domain/rules/compatibilityRules';
 import { FIELD_VERIFICATION_ITEMS } from '@/domain/rules/fieldVerificationChecklist';
-import type { CompatibilityStatus, HazardClass, VerificationResult } from '@/types/enums';
+import type { CompatibilityStatus, HazardClass, Unit, VerificationResult } from '@/types/enums';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // Pares representativos de la matriz de compatibilidad GHS. No es exhaustivo:
-// HSE puede editar/ampliar estas reglas desde la pantalla de configuración (Fase 7).
+// Supervisor puede editar/ampliar estas reglas desde la pantalla de configuración (Fase 7).
 const SEED_COMPATIBILITY_PAIRS: [HazardClass, HazardClass, CompatibilityStatus][] = [
   ['class3_flammable_liquids', 'class5_oxidizers', 'incompatible'],
   ['class3_flammable_liquids', 'class8_corrosives', 'incompatible'],
@@ -36,7 +36,6 @@ export async function seedDatabaseIfEmpty(db: Database) {
     .values([
       { name: 'Bodega Demo', role: 'warehouse' },
       { name: 'Supervisor Demo', role: 'supervisor' },
-      { name: 'HSE Demo', role: 'hse' },
     ])
     .returning();
   const supervisor = insertedUsers.find((user) => user.role === 'supervisor')!;
@@ -55,13 +54,13 @@ export async function seedDatabaseIfEmpty(db: Database) {
       zoneId: zone.id,
       hazardClass: 'class3_flammable_liquids' as HazardClass,
       maxQuantity: 200,
-      unit: 'l',
+      unit: 'l' as Unit,
     },
     {
       zoneId: zone.id,
       hazardClass: 'class8_corrosives' as HazardClass,
       maxQuantity: 100,
-      unit: 'l',
+      unit: 'l' as Unit,
     },
   ]);
   await db.insert(zoneClassLimits).values(zoneLimits);

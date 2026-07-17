@@ -1,9 +1,8 @@
 import { getPermissions } from '@/utils/permissions';
 
 describe('getPermissions', () => {
-  it('only allows HSE to configure rules', () => {
-    expect(getPermissions('hse').configureRules).toBe(true);
-    expect(getPermissions('supervisor').configureRules).toBe(false);
+  it('only allows supervisor to configure rules', () => {
+    expect(getPermissions('supervisor').configureRules).toBe(true);
     expect(getPermissions('warehouse').configureRules).toBe(false);
   });
 

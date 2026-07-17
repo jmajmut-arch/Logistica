@@ -1,0 +1,1 @@
+ALTER TABLE `substances` ADD `sds_file_name` text;

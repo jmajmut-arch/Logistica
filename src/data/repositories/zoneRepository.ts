@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { zoneClassLimits, zones } from '@/data/db/schema';
 import type { Zone, ZoneClassLimit } from '@/domain/entities/Zone';
-import type { HazardClass } from '@/types/enums';
+import type { HazardClass, Unit } from '@/types/enums';
 
 export const zoneRepository = {
   async findAll(): Promise<Zone[]> {
@@ -27,7 +27,7 @@ export const zoneRepository = {
     zoneId: number;
     hazardClass: HazardClass;
     maxQuantity: number;
-    unit: string;
+    unit: Unit;
   }): Promise<ZoneClassLimit> {
     const [existing] = await db
       .select()

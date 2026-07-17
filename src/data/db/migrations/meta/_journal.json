@@ -15,6 +15,20 @@
       "when": 1784249769049,
       "tag": "0001_spooky_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784255208494,
+      "tag": "0002_hse_role_to_supervisor",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784255483645,
+      "tag": "0003_low_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }

@@ -21,7 +21,7 @@ export interface IncompatibilityFinding {
 
 /**
  * Un par de clases co-ubicadas sin regla configurada NO genera alerta: se asume
- * compatible por defecto hasta que HSE defina explícitamente lo contrario. Esto evita
+ * compatible por defecto hasta que Supervisor defina explícitamente lo contrario. Esto evita
  * saturar de alertas de "incompatibilidad desconocida" apenas se siembra una zona nueva.
  */
 export function findIncompatibilitiesInZone(

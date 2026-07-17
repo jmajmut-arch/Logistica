@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, FAB, List, Text } from 'react-native-paper';
+import { ActivityIndicator, FAB, IconButton, List, Text } from 'react-native-paper';
 
 import { RoleGate } from '@/components/RoleGate';
 import { substanceRepository } from '@/data/repositories/substanceRepository';
@@ -10,6 +10,7 @@ import { zoneRepository } from '@/data/repositories/zoneRepository';
 import type { Substance } from '@/domain/entities/Substance';
 import type { Zone } from '@/domain/entities/Zone';
 import { HAZARD_CLASS_LABELS } from '@/utils/hazardClassLabels';
+import { openSdsFile } from '@/utils/sdsStorage';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 import type { SubstancesStackParamList } from './SubstancesStack';
@@ -50,7 +51,24 @@ export function SubstanceListScreen() {
         renderItem={({ item }) => (
           <List.Item
             title={item.name}
-            description={`${HAZARD_CLASS_LABELS[item.hazardClass]} · ${item.quantity}${item.unit} · ${zonesById.get(item.zoneId)?.code ?? '—'}`}
+            description={`${HAZARD_CLASS_LABELS[item.hazardClass]} · ${zonesById.get(item.zoneId)?.code ?? '—'}${item.sdsUri ? ' · SDS adjunta' : ''}`}
+            right={() => (
+              <View style={styles.stock}>
+                <Text variant="titleMedium" style={styles.stockValue}>
+                  {item.quantity}
+                  {item.unit}
+                </Text>
+                {item.sdsUri && (
+                  <IconButton
+                    icon="paperclip"
+                    size={18}
+                    style={styles.sdsButton}
+                    accessibilityLabel="Ver ficha de seguridad"
+                    onPress={() => openSdsFile(item.sdsUri!)}
+                  />
+                )}
+              </View>
+            )}
             onPress={() => navigation.navigate('SubstanceForm', { substanceId: item.id })}
           />
         )}
@@ -88,5 +106,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 16,
+  },
+  stock: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  stockValue: {
+    fontWeight: '600',
+  },
+  sdsButton: {
+    margin: 0,
   },
 });

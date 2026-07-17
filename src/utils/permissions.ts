@@ -14,13 +14,8 @@ const PERMISSIONS_BY_ROLE: Record<Role, Permissions> = {
     configureRules: false,
     performVerifications: true,
   },
+  // El rol HSE se fusionó con Supervisor: supervisor concentra todos los permisos.
   supervisor: {
-    manageSubstances: true,
-    resolveAlerts: true,
-    configureRules: false,
-    performVerifications: true,
-  },
-  hse: {
     manageSubstances: true,
     resolveAlerts: true,
     configureRules: true,

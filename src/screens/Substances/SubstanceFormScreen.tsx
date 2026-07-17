@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { Alert as RNAlert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert as RNAlert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -12,6 +12,7 @@ import {
   HelperText,
   IconButton,
   Menu,
+  Snackbar,
   Text,
   TextInput,
 } from 'react-native-paper';
@@ -23,9 +24,10 @@ import { zoneRepository } from '@/data/repositories/zoneRepository';
 import type { Zone } from '@/domain/entities/Zone';
 import { substanceService } from '@/domain/services/substanceService';
 import { useSessionStore } from '@/store/sessionStore';
-import { HAZARD_CLASSES } from '@/types/enums';
+import { HAZARD_CLASSES, UNITS } from '@/types/enums';
 import { HAZARD_CLASS_LABELS } from '@/utils/hazardClassLabels';
-import { copySdsToAppStorage } from '@/utils/sdsStorage';
+import { copySdsToAppStorage, openSdsFile } from '@/utils/sdsStorage';
+import { UNIT_LABELS } from '@/utils/unitLabels';
 
 import type { SubstancesStackParamList } from './SubstancesStack';
 
@@ -40,12 +42,13 @@ const substanceFormSchema = z.object({
     .refine((value) => value.trim() !== '' && !Number.isNaN(Number(value)) && Number(value) > 0, {
       message: 'Ingresa una cantidad mayor a 0',
     }),
-  unit: z.string().trim().min(1, 'Ingresa una unidad (ej. kg, l)'),
+  unit: z.enum(UNITS),
   zoneId: z.number().int().positive('Selecciona una zona'),
   expirationDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa el formato AAAA-MM-DD (ej. 2026-12-31)'),
   sdsUri: z.string().nullable(),
+  sdsFileName: z.string().nullable(),
 });
 
 type SubstanceFormValues = z.infer<typeof substanceFormSchema>;
@@ -54,10 +57,11 @@ const DEFAULT_VALUES: SubstanceFormValues = {
   name: '',
   hazardClass: HAZARD_CLASSES[0],
   quantity: '',
-  unit: '',
+  unit: UNITS[0],
   zoneId: 0,
   expirationDate: '',
   sdsUri: null,
+  sdsFileName: null,
 };
 
 export function SubstanceFormScreen() {
@@ -69,9 +73,11 @@ export function SubstanceFormScreen() {
   const [zones, setZones] = useState<Zone[] | null>(null);
   const [loadingSubstance, setLoadingSubstance] = useState(substanceId !== undefined);
   const [hazardMenuVisible, setHazardMenuVisible] = useState(false);
+  const [unitMenuVisible, setUnitMenuVisible] = useState(false);
   const [zoneMenuVisible, setZoneMenuVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [originalCreatedBy, setOriginalCreatedBy] = useState<number | null>(null);
+  const [uploadSnackbarVisible, setUploadSnackbarVisible] = useState(false);
 
   const {
     control,
@@ -101,28 +107,49 @@ export function SubstanceFormScreen() {
         name: substance.name,
         hazardClass: substance.hazardClass,
         quantity: String(substance.quantity),
-        unit: substance.unit,
+        unit: UNITS.includes(substance.unit as (typeof UNITS)[number])
+          ? (substance.unit as (typeof UNITS)[number])
+          : UNITS[0],
         zoneId: substance.zoneId,
         expirationDate: substance.expirationDate,
         sdsUri: substance.sdsUri,
+        sdsFileName: substance.sdsFileName,
       });
       setLoadingSubstance(false);
     });
   }, [substanceId, reset]);
 
   const sdsUri = useWatch({ control, name: 'sdsUri' });
+  const sdsFileName = useWatch({ control, name: 'sdsFileName' });
 
   const pickSds = async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'] });
+    // En web no hay almacenamiento de archivos persistente (ver sdsStorage.ts), así que ahí
+    // se pide el contenido como data URL para guardarlo directo en la base de datos.
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      base64: Platform.OS === 'web',
+    });
     if (result.canceled) {
       return;
     }
     const asset = result.assets[0];
-    const storedUri = await copySdsToAppStorage(asset.uri, asset.name);
+    const sourceUri = Platform.OS === 'web' && asset.base64 ? asset.base64 : asset.uri;
+    const storedUri = await copySdsToAppStorage(sourceUri, asset.name);
     setValue('sdsUri', storedUri, { shouldDirty: true });
+    setValue('sdsFileName', asset.name, { shouldDirty: true });
+    setUploadSnackbarVisible(true);
   };
 
-  const removeSds = () => setValue('sdsUri', null, { shouldDirty: true });
+  const removeSds = () => {
+    setValue('sdsUri', null, { shouldDirty: true });
+    setValue('sdsFileName', null, { shouldDirty: true });
+  };
+
+  const openSds = () => {
+    if (sdsUri) {
+      openSdsFile(sdsUri);
+    }
+  };
 
   const onSubmit = async (values: SubstanceFormValues) => {
     if (!currentUser) {
@@ -138,6 +165,7 @@ export function SubstanceFormScreen() {
         zoneId: values.zoneId,
         expirationDate: values.expirationDate,
         sdsUri: values.sdsUri,
+        sdsFileName: values.sdsFileName,
       };
       if (substanceId === undefined) {
         await substanceService.create({ ...payload, createdBy: currentUser.id });
@@ -260,13 +288,33 @@ export function SubstanceFormScreen() {
           name="unit"
           render={({ field }) => (
             <View style={[styles.field, styles.flex1]}>
-              <TextInput
-                label="Unidad (kg, l...)"
-                value={field.value}
-                onChangeText={field.onChange}
-                onBlur={field.onBlur}
-                mode="outlined"
-              />
+              <Menu
+                visible={unitMenuVisible}
+                onDismiss={() => setUnitMenuVisible(false)}
+                anchor={
+                  <Pressable onPress={() => setUnitMenuVisible(true)}>
+                    <TextInput
+                      label="Unidad"
+                      value={UNIT_LABELS[field.value]}
+                      editable={false}
+                      mode="outlined"
+                      right={<TextInput.Icon icon="menu-down" />}
+                      pointerEvents="none"
+                    />
+                  </Pressable>
+                }
+              >
+                {UNITS.map((unit) => (
+                  <Menu.Item
+                    key={unit}
+                    title={UNIT_LABELS[unit]}
+                    onPress={() => {
+                      field.onChange(unit);
+                      setUnitMenuVisible(false);
+                    }}
+                  />
+                ))}
+              </Menu>
               {errors.unit && <HelperText type="error">{errors.unit.message}</HelperText>}
             </View>
           )}
@@ -339,10 +387,13 @@ export function SubstanceFormScreen() {
         </Text>
         {sdsUri ? (
           <View style={styles.sdsRow}>
-            <Text style={styles.sdsName} numberOfLines={1}>
-              {sdsUri.split('/').pop()}
-            </Text>
-            <IconButton icon="close" onPress={removeSds} />
+            <Pressable onPress={openSds} style={styles.sdsNameButton}>
+              <Text style={styles.sdsName} numberOfLines={1}>
+                {sdsFileName ?? 'Archivo adjunto'}
+              </Text>
+            </Pressable>
+            <IconButton icon="eye-outline" onPress={openSds} accessibilityLabel="Ver ficha" />
+            <IconButton icon="close" onPress={removeSds} accessibilityLabel="Quitar ficha" />
           </View>
         ) : (
           <Button mode="outlined" icon="paperclip" onPress={pickSds}>
@@ -374,6 +425,14 @@ export function SubstanceFormScreen() {
           </Button>
         </RoleGate>
       )}
+
+      <Snackbar
+        visible={uploadSnackbarVisible}
+        onDismiss={() => setUploadSnackbarVisible(false)}
+        duration={3000}
+      >
+        Archivo subido correctamente.
+      </Snackbar>
     </ScrollView>
   );
 }
@@ -408,6 +467,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 4,
     paddingLeft: 12,
+  },
+  sdsNameButton: {
+    flex: 1,
   },
   sdsName: {
     flex: 1,

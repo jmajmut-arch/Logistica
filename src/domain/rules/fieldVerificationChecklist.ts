@@ -2,7 +2,7 @@
 // comunes exigidos por el DS 43 (almacenamiento de sustancias peligrosas) y normativa
 // asociada (DS 594 sobre condiciones sanitarias y ambientales, NCh 2190 señalización).
 // No reemplaza una auditoría legal formal: es una guía operativa para la inspección
-// periódica de bodega que HSE puede complementar según el detalle de cada faena.
+// periódica de bodega que Supervisor puede complementar según el detalle de cada faena.
 export const FIELD_VERIFICATION_ITEMS = [
   { key: 'signage', label: 'Señalización de riesgo visible y vigente (NCh 2190)' },
   { key: 'sds_available', label: 'Hojas de datos de seguridad (SDS) disponibles y accesibles' },

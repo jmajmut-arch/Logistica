@@ -78,7 +78,7 @@ export function CompatibilityMatrixScreen() {
       <Text variant="bodyMedium" style={styles.hint}>
         {canConfigure
           ? 'Toca una celda para alternar entre incompatible y compatible.'
-          : 'Vista de solo lectura. Solo HSE puede editar la matriz.'}
+          : 'Vista de solo lectura. Solo Supervisor puede editar la matriz.'}
       </Text>
       <ScrollView horizontal>
         <View>

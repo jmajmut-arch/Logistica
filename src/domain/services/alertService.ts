@@ -8,7 +8,7 @@ import { computeAlerts, diffAlerts } from '@/domain/rules/alertEngine';
 /**
  * Recalcula el estado completo de alertas a partir de los datos actuales en SQLite.
  * Se llama después de cualquier mutación que pueda afectar vencimientos, límites o
- * compatibilidad (CRUD de sustancias, cambios de límites/reglas por HSE).
+ * compatibilidad (CRUD de sustancias, cambios de límites/reglas por Supervisor).
  *
  * Es intencionalmente global (no por zona): con el volumen de datos de este MVP
  * recalcular todo es barato y evita bugs por invalidar el scope equivocado.

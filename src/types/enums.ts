@@ -1,4 +1,8 @@
-export type Role = 'warehouse' | 'supervisor' | 'hse';
+export type Role = 'warehouse' | 'supervisor';
+
+export const UNITS = ['l', 'ml', 'kg', 't'] as const;
+
+export type Unit = (typeof UNITS)[number];
 
 export const HAZARD_CLASSES = [
   'class1_explosives',

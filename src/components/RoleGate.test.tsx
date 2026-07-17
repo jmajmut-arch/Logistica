@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe('RoleGate', () => {
   it('renders children when the active role has the permission', async () => {
-    setRole('hse');
+    setRole('supervisor');
     await render(
       <RoleGate permission="configureRules">
         <Text>Editar reglas</Text>
@@ -37,9 +37,9 @@ describe('RoleGate', () => {
   });
 
   it('renders the fallback when provided and the permission is missing', async () => {
-    setRole('supervisor');
+    setRole('warehouse');
     await render(
-      <RoleGate permission="configureRules" fallback={<Text>Solo lectura</Text>}>
+      <RoleGate permission="resolveAlerts" fallback={<Text>Solo lectura</Text>}>
         <Text>Editar reglas</Text>
       </RoleGate>,
     );

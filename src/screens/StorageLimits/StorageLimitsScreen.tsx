@@ -21,16 +21,17 @@ import {
 import { zoneRepository } from '@/data/repositories/zoneRepository';
 import { recalculateAlerts } from '@/domain/services/alertService';
 import type { Zone, ZoneClassLimit } from '@/domain/entities/Zone';
-import { HAZARD_CLASSES } from '@/types/enums';
+import { HAZARD_CLASSES, UNITS } from '@/types/enums';
 import { HAZARD_CLASS_LABELS } from '@/utils/hazardClassLabels';
+import { UNIT_LABELS } from '@/utils/unitLabels';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
-import type { HazardClass } from '@/types/enums';
+import type { HazardClass, Unit } from '@/types/enums';
 
 interface EditingContext {
   zoneId: number;
   hazardClass: HazardClass;
   maxQuantity: string;
-  unit: string;
+  unit: Unit;
 }
 
 export function StorageLimitsScreen() {
@@ -38,6 +39,7 @@ export function StorageLimitsScreen() {
   const [limits, setLimits] = useState<ZoneClassLimit[]>([]);
   const [totals, setTotals] = useState<ZoneClassQuantity[]>([]);
   const [editing, setEditing] = useState<EditingContext | null>(null);
+  const [unitMenuVisible, setUnitMenuVisible] = useState(false);
   const [classMenuVisible, setClassMenuVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -69,14 +71,14 @@ export function StorageLimitsScreen() {
       ?.totalQuantity ?? 0;
 
   const openAdd = (zoneId: number) =>
-    setEditing({ zoneId, hazardClass: HAZARD_CLASSES[0], maxQuantity: '', unit: '' });
+    setEditing({ zoneId, hazardClass: HAZARD_CLASSES[0], maxQuantity: '', unit: UNITS[0] });
 
   const openEdit = (limit: ZoneClassLimit) =>
     setEditing({
       zoneId: limit.zoneId,
       hazardClass: limit.hazardClass,
       maxQuantity: String(limit.maxQuantity),
-      unit: limit.unit,
+      unit: UNITS.includes(limit.unit as Unit) ? (limit.unit as Unit) : UNITS[0],
     });
 
   const closeDialog = () => setEditing(null);
@@ -86,7 +88,7 @@ export function StorageLimitsScreen() {
       return;
     }
     const maxQuantity = Number(editing.maxQuantity);
-    if (!editing.unit.trim() || Number.isNaN(maxQuantity) || maxQuantity <= 0) {
+    if (Number.isNaN(maxQuantity) || maxQuantity <= 0) {
       return;
     }
     setSaving(true);
@@ -95,7 +97,7 @@ export function StorageLimitsScreen() {
         zoneId: editing.zoneId,
         hazardClass: editing.hazardClass,
         maxQuantity,
-        unit: editing.unit.trim(),
+        unit: editing.unit,
       });
       await recalculateAlerts();
       await loadData();
@@ -209,13 +211,34 @@ export function StorageLimitsScreen() {
                   mode="outlined"
                   style={styles.dialogField}
                 />
-                <TextInput
-                  label="Unidad (kg, l...)"
-                  value={editing.unit}
-                  onChangeText={(text) => setEditing({ ...editing, unit: text })}
-                  mode="outlined"
-                  style={styles.dialogField}
-                />
+                <Menu
+                  visible={unitMenuVisible}
+                  onDismiss={() => setUnitMenuVisible(false)}
+                  anchor={
+                    <Pressable onPress={() => setUnitMenuVisible(true)}>
+                      <TextInput
+                        label="Unidad"
+                        value={UNIT_LABELS[editing.unit]}
+                        editable={false}
+                        mode="outlined"
+                        right={<TextInput.Icon icon="menu-down" />}
+                        pointerEvents="none"
+                        style={styles.dialogField}
+                      />
+                    </Pressable>
+                  }
+                >
+                  {UNITS.map((unit) => (
+                    <Menu.Item
+                      key={unit}
+                      title={UNIT_LABELS[unit]}
+                      onPress={() => {
+                        setEditing({ ...editing, unit });
+                        setUnitMenuVisible(false);
+                      }}
+                    />
+                  ))}
+                </Menu>
               </>
             )}
           </Dialog.Content>
