@@ -1,27 +1,22 @@
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { useEffect, useState, type PropsWithChildren } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 
 import { db } from '@/data/db/client';
-import migrations from '@/data/db/migrations/migrations';
+import { runMigrationsAsync } from '@/data/db/migrate';
 import { seedDatabaseIfEmpty } from '@/data/seed/seedData';
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
-  const { success: migrationsSuccess, error: migrationError } = useMigrations(db, migrations);
-  const [seedError, setSeedError] = useState<Error | null>(null);
-  const [seedDone, setSeedDone] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!migrationsSuccess) {
-      return;
-    }
-    seedDatabaseIfEmpty(db)
-      .then(() => setSeedDone(true))
-      .catch((error: Error) => setSeedError(error));
-  }, [migrationsSuccess]);
+    runMigrationsAsync()
+      .then(() => seedDatabaseIfEmpty(db))
+      .then(() => setReady(true))
+      .catch((err: Error) => setError(err));
+  }, []);
 
-  const error = migrationError ?? seedError;
   if (error) {
     return (
       <View style={styles.center}>
@@ -33,7 +28,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
     );
   }
 
-  if (!migrationsSuccess || !seedDone) {
+  if (!ready) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
