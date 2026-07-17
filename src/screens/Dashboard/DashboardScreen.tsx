@@ -18,7 +18,12 @@ import type { AlertType } from '@/types/enums';
 
 type Navigation = BottomTabNavigationProp<AppTabsParamList, 'Dashboard'>;
 
-const ALERT_TYPES: AlertType[] = ['expiration', 'limit_exceeded', 'incompatibility'];
+const ALERT_TYPES: AlertType[] = [
+  'expiration',
+  'limit_exceeded',
+  'incompatibility',
+  'verification_overdue',
+];
 
 export function DashboardScreen() {
   const navigation = useNavigation<Navigation>();

@@ -8,6 +8,10 @@ import {
   findIncompatibilities,
   type IncompatibilityFinding,
 } from '@/domain/rules/compatibilityRules';
+import {
+  findVerificationFindings,
+  VERIFICATION_THRESHOLDS,
+} from '@/domain/rules/verificationRules';
 import type { Alert } from '@/domain/entities/Alert';
 import type { CompatibilityRule } from '@/domain/entities/CompatibilityRule';
 import type { Substance } from '@/domain/entities/Substance';
@@ -29,6 +33,8 @@ export interface AlertEngineInput {
   zones: Zone[];
   zoneClassLimits: ZoneClassLimit[];
   compatibilityRules: CompatibilityRule[];
+  /** Última fecha de verificación en terreno por zona (ver fieldVerificationRepository.findLatestByZone). */
+  latestVerificationByZone: Map<number, number>;
   /** Inyectable para tests; por defecto la fecha/hora actual. */
   today?: Date;
 }
@@ -76,7 +82,28 @@ export function computeAlerts(input: AlertEngineInput): AlertCandidate[] {
     message: buildIncompatibilityMessage(finding, zoneLabel),
   }));
 
-  return [...expirationCandidates, ...capacityCandidates, ...incompatibilityCandidates];
+  const verificationCandidates = findVerificationFindings(
+    input.zones,
+    input.latestVerificationByZone,
+    today,
+  ).map((finding): AlertCandidate => ({
+    type: 'verification_overdue',
+    severity: finding.severity,
+    status: 'pending',
+    relatedSubstanceId: null,
+    relatedZoneId: finding.zoneId,
+    message:
+      finding.daysSinceLastVerification === null
+        ? `${zoneLabel(finding.zoneId)}: nunca se ha registrado una verificación en terreno.`
+        : `${zoneLabel(finding.zoneId)}: sin verificación en terreno hace ${finding.daysSinceLastVerification} día(s) (máximo ${VERIFICATION_THRESHOLDS.intervalDays}).`,
+  }));
+
+  return [
+    ...expirationCandidates,
+    ...capacityCandidates,
+    ...incompatibilityCandidates,
+    ...verificationCandidates,
+  ];
 }
 
 function groupHazardClassesByZone(substances: Substance[]): Map<number, HazardClass[]> {

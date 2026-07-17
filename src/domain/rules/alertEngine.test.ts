@@ -25,6 +25,11 @@ function makeSubstance(overrides: Partial<Substance> = {}): Substance {
 
 const ZONES: Zone[] = [{ id: 1, name: 'Rack A1', code: 'A1' }];
 
+// La mayoría de los tests de esta suite no ejercitan la regla de verificación en
+// terreno: se les da una verificación reciente para que no aporte candidatos y así
+// no interfiera con las aserciones de las otras reglas.
+const RECENTLY_VERIFIED = new Map([[1, TODAY.getTime()]]);
+
 describe('computeAlerts', () => {
   it('returns no candidates for a substance well within all thresholds', () => {
     const alerts = computeAlerts({
@@ -34,6 +39,7 @@ describe('computeAlerts', () => {
         { id: 1, zoneId: 1, hazardClass: 'class8_corrosives', maxQuantity: 100, unit: 'l' },
       ],
       compatibilityRules: [],
+      latestVerificationByZone: RECENTLY_VERIFIED,
       today: TODAY,
     });
     expect(alerts).toEqual([]);
@@ -45,6 +51,7 @@ describe('computeAlerts', () => {
       zones: ZONES,
       zoneClassLimits: [],
       compatibilityRules: [],
+      latestVerificationByZone: RECENTLY_VERIFIED,
       today: TODAY,
     });
     expect(alerts).toEqual([
@@ -66,6 +73,7 @@ describe('computeAlerts', () => {
         { id: 1, zoneId: 1, hazardClass: 'class8_corrosives', maxQuantity: 100, unit: 'l' },
       ],
       compatibilityRules: [],
+      latestVerificationByZone: RECENTLY_VERIFIED,
       today: TODAY,
     });
     expect(alerts).toEqual([
@@ -95,6 +103,7 @@ describe('computeAlerts', () => {
       zones: ZONES,
       zoneClassLimits: [],
       compatibilityRules: rules,
+      latestVerificationByZone: RECENTLY_VERIFIED,
       today: TODAY,
     });
     expect(alerts).toEqual([
@@ -107,7 +116,26 @@ describe('computeAlerts', () => {
     ]);
   });
 
-  it('combines findings from all three rule types in a single pass', () => {
+  it('produces a verification_overdue candidate for a zone never verified', () => {
+    const alerts = computeAlerts({
+      substances: [],
+      zones: ZONES,
+      zoneClassLimits: [],
+      compatibilityRules: [],
+      latestVerificationByZone: new Map(),
+      today: TODAY,
+    });
+    expect(alerts).toEqual([
+      expect.objectContaining({
+        type: 'verification_overdue',
+        severity: 'high',
+        relatedSubstanceId: null,
+        relatedZoneId: 1,
+      }),
+    ]);
+  });
+
+  it('combines findings from all four rule types in a single pass', () => {
     const limits: ZoneClassLimit[] = [
       { id: 1, zoneId: 1, hazardClass: 'class8_corrosives', maxQuantity: 10, unit: 'l' },
     ];
@@ -132,6 +160,7 @@ describe('computeAlerts', () => {
       zones: ZONES,
       zoneClassLimits: limits,
       compatibilityRules: rules,
+      latestVerificationByZone: RECENTLY_VERIFIED,
       today: TODAY,
     });
 

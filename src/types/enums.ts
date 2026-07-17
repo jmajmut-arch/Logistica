@@ -16,8 +16,11 @@ export type HazardClass = (typeof HAZARD_CLASSES)[number];
 
 export type CompatibilityStatus = 'compatible' | 'incompatible';
 
-export type AlertType = 'expiration' | 'limit_exceeded' | 'incompatibility';
+export type AlertType =
+  'expiration' | 'limit_exceeded' | 'incompatibility' | 'verification_overdue';
 
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export type AlertStatus = 'pending' | 'resolved';
+
+export type VerificationResult = 'cumple' | 'no_cumple' | 'no_aplica';

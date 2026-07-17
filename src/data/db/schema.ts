@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+import type { FieldVerificationItemKey } from '@/domain/rules/fieldVerificationChecklist';
 import type {
   AlertSeverity,
   AlertStatus,
@@ -8,6 +9,7 @@ import type {
   CompatibilityStatus,
   HazardClass,
   Role,
+  VerificationResult,
 } from '@/types/enums';
 
 export const users = sqliteTable('users', {
@@ -107,6 +109,57 @@ export const zonesRelations = relations(zones, ({ many }) => ({
 export const substancesRelations = relations(substances, ({ one }) => ({
   zone: one(zones, { fields: [substances.zoneId], references: [zones.id] }),
   createdByUser: one(users, { fields: [substances.createdBy], references: [users.id] }),
+}));
+
+export const fieldVerifications = sqliteTable(
+  'field_verifications',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    zoneId: integer('zone_id')
+      .notNull()
+      .references(() => zones.id, { onDelete: 'restrict' }),
+    performedBy: integer('performed_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    performedAt: integer('performed_at')
+      .notNull()
+      .default(sql`(unixepoch('now') * 1000)`),
+    notes: text('notes'),
+  },
+  (table) => [
+    index('field_verifications_zone_idx').on(table.zoneId),
+    index('field_verifications_performed_at_idx').on(table.performedAt),
+  ],
+);
+
+export const fieldVerificationItems = sqliteTable(
+  'field_verification_items',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    verificationId: integer('verification_id')
+      .notNull()
+      .references(() => fieldVerifications.id, { onDelete: 'cascade' }),
+    itemKey: text('item_key').$type<FieldVerificationItemKey>().notNull(),
+    result: text('result').$type<VerificationResult>().notNull(),
+    observation: text('observation'),
+  },
+  (table) => [index('field_verification_items_verification_idx').on(table.verificationId)],
+);
+
+export const fieldVerificationsRelations = relations(fieldVerifications, ({ one, many }) => ({
+  zone: one(zones, { fields: [fieldVerifications.zoneId], references: [zones.id] }),
+  performedByUser: one(users, {
+    fields: [fieldVerifications.performedBy],
+    references: [users.id],
+  }),
+  items: many(fieldVerificationItems),
+}));
+
+export const fieldVerificationItemsRelations = relations(fieldVerificationItems, ({ one }) => ({
+  verification: one(fieldVerifications, {
+    fields: [fieldVerificationItems.verificationId],
+    references: [fieldVerifications.id],
+  }),
 }));
 
 export const alertsRelations = relations(alerts, ({ one }) => ({

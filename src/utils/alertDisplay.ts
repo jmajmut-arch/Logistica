@@ -21,4 +21,5 @@ export const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   expiration: 'Vencimiento',
   limit_exceeded: 'Límite excedido',
   incompatibility: 'Incompatibilidad',
+  verification_overdue: 'Verificación atrasada',
 };

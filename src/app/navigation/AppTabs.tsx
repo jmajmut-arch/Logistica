@@ -5,6 +5,7 @@ import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
 import { AlertsScreen } from '@/screens/Alerts/AlertsScreen';
 import { CompatibilityMatrixScreen } from '@/screens/CompatibilityMatrix/CompatibilityMatrixScreen';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
+import { FieldVerificationsStack } from '@/screens/FieldVerifications/FieldVerificationsStack';
 import { StorageLimitsScreen } from '@/screens/StorageLimits/StorageLimitsScreen';
 import { SubstancesStack } from '@/screens/Substances/SubstancesStack';
 
@@ -13,6 +14,7 @@ export type AppTabsParamList = {
   Substances: undefined;
   CompatibilityMatrix: undefined;
   StorageLimits: undefined;
+  FieldVerifications: undefined;
   Alerts: undefined;
 };
 
@@ -23,6 +25,7 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   Substances: 'flask-outline',
   CompatibilityMatrix: 'grid',
   StorageLimits: 'gauge',
+  FieldVerifications: 'clipboard-check-outline',
   Alerts: 'alert-circle-outline',
 };
 
@@ -55,6 +58,11 @@ export function AppTabs() {
         name="StorageLimits"
         component={StorageLimitsScreen}
         options={{ title: 'Límites' }}
+      />
+      <Tab.Screen
+        name="FieldVerifications"
+        component={FieldVerificationsStack}
+        options={{ title: 'Verificaciones', headerShown: false }}
       />
       <Tab.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alertas' }} />
     </Tab.Navigator>
