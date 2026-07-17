@@ -4,15 +4,16 @@ import { PaperProvider } from 'react-native-paper';
 
 import { RootNavigator } from '@/app/navigation/RootNavigator';
 import { DatabaseProvider } from '@/app/providers/DatabaseProvider';
+import { paperTheme } from '@/theme';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <PaperProvider>
+      <PaperProvider theme={paperTheme}>
         <DatabaseProvider>
           <RootNavigator />
         </DatabaseProvider>
-        <StatusBar style="auto" />
+        <StatusBar style="light" />
       </PaperProvider>
     </SafeAreaProvider>
   );

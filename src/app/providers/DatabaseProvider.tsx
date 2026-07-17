@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 
 import { supabase } from '@/data/supabase/client';
+import { PALETTE } from '@/theme';
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
@@ -28,7 +29,9 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text variant="titleMedium">Error al conectar con la base de datos</Text>
+        <Text variant="titleMedium" style={styles.errorTitle}>
+          Error al conectar con la base de datos
+        </Text>
         <Text variant="bodySmall" style={styles.errorMessage}>
           {error.message}
         </Text>
@@ -39,7 +42,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   if (!ready) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={PALETTE.primary} />
       </View>
     );
   }
@@ -54,9 +57,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 8,
+    backgroundColor: PALETTE.background,
+  },
+  errorTitle: {
+    color: PALETTE.text,
   },
   errorMessage: {
     textAlign: 'center',
-    opacity: 0.7,
+    color: PALETTE.textMuted,
   },
 });

@@ -9,7 +9,7 @@ values
     '2029-07-17',
     'https://www.merckmillipore.com/Web-CH-Site/de_DE/-/CHF/ShowDocument-File?ProductSKU=MDA_CHEM-100731&DocumentType=MSD&DocumentId=100731_SDS_CL_ES.PDF&DocumentUID=295555&Language=ES&Country=CL&Origin=PDP',
     'HDS_Acido_Sulfurico_98_Merck_CL.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Acido clorhidrico 37%',
@@ -20,7 +20,7 @@ values
     '2028-01-17',
     'https://www.merckmillipore.com/CL/es/product/msds/MDA_CHEM-109057',
     'HDS_Acido_Clorhidrico_Merck_CL.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Hidroxido de sodio (solucion)',
@@ -31,7 +31,7 @@ values
     '2029-01-17',
     'https://www.merckmillipore.com/Web-DE-Site/en_US/-/EUR/ShowDocument-File?ProductSKU=MDA_CHEM-106498&DocumentType=MSD&DocumentId=106498_SDS_CL_ES.PDF&DocumentUID=364224&Language=ES&Country=CL&Origin=null',
     'HDS_Hidroxido_Sodio_Merck_CL.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Hipoclorito de sodio (solucion)',
@@ -42,7 +42,7 @@ values
     '2026-10-15',
     'https://www.merckmillipore.com/Web-CO-Site/en_US/-/COP/ShowDocument-File?ProductSKU=MDA_CHEM-105614&DocumentType=MSD&DocumentId=105614_SDS_CO_ES.PDF&DocumentUID=352231&Language=ES&Country=CO&Origin=null',
     'HDS_Hipoclorito_Sodio_Merck_CO.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Peroxido de hidrogeno 30%',
@@ -53,7 +53,7 @@ values
     '2027-01-17',
     'https://www.merckmillipore.com/Web-DE-Site/en_US/-/EUR/ShowDocument-File?ProductSKU=MDA_CHEM-107209&DocumentType=MSD&DocumentId=107209_SDS_PE_ES.PDF&DocumentUID=6501870&Language=ES&Country=PE&Origin=PDP',
     'HDS_Peroxido_Hidrogeno_Merck_PE.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Gasolina 93 octanos',
@@ -64,7 +64,7 @@ values
     '2027-01-15',
     'https://www.sec.cl/sitio-web/wp-content/uploads/2019/06/HDS_COPEC_GASOLINA_SP_93.pdf',
     'HDS_Copec_Gasolina_93_SEC.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Petroleo diesel',
@@ -75,7 +75,7 @@ values
     '2027-07-17',
     'https://www.sec.cl/sitio-web/wp-content/uploads/2019/06/HDS_COPEC_PETROLEO_DIESEL_ULTRA.pdf',
     'HDS_Copec_Diesel_Ultra_SEC.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Etanol 96 grados',
@@ -86,7 +86,7 @@ values
     '2028-07-17',
     'https://www.merckmillipore.com/MX/es/product/msds/MDA_CHEM-100983',
     'HDS_Etanol_Merck_MX.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Gas licuado de petroleo (GLP)',
@@ -97,7 +97,7 @@ values
     '2036-07-17',
     'http://www.mininco.cl/maderas/sigex/pages/abrearchivo2.asp?arch=archivos%2F1705%2FHDS+GAS+LIPIGAS.pdf',
     'HDS_GLP_Lipigas.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Oxigeno comprimido',
@@ -108,7 +108,7 @@ values
     '2031-07-17',
     'http://www.indura.cl/Descargar/Ox%C3%ADgeno?path=/content/storage/cl/biblioteca/e6c4c65ea426493ea2ded2c57085008c.pdf',
     'HDS_Oxigeno_Indura_CL.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   );
 
 select name, hazard_class, quantity, unit from substances order by id;

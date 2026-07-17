@@ -8,6 +8,7 @@ import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { FieldVerificationsStack } from '@/screens/FieldVerifications/FieldVerificationsStack';
 import { StorageLimitsScreen } from '@/screens/StorageLimits/StorageLimitsScreen';
 import { SubstancesStack } from '@/screens/Substances/SubstancesStack';
+import { PALETTE } from '@/theme';
 
 export type AppTabsParamList = {
   Dashboard: undefined;
@@ -41,6 +42,13 @@ export function AppTabs() {
           />
         ),
         headerRight: () => <SessionHeaderRight />,
+        headerStyle: { backgroundColor: PALETTE.surface },
+        headerTintColor: PALETTE.text,
+        headerTitleStyle: { color: PALETTE.text },
+        sceneStyle: { backgroundColor: PALETTE.background },
+        tabBarStyle: { backgroundColor: PALETTE.surface, borderTopColor: PALETTE.border },
+        tabBarActiveTintColor: PALETTE.primary,
+        tabBarInactiveTintColor: PALETTE.textMuted,
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />

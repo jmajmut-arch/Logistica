@@ -5,6 +5,7 @@ import { ActivityIndicator } from 'react-native-paper';
 
 import { LoginScreen } from '@/screens/Login/LoginScreen';
 import { useSessionHydrated, useSessionStore } from '@/store/sessionStore';
+import { navigationTheme, PALETTE } from '@/theme';
 
 import { AppTabs } from './AppTabs';
 
@@ -21,15 +22,17 @@ export function RootNavigator() {
 
   if (!sessionHydrated) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
+      <View style={[styles.center, { backgroundColor: PALETTE.background }]}>
+        <ActivityIndicator size="large" color={PALETTE.primary} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer theme={navigationTheme}>
+      <Stack.Navigator
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PALETTE.background } }}
+      >
         {currentUser ? (
           <Stack.Screen name="App" component={AppTabs} />
         ) : (

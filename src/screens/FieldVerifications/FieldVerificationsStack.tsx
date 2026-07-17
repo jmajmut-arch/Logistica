@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
+import { PALETTE } from '@/theme';
 
 import { FieldVerificationDetailScreen } from './FieldVerificationDetailScreen';
 import { FieldVerificationFormScreen } from './FieldVerificationFormScreen';
@@ -16,7 +17,15 @@ const Stack = createNativeStackNavigator<FieldVerificationsStackParamList>();
 
 export function FieldVerificationsStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerRight: () => <SessionHeaderRight /> }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerRight: () => <SessionHeaderRight />,
+        headerStyle: { backgroundColor: PALETTE.surface },
+        headerTintColor: PALETTE.text,
+        headerTitleStyle: { color: PALETTE.text },
+        contentStyle: { backgroundColor: PALETTE.background },
+      }}
+    >
       <Stack.Screen
         name="FieldVerificationList"
         component={FieldVerificationListScreen}

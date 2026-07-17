@@ -16,7 +16,7 @@ values
     '2027-07-17',
     'https://winklerltda.cl/quimicav2/wp-content/uploads/2025/01/SO-1445-SODIO-CIANURO-P.pdf',
     'HDS_Cianuro_Sodio_Winkler_CL.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Nitrato de amonio (grado tecnico)',
@@ -27,7 +27,7 @@ values
     '2028-07-17',
     'https://ecostandard.cl/wp-content/uploads/2021/09/nitrato-de-amonio-ficha-tecnica-HDS.pdf',
     'HDS_Nitrato_Amonio_NCh2245_CL.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Emulsion explosiva / ANFO a granel',
@@ -38,7 +38,7 @@ values
     '2027-01-17',
     'https://www.ecosmep.com/cabecera/upload/fichas/12436.pdf',
     'HDS_ANFO.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Xantato isopropilico de sodio (SIPX)',
@@ -49,7 +49,7 @@ values
     '2027-04-17',
     'https://flottec.mx/archivos/Flottec%20SIPX%20Collector%20SDS%20Spanish%20r00%202018-07-18.pdf',
     'HDS_Xantato_SIPX_Flottec.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'MIBC (espumante de flotacion)',
@@ -60,7 +60,7 @@ values
     '2027-10-17',
     'https://www.flottec.mx/archivos/Flottec%20F120%20Frother%20SDS%20SP%20r01%202024-02-09.pdf',
     'HDS_MIBC_Flottec_F120.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   ),
   (
     'Cal hidratada',
@@ -71,7 +71,7 @@ values
     '2028-01-17',
     'https://www.carmeuse.com/sites/default/files/2023-06/sds_-_hydrated_lime_-_spanish.pdf',
     'HDS_Cal_Hidratada_Carmeuse.pdf',
-    (select id from users where name = 'Bodega Demo')
+    (select id from users where name = 'Bodega')
   );
 
 select name, hazard_class, quantity, unit from substances order by id;

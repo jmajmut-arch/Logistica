@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { useSessionStore } from '@/store/sessionStore';
+import { PALETTE } from '@/theme';
 import type { Role } from '@/types/enums';
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -29,7 +30,7 @@ export function SessionHeaderRight() {
         accessibilityRole="button"
         accessibilityLabel="Cerrar sesión"
       >
-        <MaterialCommunityIcons name="logout" size={22} />
+        <MaterialCommunityIcons name="logout" size={22} color={PALETTE.text} />
       </Pressable>
     </View>
   );

@@ -115,8 +115,8 @@ grant select, insert, update, delete on all tables in schema public to anon, aut
 grant usage, select on all sequences in schema public to anon, authenticated;
 
 insert into users (name, role) values
-  ('Bodega Demo', 'warehouse'),
-  ('Supervisor Demo', 'supervisor');
+  ('Bodega', 'warehouse'),
+  ('Supervisor', 'supervisor');
 
 insert into zones (name, code) values
   ('Rack A1', 'A1'),
