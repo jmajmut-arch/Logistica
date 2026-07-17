@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -112,14 +112,16 @@ export function FieldVerificationFormScreen() {
           visible={zoneMenuVisible}
           onDismiss={() => setZoneMenuVisible(false)}
           anchor={
-            <TextInput
-              label="Zona / rack"
-              value={selectedZone ? `${selectedZone.name} (${selectedZone.code})` : ''}
-              editable={false}
-              mode="outlined"
-              right={<TextInput.Icon icon="menu-down" />}
-              onPressIn={() => setZoneMenuVisible(true)}
-            />
+            <Pressable onPress={() => setZoneMenuVisible(true)}>
+              <TextInput
+                label="Zona / rack"
+                value={selectedZone ? `${selectedZone.name} (${selectedZone.code})` : ''}
+                editable={false}
+                mode="outlined"
+                right={<TextInput.Icon icon="menu-down" />}
+                pointerEvents="none"
+              />
+            </Pressable>
           }
         >
           {zones.map((zone) => (

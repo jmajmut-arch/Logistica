@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { Alert as RNAlert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert as RNAlert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -210,14 +210,16 @@ export function SubstanceFormScreen() {
               visible={hazardMenuVisible}
               onDismiss={() => setHazardMenuVisible(false)}
               anchor={
-                <TextInput
-                  label="Clase de peligrosidad"
-                  value={HAZARD_CLASS_LABELS[field.value]}
-                  editable={false}
-                  mode="outlined"
-                  right={<TextInput.Icon icon="menu-down" />}
-                  onPressIn={() => setHazardMenuVisible(true)}
-                />
+                <Pressable onPress={() => setHazardMenuVisible(true)}>
+                  <TextInput
+                    label="Clase de peligrosidad"
+                    value={HAZARD_CLASS_LABELS[field.value]}
+                    editable={false}
+                    mode="outlined"
+                    right={<TextInput.Icon icon="menu-down" />}
+                    pointerEvents="none"
+                  />
+                </Pressable>
               }
             >
               {HAZARD_CLASSES.map((hazardClass) => (
@@ -282,14 +284,16 @@ export function SubstanceFormScreen() {
                 visible={zoneMenuVisible}
                 onDismiss={() => setZoneMenuVisible(false)}
                 anchor={
-                  <TextInput
-                    label="Zona / rack"
-                    value={selectedZone ? `${selectedZone.name} (${selectedZone.code})` : ''}
-                    editable={false}
-                    mode="outlined"
-                    right={<TextInput.Icon icon="menu-down" />}
-                    onPressIn={() => setZoneMenuVisible(true)}
-                  />
+                  <Pressable onPress={() => setZoneMenuVisible(true)}>
+                    <TextInput
+                      label="Zona / rack"
+                      value={selectedZone ? `${selectedZone.name} (${selectedZone.code})` : ''}
+                      editable={false}
+                      mode="outlined"
+                      right={<TextInput.Icon icon="menu-down" />}
+                      pointerEvents="none"
+                    />
+                  </Pressable>
                 }
               >
                 {zones.map((zone) => (

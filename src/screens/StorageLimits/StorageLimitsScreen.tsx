@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -176,14 +176,16 @@ export function StorageLimitsScreen() {
                   visible={classMenuVisible}
                   onDismiss={() => setClassMenuVisible(false)}
                   anchor={
-                    <TextInput
-                      label="Clase de peligrosidad"
-                      value={HAZARD_CLASS_LABELS[editing.hazardClass]}
-                      editable={false}
-                      mode="outlined"
-                      right={<TextInput.Icon icon="menu-down" />}
-                      onPressIn={() => setClassMenuVisible(true)}
-                    />
+                    <Pressable onPress={() => setClassMenuVisible(true)}>
+                      <TextInput
+                        label="Clase de peligrosidad"
+                        value={HAZARD_CLASS_LABELS[editing.hazardClass]}
+                        editable={false}
+                        mode="outlined"
+                        right={<TextInput.Icon icon="menu-down" />}
+                        pointerEvents="none"
+                      />
+                    </Pressable>
                   }
                 >
                   {HAZARD_CLASSES.map((hazardClass) => (
