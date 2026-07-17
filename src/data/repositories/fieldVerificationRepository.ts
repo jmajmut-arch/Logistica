@@ -1,7 +1,5 @@
-import { desc, eq, sql } from 'drizzle-orm';
-
-import { db } from '@/data/db/client';
-import { fieldVerificationItems, fieldVerifications } from '@/data/db/schema';
+import { rowToCamelCase, rowsToCamelCase } from '@/data/supabase/caseMapping';
+import { supabase } from '@/data/supabase/client';
 import type {
   FieldVerification,
   FieldVerificationItem,
@@ -15,56 +13,78 @@ export interface ZoneLatestVerification {
 
 export const fieldVerificationRepository = {
   async findAll(): Promise<FieldVerification[]> {
-    return db.select().from(fieldVerifications).orderBy(desc(fieldVerifications.performedAt));
+    const { data, error } = await supabase
+      .from('field_verifications')
+      .select('*')
+      .order('performed_at', { ascending: false });
+    if (error) throw error;
+    return rowsToCamelCase<FieldVerification>(data);
   },
 
   async findByZone(zoneId: number): Promise<FieldVerification[]> {
-    return db
-      .select()
-      .from(fieldVerifications)
-      .where(eq(fieldVerifications.zoneId, zoneId))
-      .orderBy(desc(fieldVerifications.performedAt));
+    const { data, error } = await supabase
+      .from('field_verifications')
+      .select('*')
+      .eq('zone_id', zoneId)
+      .order('performed_at', { ascending: false });
+    if (error) throw error;
+    return rowsToCamelCase<FieldVerification>(data);
   },
 
   async findItems(verificationId: number): Promise<FieldVerificationItem[]> {
-    return db
-      .select()
-      .from(fieldVerificationItems)
-      .where(eq(fieldVerificationItems.verificationId, verificationId));
+    const { data, error } = await supabase
+      .from('field_verification_items')
+      .select('*')
+      .eq('verification_id', verificationId);
+    if (error) throw error;
+    return rowsToCamelCase<FieldVerificationItem>(data);
   },
 
   async findAllItems(): Promise<FieldVerificationItem[]> {
-    return db.select().from(fieldVerificationItems);
+    const { data, error } = await supabase.from('field_verification_items').select('*');
+    if (error) throw error;
+    return rowsToCamelCase<FieldVerificationItem>(data);
   },
 
   /** Última fecha de verificación por zona — base de la regla de atraso (ver verificationRules.ts). */
   async findLatestByZone(): Promise<ZoneLatestVerification[]> {
-    const rows = await db
-      .select({
-        zoneId: fieldVerifications.zoneId,
-        performedAt: sql<number>`max(${fieldVerifications.performedAt})`,
-      })
-      .from(fieldVerifications)
-      .groupBy(fieldVerifications.zoneId);
+    const { data, error } = await supabase
+      .from('field_verifications')
+      .select('zone_id, performed_at');
+    if (error) throw error;
 
-    return rows.map((row) => ({ ...row, performedAt: Number(row.performedAt) }));
+    const latestByZone = new Map<number, number>();
+    for (const row of data) {
+      const zoneId = row.zone_id as number;
+      const performedAt = row.performed_at as number;
+      const current = latestByZone.get(zoneId);
+      if (current === undefined || performedAt > current) {
+        latestByZone.set(zoneId, performedAt);
+      }
+    }
+    return Array.from(latestByZone, ([zoneId, performedAt]) => ({ zoneId, performedAt }));
   },
 
   async create(input: NewFieldVerification): Promise<FieldVerification> {
-    const [created] = await db
-      .insert(fieldVerifications)
-      .values({ zoneId: input.zoneId, performedBy: input.performedBy, notes: input.notes })
-      .returning();
+    const { data: created, error: verificationError } = await supabase
+      .from('field_verifications')
+      .insert({ zone_id: input.zoneId, performed_by: input.performedBy, notes: input.notes })
+      .select()
+      .single();
+    if (verificationError) throw verificationError;
 
-    await db.insert(fieldVerificationItems).values(
+    const verification = rowToCamelCase<FieldVerification>(created);
+
+    const { error: itemsError } = await supabase.from('field_verification_items').insert(
       input.items.map((item) => ({
-        verificationId: created.id,
-        itemKey: item.itemKey,
+        verification_id: verification.id,
+        item_key: item.itemKey,
         result: item.result,
         observation: item.observation,
       })),
     );
+    if (itemsError) throw itemsError;
 
-    return created;
+    return verification;
   },
 };

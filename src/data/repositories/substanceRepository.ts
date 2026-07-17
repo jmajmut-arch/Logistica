@@ -1,63 +1,63 @@
-import { eq, sql } from 'drizzle-orm';
-
-import { db } from '@/data/db/client';
-import { substances } from '@/data/db/schema';
+import { objectToSnakeCase, rowToCamelCase, rowsToCamelCase } from '@/data/supabase/caseMapping';
+import { supabase } from '@/data/supabase/client';
 import type { NewSubstance, Substance } from '@/domain/entities/Substance';
-import type { HazardClass } from '@/types/enums';
+import { sumQuantityByZoneAndClass, type ZoneClassTotal } from '@/domain/rules/capacityRules';
 
-export interface ZoneClassQuantity {
-  zoneId: number;
-  hazardClass: HazardClass;
-  totalQuantity: number;
-}
+export type ZoneClassQuantity = ZoneClassTotal;
 
 export const substanceRepository = {
   async findAll(): Promise<Substance[]> {
-    return db.select().from(substances);
+    const { data, error } = await supabase.from('substances').select('*');
+    if (error) throw error;
+    return rowsToCamelCase<Substance>(data);
   },
 
   async findById(id: number): Promise<Substance | undefined> {
-    const [substance] = await db.select().from(substances).where(eq(substances.id, id));
-    return substance;
+    const { data, error } = await supabase
+      .from('substances')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToCamelCase<Substance>(data) : undefined;
   },
 
   async findByZone(zoneId: number): Promise<Substance[]> {
-    return db.select().from(substances).where(eq(substances.zoneId, zoneId));
+    const { data, error } = await supabase.from('substances').select('*').eq('zone_id', zoneId);
+    if (error) throw error;
+    return rowsToCamelCase<Substance>(data);
   },
 
   async create(input: NewSubstance): Promise<Substance> {
     const now = Date.now();
-    const [created] = await db
-      .insert(substances)
-      .values({ ...input, createdAt: now, updatedAt: now })
-      .returning();
-    return created;
+    const { data, error } = await supabase
+      .from('substances')
+      .insert({ ...objectToSnakeCase(input), created_at: now, updated_at: now })
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToCamelCase<Substance>(data);
   },
 
   async update(id: number, input: Partial<NewSubstance>): Promise<Substance> {
-    const [updated] = await db
-      .update(substances)
-      .set({ ...input, updatedAt: Date.now() })
-      .where(eq(substances.id, id))
-      .returning();
-    return updated;
+    const { data, error } = await supabase
+      .from('substances')
+      .update({ ...objectToSnakeCase(input), updated_at: Date.now() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToCamelCase<Substance>(data);
   },
 
   async delete(id: number): Promise<void> {
-    await db.delete(substances).where(eq(substances.id, id));
+    const { error } = await supabase.from('substances').delete().eq('id', id);
+    if (error) throw error;
   },
 
   /** Cantidad total almacenada por zona+clase — base de la validación de límites. */
   async sumQuantityByZoneAndClass(): Promise<ZoneClassQuantity[]> {
-    const rows = await db
-      .select({
-        zoneId: substances.zoneId,
-        hazardClass: substances.hazardClass,
-        totalQuantity: sql<number>`sum(${substances.quantity})`,
-      })
-      .from(substances)
-      .groupBy(substances.zoneId, substances.hazardClass);
-
-    return rows.map((row) => ({ ...row, totalQuantity: Number(row.totalQuantity) }));
+    const substances = await this.findAll();
+    return sumQuantityByZoneAndClass(substances);
   },
 };

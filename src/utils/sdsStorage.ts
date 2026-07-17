@@ -1,46 +1,21 @@
-import { Directory, File, Paths } from 'expo-file-system';
 import { Linking, Platform } from 'react-native';
 
-const SDS_DIRECTORY_NAME = 'sds';
-
-function getSdsDirectory(): Directory {
-  const directory = new Directory(Paths.document, SDS_DIRECTORY_NAME);
-  if (!directory.exists) {
-    directory.create();
-  }
-  return directory;
-}
-
 /**
- * Copia el archivo elegido en expo-document-picker a almacenamiento persistente de la app.
- *
- * expo-file-system (File/Directory/Paths) no tiene implementación en web — su módulo nativo
- * es un stub que solo loguea un warning, así que ahí no hay nada que copiar: en web
- * `pickedUri` ya viene como data URL (ver `pickSds` en SubstanceFormScreen, que pide
- * `base64: true` al DocumentPicker solo en esa plataforma) y se guarda tal cual, tal como
- * queda persistido directamente en la fila de la sustancia.
+ * Los datos ahora viven en Supabase (compartidos entre dispositivos), así que la ficha
+ * adjunta no puede quedar guardada como un archivo local — no sería visible desde otro
+ * dispositivo/navegador. Se guarda directo como data URL en la fila de la sustancia (ver
+ * `pickSds` en SubstanceFormScreen, que pide `base64: true` al DocumentPicker), igual en
+ * todas las plataformas.
  */
 export async function copySdsToAppStorage(
   pickedUri: string,
-  originalName: string,
+  _originalName: string,
 ): Promise<string> {
-  if (Platform.OS === 'web') {
-    return pickedUri;
-  }
-  const source = new File(pickedUri);
-  const destination = new File(getSdsDirectory(), `${Date.now()}-${originalName}`);
-  await source.copy(destination);
-  return destination.uri;
+  return pickedUri;
 }
 
-export function deleteSdsFile(uri: string): void {
-  if (Platform.OS === 'web') {
-    return;
-  }
-  const file = new File(uri);
-  if (file.exists) {
-    file.delete();
-  }
+export function deleteSdsFile(_uri: string): void {
+  // No-op: no hay archivo local que borrar, la ficha vive en la fila de la sustancia.
 }
 
 /**

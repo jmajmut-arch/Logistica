@@ -1,14 +1,14 @@
-import { and, eq } from 'drizzle-orm';
-
-import { db } from '@/data/db/client';
-import { compatibilityRules } from '@/data/db/schema';
+import { rowToCamelCase, rowsToCamelCase } from '@/data/supabase/caseMapping';
+import { supabase } from '@/data/supabase/client';
 import type { CompatibilityRule } from '@/domain/entities/CompatibilityRule';
 import { normalizeClassPair } from '@/domain/rules/compatibilityRules';
 import type { CompatibilityStatus, HazardClass } from '@/types/enums';
 
 export const ruleRepository = {
   async findAll(): Promise<CompatibilityRule[]> {
-    return db.select().from(compatibilityRules);
+    const { data, error } = await supabase.from('compatibility_rules').select('*');
+    if (error) throw error;
+    return rowsToCamelCase<CompatibilityRule>(data);
   },
 
   async upsert(
@@ -17,26 +17,15 @@ export const ruleRepository = {
     status: CompatibilityStatus,
   ): Promise<CompatibilityRule> {
     const [normalizedA, normalizedB] = normalizeClassPair(classA, classB);
-    const [existing] = await db
+    const { data, error } = await supabase
+      .from('compatibility_rules')
+      .upsert(
+        { class_a: normalizedA, class_b: normalizedB, status },
+        { onConflict: 'class_a,class_b' },
+      )
       .select()
-      .from(compatibilityRules)
-      .where(
-        and(eq(compatibilityRules.classA, normalizedA), eq(compatibilityRules.classB, normalizedB)),
-      );
-
-    if (existing) {
-      const [updated] = await db
-        .update(compatibilityRules)
-        .set({ status })
-        .where(eq(compatibilityRules.id, existing.id))
-        .returning();
-      return updated;
-    }
-
-    const [created] = await db
-      .insert(compatibilityRules)
-      .values({ classA: normalizedA, classB: normalizedB, status })
-      .returning();
-    return created;
+      .single();
+    if (error) throw error;
+    return rowToCamelCase<CompatibilityRule>(data);
   },
 };

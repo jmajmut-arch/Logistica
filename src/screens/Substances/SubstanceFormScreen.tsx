@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { Alert as RNAlert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert as RNAlert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -123,17 +123,18 @@ export function SubstanceFormScreen() {
   const sdsFileName = useWatch({ control, name: 'sdsFileName' });
 
   const pickSds = async () => {
-    // En web no hay almacenamiento de archivos persistente (ver sdsStorage.ts), así que ahí
-    // se pide el contenido como data URL para guardarlo directo en la base de datos.
+    // Se pide el contenido como data URL (no la uri local del picker): los datos ahora
+    // viven en Supabase, compartidos entre dispositivos, así que la ficha tiene que viajar
+    // con la fila de la sustancia en vez de quedar como archivo local (ver sdsStorage.ts).
     const result = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'image/*'],
-      base64: Platform.OS === 'web',
+      base64: true,
     });
     if (result.canceled) {
       return;
     }
     const asset = result.assets[0];
-    const sourceUri = Platform.OS === 'web' && asset.base64 ? asset.base64 : asset.uri;
+    const sourceUri = asset.base64 ?? asset.uri;
     const storedUri = await copySdsToAppStorage(sourceUri, asset.name);
     setValue('sdsUri', storedUri, { shouldDirty: true });
     setValue('sdsFileName', asset.name, { shouldDirty: true });

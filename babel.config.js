@@ -3,9 +3,6 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      // Inlinea el contenido de los .sql de src/data/db/migrations como texto,
-      // requerido por drizzle-orm/expo-sqlite para aplicar migraciones en runtime.
-      ['inline-import', { extensions: ['.sql'] }],
       [
         'module-resolver',
         {
