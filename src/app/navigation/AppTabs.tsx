@@ -6,6 +6,7 @@ import { AlertsScreen } from '@/screens/Alerts/AlertsScreen';
 import { CompatibilityMatrixScreen } from '@/screens/CompatibilityMatrix/CompatibilityMatrixScreen';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { FieldVerificationsStack } from '@/screens/FieldVerifications/FieldVerificationsStack';
+import { LoadSimulatorScreen } from '@/screens/LoadSimulator/LoadSimulatorScreen';
 import { StorageLimitsScreen } from '@/screens/StorageLimits/StorageLimitsScreen';
 import { SubstancesStack } from '@/screens/Substances/SubstancesStack';
 import { PALETTE } from '@/theme';
@@ -17,6 +18,7 @@ export type AppTabsParamList = {
   StorageLimits: undefined;
   FieldVerifications: undefined;
   Alerts: undefined;
+  LoadSimulator: undefined;
 };
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
@@ -28,6 +30,7 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   StorageLimits: 'gauge',
   FieldVerifications: 'clipboard-check-outline',
   Alerts: 'alert-circle-outline',
+  LoadSimulator: 'truck-outline',
 };
 
 export function AppTabs() {
@@ -73,6 +76,11 @@ export function AppTabs() {
         options={{ title: 'Verificaciones', headerShown: false }}
       />
       <Tab.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alertas' }} />
+      <Tab.Screen
+        name="LoadSimulator"
+        component={LoadSimulatorScreen}
+        options={{ title: 'Simulador de Carga' }}
+      />
     </Tab.Navigator>
   );
 }
