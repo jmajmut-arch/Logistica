@@ -212,11 +212,9 @@ export function LoadSimulatorScreen() {
         </Text>
         <View style={styles.resultBlock}>
           <Text variant="bodyMedium">Peso</Text>
-          <ProgressBar
-            progress={Math.min(result.weightUtilization, 1)}
-            color={weightColor}
-            style={styles.progressBar}
-          />
+          <View style={styles.progressBarWrapper}>
+            <ProgressBar progress={Math.min(result.weightUtilization, 1)} color={weightColor} />
+          </View>
           <Text variant="bodySmall" style={result.overWeight && styles.overText}>
             {formatNumber(result.totalWeightKg)} kg / {formatNumber(result.maxWeightKg)} kg (
             {Math.round(result.weightUtilization * 100)}%)
@@ -224,11 +222,9 @@ export function LoadSimulatorScreen() {
         </View>
         <View style={styles.resultBlock}>
           <Text variant="bodyMedium">Volumen</Text>
-          <ProgressBar
-            progress={Math.min(result.volumeUtilization, 1)}
-            color={volumeColor}
-            style={styles.progressBar}
-          />
+          <View style={styles.progressBarWrapper}>
+            <ProgressBar progress={Math.min(result.volumeUtilization, 1)} color={volumeColor} />
+          </View>
           <Text variant="bodySmall" style={result.overVolume && styles.overText}>
             {formatNumber(result.totalVolumeM3)} m³ / {formatNumber(result.maxVolumeM3)} m³ (
             {Math.round(result.volumeUtilization * 100)}%)
@@ -338,9 +334,10 @@ const styles = StyleSheet.create({
   resultBlock: {
     marginTop: 8,
   },
-  progressBar: {
+  progressBarWrapper: {
     height: 8,
     borderRadius: 4,
+    overflow: 'hidden',
     marginVertical: 4,
   },
   overText: {
