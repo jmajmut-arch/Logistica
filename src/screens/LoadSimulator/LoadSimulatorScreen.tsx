@@ -1,301 +1,318 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import {
-  Button,
-  Dialog,
-  IconButton,
-  List,
-  Menu,
-  Portal,
-  ProgressBar,
-  SegmentedButtons,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { IconButton, Text, TextInput } from 'react-native-paper';
+import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
 
-import type { CargoItem, LoadCapacityCategory } from '@/domain/entities/LoadSimulation';
-import { simulateLoad } from '@/domain/rules/loadSimulatorRules';
-import { CUSTOM_PROFILE_ID, profilesForCategory } from '@/screens/LoadSimulator/loadProfiles';
+import type {
+  DockCycleParams,
+  ForkliftPhase,
+  ForkliftState,
+  Point,
+} from '@/domain/entities/DockSimulation';
+import {
+  computeCycleBreakdown,
+  computePhaseFractions,
+  computeThroughputPerForkliftPerHour,
+  computeTotalThroughputPerHour,
+  computeTruckUnloadTimeMin,
+  forkliftPositionForProgress,
+} from '@/domain/rules/dockSimulationRules';
 import { PALETTE } from '@/theme';
 
-interface ItemDraft {
-  name: string;
-  unitWeightKg: string;
-  unitVolumeM3: string;
-  quantity: string;
+const VIEW_W = 400;
+const VIEW_H = 170;
+const PATH: Point[] = [
+  { x: 40, y: 130 },
+  { x: 220, y: 130 },
+  { x: 360, y: 50 },
+];
+const MAX_RENDERED_FORKLIFTS = 6;
+const VISUAL_CYCLE_MS = 4000;
+const FRAME_INTERVAL_MS = 1000 / 30;
+
+const PHASE_COLORS: Record<ForkliftPhase, string> = {
+  picking: PALETTE.secondary,
+  traveling: PALETTE.primary,
+  placing: '#22c55e',
+  returning: 'rgba(226,232,240,0.4)',
+};
+
+const PHASE_LABELS: Record<ForkliftPhase, string> = {
+  picking: 'Recogiendo en andén',
+  traveling: 'Trasladando pallet',
+  placing: 'Ubicando en rack',
+  returning: 'Retornando vacío',
+};
+
+interface FieldConfig {
+  key: keyof typeof DEFAULTS;
+  label: string;
 }
 
-const EMPTY_DRAFT: ItemDraft = { name: '', unitWeightKg: '', unitVolumeM3: '', quantity: '1' };
+const DEFAULTS = {
+  palletsPerTruck: '24',
+  numForklifts: '2',
+  pickTimeSec: '15',
+  placeTimeSec: '20',
+  distanceM: '60',
+  speedLoadedKmh: '6',
+  speedEmptyKmh: '9',
+};
+
+const FIELDS: FieldConfig[] = [
+  { key: 'palletsPerTruck', label: 'Pallets por camión' },
+  { key: 'numForklifts', label: 'N° de montacargas' },
+  { key: 'pickTimeSec', label: 'Tiempo de recogida (seg)' },
+  { key: 'placeTimeSec', label: 'Tiempo de ubicación (seg)' },
+  { key: 'distanceM', label: 'Distancia al rack (m)' },
+  { key: 'speedLoadedKmh', label: 'Velocidad cargado (km/h)' },
+  { key: 'speedEmptyKmh', label: 'Velocidad vacío (km/h)' },
+];
 
 function toNumber(text: string): number {
   const value = Number(text.replace(',', '.'));
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
-function formatNumber(value: number): string {
-  return value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+function formatNumber(value: number, maximumFractionDigits = 1): string {
+  if (!Number.isFinite(value)) {
+    return '—';
+  }
+  return value.toLocaleString('es-CL', { maximumFractionDigits });
+}
+
+function ResultRow({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <View style={styles.resultRow}>
+      <Text variant="bodyMedium" style={styles.resultLabel}>
+        {label}
+      </Text>
+      <Text
+        variant={emphasize ? 'titleMedium' : 'bodyMedium'}
+        style={emphasize && styles.resultEmphasis}
+      >
+        {value}
+      </Text>
+    </View>
+  );
 }
 
 export function LoadSimulatorScreen() {
-  const [category, setCategory] = useState<LoadCapacityCategory>('vehicle');
-  const [profileId, setProfileId] = useState(profilesForCategory('vehicle')[0].id);
-  const [maxWeightKg, setMaxWeightKg] = useState(
-    String(profilesForCategory('vehicle')[0].maxWeightKg),
+  const [values, setValues] = useState(DEFAULTS);
+  const [playing, setPlaying] = useState(true);
+  const [forklifts, setForklifts] = useState<ForkliftState[]>([]);
+
+  const setField = (key: keyof typeof DEFAULTS, text: string) =>
+    setValues((current) => ({ ...current, [key]: text.replace(',', '.') }));
+
+  const params: DockCycleParams = useMemo(
+    () => ({
+      palletsPerTruck: toNumber(values.palletsPerTruck),
+      pickTimeSec: toNumber(values.pickTimeSec),
+      distanceM: toNumber(values.distanceM),
+      speedLoadedKmh: toNumber(values.speedLoadedKmh),
+      speedEmptyKmh: toNumber(values.speedEmptyKmh),
+      placeTimeSec: toNumber(values.placeTimeSec),
+    }),
+    [values],
   );
-  const [maxVolumeM3, setMaxVolumeM3] = useState(
-    String(profilesForCategory('vehicle')[0].maxVolumeM3),
-  );
-  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
-  const [items, setItems] = useState<CargoItem[]>([]);
-  const [draft, setDraft] = useState<ItemDraft | null>(null);
+  const numForklifts = toNumber(values.numForklifts);
 
-  const profiles = profilesForCategory(category);
-
-  const selectCategory = (next: string) => {
-    const nextCategory = next as LoadCapacityCategory;
-    const nextProfiles = profilesForCategory(nextCategory);
-    setCategory(nextCategory);
-    setProfileId(nextProfiles[0].id);
-    setMaxWeightKg(String(nextProfiles[0].maxWeightKg));
-    setMaxVolumeM3(String(nextProfiles[0].maxVolumeM3));
-  };
-
-  const selectProfile = (id: string) => {
-    setProfileId(id);
-    setProfileMenuVisible(false);
-    if (id === CUSTOM_PROFILE_ID) {
-      return;
-    }
-    const profile = profiles.find((candidate) => candidate.id === id);
-    if (profile) {
-      setMaxWeightKg(String(profile.maxWeightKg));
-      setMaxVolumeM3(String(profile.maxVolumeM3));
-    }
-  };
-
-  const profileLabel =
-    profileId === CUSTOM_PROFILE_ID
-      ? 'Personalizado'
-      : (profiles.find((candidate) => candidate.id === profileId)?.label ?? 'Personalizado');
-
-  const result = useMemo(
-    () =>
-      simulateLoad(items, {
-        maxWeightKg: toNumber(maxWeightKg),
-        maxVolumeM3: toNumber(maxVolumeM3),
-      }),
-    [items, maxWeightKg, maxVolumeM3],
+  const breakdown = useMemo(() => computeCycleBreakdown(params), [params]);
+  const fractions = useMemo(() => computePhaseFractions(breakdown), [breakdown]);
+  const perForkliftThroughput = computeThroughputPerForkliftPerHour(breakdown.cycleTimeMin);
+  const totalThroughput = computeTotalThroughputPerHour(breakdown.cycleTimeMin, numForklifts);
+  const unloadTimeMin = computeTruckUnloadTimeMin(
+    params.palletsPerTruck,
+    breakdown.cycleTimeMin,
+    numForklifts,
   );
 
-  const openAddItem = () => setDraft({ ...EMPTY_DRAFT });
-  const closeDialog = () => setDraft(null);
+  const renderedCount = Math.min(Math.max(Math.floor(numForklifts), 0), MAX_RENDERED_FORKLIFTS);
+  const requestRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const lastRenderRef = useRef(0);
 
-  const saveItem = () => {
-    if (!draft || draft.name.trim() === '') {
-      return;
+  useEffect(() => {
+    if (!playing || renderedCount === 0) {
+      return undefined;
     }
-    const quantity = toNumber(draft.quantity);
-    if (quantity <= 0) {
-      return;
-    }
-    setItems((current) => [
-      ...current,
-      {
-        id: `${Date.now()}`,
-        name: draft.name.trim(),
-        unitWeightKg: toNumber(draft.unitWeightKg),
-        unitVolumeM3: toNumber(draft.unitVolumeM3),
-        quantity,
-      },
-    ]);
-    closeDialog();
-  };
 
-  const removeItem = (id: string) =>
-    setItems((current) => current.filter((item) => item.id !== id));
+    const animate = (timestamp: number) => {
+      if (startTimeRef.current === null) {
+        startTimeRef.current = timestamp;
+      }
+      if (timestamp - lastRenderRef.current > FRAME_INTERVAL_MS) {
+        lastRenderRef.current = timestamp;
+        const elapsed = timestamp - startTimeRef.current;
+        const baseProgress = (elapsed % VISUAL_CYCLE_MS) / VISUAL_CYCLE_MS;
+        const next: ForkliftState[] = [];
+        for (let i = 0; i < renderedCount; i += 1) {
+          next.push(forkliftPositionForProgress(baseProgress + i / renderedCount, fractions, PATH));
+        }
+        setForklifts(next);
+      }
+      requestRef.current = requestAnimationFrame(animate);
+    };
 
-  const weightColor = result.overWeight
-    ? '#B3261E'
-    : result.weightNearLimit
-      ? PALETTE.primary
-      : undefined;
-  const volumeColor = result.overVolume
-    ? '#B3261E'
-    : result.volumeNearLimit
-      ? PALETTE.primary
-      : undefined;
+    requestRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (requestRef.current !== null) {
+        cancelAnimationFrame(requestRef.current);
+      }
+      startTimeRef.current = null;
+    };
+  }, [playing, renderedCount, fractions]);
 
   return (
-    <>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text variant="titleMedium">Capacidad</Text>
-        <SegmentedButtons
-          value={category}
-          onValueChange={selectCategory}
-          style={styles.segmented}
-          buttons={[
-            { value: 'vehicle', label: 'Transporte', icon: 'truck-outline' },
-            { value: 'zone', label: 'Bodega', icon: 'warehouse' },
-          ]}
-        />
-
-        <Menu
-          visible={profileMenuVisible}
-          onDismiss={() => setProfileMenuVisible(false)}
-          anchor={
-            <Pressable onPress={() => setProfileMenuVisible(true)}>
-              <TextInput
-                label={category === 'vehicle' ? 'Perfil de vehículo' : 'Perfil de bodega'}
-                value={profileLabel}
-                editable={false}
-                mode="outlined"
-                right={<TextInput.Icon icon="menu-down" />}
-                pointerEvents="none"
-              />
-            </Pressable>
-          }
-        >
-          {profiles.map((profile) => (
-            <Menu.Item
-              key={profile.id}
-              title={profile.label}
-              onPress={() => selectProfile(profile.id)}
-            />
-          ))}
-          <Menu.Item title="Personalizado" onPress={() => selectProfile(CUSTOM_PROFILE_ID)} />
-        </Menu>
-
-        <View style={styles.capacityRow}>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text variant="titleMedium">Parámetros de recepción</Text>
+      <View style={styles.grid}>
+        {FIELDS.map((field) => (
           <TextInput
-            label="Peso máx. (kg)"
-            value={maxWeightKg}
-            onChangeText={(text) => {
-              setMaxWeightKg(text.replace(',', '.'));
-              setProfileId(CUSTOM_PROFILE_ID);
-            }}
+            key={field.key}
+            label={field.label}
+            value={values[field.key]}
+            onChangeText={(text) => setField(field.key, text)}
             keyboardType="decimal-pad"
             mode="outlined"
-            style={styles.capacityField}
-          />
-          <TextInput
-            label="Volumen máx. (m³)"
-            value={maxVolumeM3}
-            onChangeText={(text) => {
-              setMaxVolumeM3(text.replace(',', '.'));
-              setProfileId(CUSTOM_PROFILE_ID);
-            }}
-            keyboardType="decimal-pad"
-            mode="outlined"
-            style={styles.capacityField}
-          />
-        </View>
-
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Ítems de carga
-        </Text>
-        {items.length === 0 && <Text style={styles.emptyText}>Sin ítems agregados.</Text>}
-        {items.map((item) => (
-          <List.Item
-            key={item.id}
-            title={item.name}
-            description={`${formatNumber(item.unitWeightKg)} kg · ${formatNumber(item.unitVolumeM3)} m³ × ${item.quantity}`}
-            right={() => <IconButton icon="delete-outline" onPress={() => removeItem(item.id)} />}
-            style={styles.itemRow}
+            style={styles.gridField}
           />
         ))}
-        <Button compact icon="plus" onPress={openAddItem} style={styles.addButton}>
-          Agregar ítem
-        </Button>
+      </View>
 
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Resultado de la simulación
-        </Text>
-        <View style={styles.resultBlock}>
-          <Text variant="bodyMedium">Peso</Text>
-          <View style={styles.progressBarWrapper}>
-            <ProgressBar progress={Math.min(result.weightUtilization, 1)} color={weightColor} />
-          </View>
-          <Text variant="bodySmall" style={result.overWeight && styles.overText}>
-            {formatNumber(result.totalWeightKg)} kg / {formatNumber(result.maxWeightKg)} kg (
-            {Math.round(result.weightUtilization * 100)}%)
-          </Text>
-        </View>
-        <View style={styles.resultBlock}>
-          <Text variant="bodyMedium">Volumen</Text>
-          <View style={styles.progressBarWrapper}>
-            <ProgressBar progress={Math.min(result.volumeUtilization, 1)} color={volumeColor} />
-          </View>
-          <Text variant="bodySmall" style={result.overVolume && styles.overText}>
-            {formatNumber(result.totalVolumeM3)} m³ / {formatNumber(result.maxVolumeM3)} m³ (
-            {Math.round(result.volumeUtilization * 100)}%)
-          </Text>
-        </View>
-        <Text variant="bodySmall" style={styles.itemCount}>
-          {result.itemCount} unidades en {items.length} ítem(s)
-        </Text>
-        {(result.overWeight || result.overVolume) && (
-          <Text style={styles.overWarning}>
-            La carga excede la capacidad{' '}
-            {result.overWeight && result.overVolume
-              ? 'de peso y volumen'
-              : result.overWeight
-                ? 'de peso'
-                : 'de volumen'}
-            .
-          </Text>
-        )}
-      </ScrollView>
+      <Text variant="titleMedium" style={styles.sectionTitle}>
+        Simulación en vivo
+      </Text>
+      <View style={styles.animationPanel}>
+        <Svg width="100%" height={VIEW_H} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
+          <Line
+            x1={PATH[0].x}
+            y1={PATH[0].y}
+            x2={PATH[1].x}
+            y2={PATH[1].y}
+            stroke={PALETTE.border}
+            strokeWidth={10}
+            strokeLinecap="round"
+          />
+          <Line
+            x1={PATH[1].x}
+            y1={PATH[1].y}
+            x2={PATH[2].x}
+            y2={PATH[2].y}
+            stroke={PALETTE.border}
+            strokeWidth={10}
+            strokeLinecap="round"
+          />
 
-      <Portal>
-        <Dialog visible={draft !== null} onDismiss={closeDialog}>
-          <Dialog.Title>Ítem de carga</Dialog.Title>
-          <Dialog.Content style={styles.dialogContent}>
-            {draft && (
-              <>
-                <TextInput
-                  label="Nombre"
-                  value={draft.name}
-                  onChangeText={(text) => setDraft({ ...draft, name: text })}
-                  mode="outlined"
-                />
-                <TextInput
-                  label="Peso unitario (kg)"
-                  value={draft.unitWeightKg}
-                  onChangeText={(text) =>
-                    setDraft({ ...draft, unitWeightKg: text.replace(',', '.') })
-                  }
-                  keyboardType="decimal-pad"
-                  mode="outlined"
-                  style={styles.dialogField}
-                />
-                <TextInput
-                  label="Volumen unitario (m³)"
-                  value={draft.unitVolumeM3}
-                  onChangeText={(text) =>
-                    setDraft({ ...draft, unitVolumeM3: text.replace(',', '.') })
-                  }
-                  keyboardType="decimal-pad"
-                  mode="outlined"
-                  style={styles.dialogField}
-                />
-                <TextInput
-                  label="Cantidad"
-                  value={draft.quantity}
-                  onChangeText={(text) => setDraft({ ...draft, quantity: text.replace(',', '.') })}
-                  keyboardType="decimal-pad"
-                  mode="outlined"
-                  style={styles.dialogField}
-                />
-              </>
-            )}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={closeDialog}>Cancelar</Button>
-            <Button onPress={saveItem}>Agregar</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </>
+          <Rect x={8} y={112} width={48} height={26} rx={4} fill={PALETTE.secondary} />
+          <Circle cx={18} cy={140} r={4} fill={PALETTE.background} />
+          <Circle cx={46} cy={140} r={4} fill={PALETTE.background} />
+          <SvgText x={32} y={162} fontSize={10} fill={PALETTE.textMuted} textAnchor="middle">
+            Andén
+          </SvgText>
+
+          <Rect
+            x={338}
+            y={12}
+            width={44}
+            height={58}
+            rx={2}
+            fill={PALETTE.surfaceVariant}
+            stroke={PALETTE.border}
+          />
+          <Line x1={338} y1={30} x2={382} y2={30} stroke={PALETTE.border} strokeWidth={2} />
+          <Line x1={338} y1={48} x2={382} y2={48} stroke={PALETTE.border} strokeWidth={2} />
+          <SvgText x={360} y={84} fontSize={10} fill={PALETTE.textMuted} textAnchor="middle">
+            Rack
+          </SvgText>
+
+          {(renderedCount === 0 ? [] : forklifts).map((forklift, index) => (
+            <Rect
+              key={index}
+              x={forklift.x - 6}
+              y={forklift.y - 5}
+              width={12}
+              height={10}
+              rx={2}
+              fill={PHASE_COLORS[forklift.phase]}
+            />
+          ))}
+        </Svg>
+
+        <View style={styles.legendRow}>
+          {(Object.keys(PHASE_LABELS) as ForkliftPhase[]).map((phase) => (
+            <View key={phase} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: PHASE_COLORS[phase] }]} />
+              <Text variant="bodySmall" style={styles.legendLabel}>
+                {PHASE_LABELS[phase]}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.playRow}>
+          <IconButton
+            icon={playing ? 'pause' : 'play'}
+            onPress={() => setPlaying((current) => !current)}
+          />
+          {numForklifts > MAX_RENDERED_FORKLIFTS && (
+            <Text variant="bodySmall" style={styles.legendLabel}>
+              Mostrando {MAX_RENDERED_FORKLIFTS} de {formatNumber(numForklifts, 0)} montacargas
+            </Text>
+          )}
+        </View>
+      </View>
+
+      <Text variant="titleMedium" style={styles.sectionTitle}>
+        Resultado
+      </Text>
+      <View style={styles.resultsPanel}>
+        <ResultRow
+          label="Recogida en andén"
+          value={`${formatNumber(breakdown.pickTimeMin, 2)} min`}
+        />
+        <ResultRow
+          label="Traslado cargado"
+          value={`${formatNumber(breakdown.travelTimeMin, 2)} min`}
+        />
+        <ResultRow
+          label="Ubicación en rack"
+          value={`${formatNumber(breakdown.placeTimeMin, 2)} min`}
+        />
+        <ResultRow
+          label="Retorno vacío"
+          value={`${formatNumber(breakdown.returnTimeMin, 2)} min`}
+        />
+        <View style={styles.divider} />
+        <ResultRow
+          label="Ciclo total por pallet"
+          value={`${formatNumber(breakdown.cycleTimeMin, 2)} min`}
+          emphasize
+        />
+        <ResultRow
+          label="Rendimiento por montacargas"
+          value={`${formatNumber(perForkliftThroughput)} pallets/h`}
+        />
+        <ResultRow
+          label={`Rendimiento total (${formatNumber(numForklifts, 0)} montacargas)`}
+          value={`${formatNumber(totalThroughput)} pallets/h`}
+          emphasize
+        />
+        <ResultRow
+          label={`Tiempo para descargar 1 camión (${formatNumber(params.palletsPerTruck, 0)} pallets)`}
+          value={Number.isFinite(unloadTimeMin) ? `${formatNumber(unloadTimeMin)} min` : '—'}
+        />
+      </View>
+    </ScrollView>
   );
 }
 
@@ -304,58 +321,74 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 4,
   },
-  segmented: {
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  capacityRow: {
+  grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
-    marginTop: 12,
+    marginTop: 8,
   },
-  capacityField: {
-    flex: 1,
+  gridField: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 150,
   },
   sectionTitle: {
     marginTop: 20,
-    marginBottom: 4,
-  },
-  emptyText: {
-    opacity: 0.6,
     marginBottom: 8,
   },
-  itemRow: {
-    paddingHorizontal: 0,
+  animationPanel: {
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
   },
-  addButton: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
-  },
-  resultBlock: {
+  legendRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     marginTop: 8,
+    justifyContent: 'center',
   },
-  progressBarWrapper: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginVertical: 4,
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  overText: {
-    color: '#B3261E',
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  overWarning: {
-    color: '#B3261E',
-    marginTop: 12,
-    fontWeight: '600',
-  },
-  itemCount: {
-    marginTop: 8,
+  legendLabel: {
     opacity: 0.7,
   },
-  dialogContent: {
+  playRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  resultsPanel: {
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    padding: 16,
     gap: 4,
   },
-  dialogField: {
-    marginTop: 8,
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  resultLabel: {
+    opacity: 0.75,
+  },
+  resultEmphasis: {
+    color: PALETTE.primary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: PALETTE.border,
+    marginVertical: 6,
   },
 });

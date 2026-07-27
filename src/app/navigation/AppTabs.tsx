@@ -30,7 +30,7 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   StorageLimits: 'gauge',
   FieldVerifications: 'clipboard-check-outline',
   Alerts: 'alert-circle-outline',
-  LoadSimulator: 'truck-outline',
+  LoadSimulator: 'forklift',
 };
 
 export function AppTabs() {
@@ -79,7 +79,7 @@ export function AppTabs() {
       <Tab.Screen
         name="LoadSimulator"
         component={LoadSimulatorScreen}
-        options={{ title: 'Simulador de Carga' }}
+        options={{ title: 'Simulador de Bodega' }}
       />
     </Tab.Navigator>
   );
