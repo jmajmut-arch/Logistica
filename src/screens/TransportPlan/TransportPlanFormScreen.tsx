@@ -3,14 +3,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, HelperText, Menu, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import { Button, HelperText, Menu, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 
 import { carrierRepository } from '@/data/repositories/carrierRepository';
+import { recurringPlanRuleRepository } from '@/data/repositories/recurringPlanRuleRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
 import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
+import { ensureRecurringPlanOccurrences } from '@/domain/services/recurringPlanSync';
 import { useSessionStore } from '@/store/sessionStore';
 import type { OperationType } from '@/types/enums';
 import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
@@ -25,6 +27,16 @@ const OPERATION_TYPE_OPTIONS: { value: OperationType; label: string }[] = [
   { value: 'carga_subida', label: 'Subida' },
   { value: 'retiro_carga', label: 'Retiro' },
   { value: 'home_delivery', label: 'Home delivery' },
+];
+
+const WEEKDAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Lun' },
+  { value: 1, label: 'Mar' },
+  { value: 2, label: 'Mié' },
+  { value: 3, label: 'Jue' },
+  { value: 4, label: 'Vie' },
+  { value: 5, label: 'Sáb' },
+  { value: 6, label: 'Dom' },
 ];
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -63,6 +75,9 @@ export function TransportPlanFormScreen() {
   const allowedOperationTypes = OPERATION_TYPE_OPTIONS.filter((option) =>
     matchesOperatorScope(option.value, planManagerScope),
   );
+  // Solo el Administrador puede dejar una planificación de home delivery permanente, y
+  // solo al crearla (una ocurrencia ya generada se edita/elimina puntualmente, no la regla).
+  const canBeRecurring = planManagerScope === 'home_delivery' && planItemId === undefined;
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
@@ -72,6 +87,8 @@ export function TransportPlanFormScreen() {
   );
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [dayOfWeek, setDayOfWeek] = useState<number | null>(null);
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [blockMinutes, setBlockMinutes] = useState<number | null>(null);
@@ -84,6 +101,7 @@ export function TransportPlanFormScreen() {
   const [dateError, setDateError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [originalCreatedBy, setOriginalCreatedBy] = useState<number | null>(null);
+  const [originalRecurrenceRuleId, setOriginalRecurrenceRuleId] = useState<number | null>(null);
 
   useEffect(() => {
     siteRepository.findAll().then(setSites);
@@ -107,6 +125,7 @@ export function TransportPlanFormScreen() {
         setReference(item.reference ?? '');
         setNotes(item.notes ?? '');
         setOriginalCreatedBy(item.createdBy);
+        setOriginalRecurrenceRuleId(item.recurrenceRuleId);
       }
       setLoading(false);
     });
@@ -128,6 +147,34 @@ export function TransportPlanFormScreen() {
     }
     setSiteError(false);
 
+    if (isRecurring && canBeRecurring) {
+      if (dayOfWeek === null || blockMinutes === null) {
+        setDateError(true);
+        return;
+      }
+      setDateError(false);
+
+      setSubmitting(true);
+      try {
+        await recurringPlanRuleRepository.create({
+          operationType,
+          siteId,
+          carrierId: carrierId || null,
+          dayOfWeek,
+          blockMinutes,
+          reference: reference.trim() || null,
+          notes: notes.trim() || null,
+          active: true,
+          createdBy: currentUser.id,
+        });
+        await ensureRecurringPlanOccurrences();
+        navigation.goBack();
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (scheduledAt === null) {
       setDateError(true);
       return;
@@ -144,6 +191,7 @@ export function TransportPlanFormScreen() {
           carrierId: carrierId || null,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
+          recurrenceRuleId: originalRecurrenceRuleId,
           createdBy: originalCreatedBy ?? currentUser.id,
         });
       } else {
@@ -154,6 +202,7 @@ export function TransportPlanFormScreen() {
           carrierId: carrierId || null,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
+          recurrenceRuleId: null,
           createdBy: currentUser.id,
         });
       }
@@ -221,31 +270,61 @@ export function TransportPlanFormScreen() {
         {siteError && <HelperText type="error">Selecciona un área</HelperText>}
       </View>
 
-      <View style={styles.field}>
-        <Pressable onPress={() => setDatePickerVisible(true)}>
-          <TextInput
-            label="Fecha"
-            value={selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}
-            editable={false}
-            mode="outlined"
-            right={<TextInput.Icon icon="calendar" />}
-            pointerEvents="none"
+      {canBeRecurring && (
+        <View style={[styles.field, styles.recurringRow]}>
+          <View style={styles.recurringText}>
+            <Text variant="bodyMedium">Planificación permanente</Text>
+            <Text variant="bodySmall" style={styles.recurringHint}>
+              Se repite todas las semanas en el mismo día y hora
+            </Text>
+          </View>
+          <Switch value={isRecurring} onValueChange={setIsRecurring} />
+        </View>
+      )}
+
+      {isRecurring && canBeRecurring ? (
+        <View style={styles.field}>
+          <Text variant="bodyMedium" style={styles.label}>
+            Día de la semana
+          </Text>
+          <SegmentedButtons
+            value={dayOfWeek === null ? '' : String(dayOfWeek)}
+            onValueChange={(value) => setDayOfWeek(Number(value))}
+            buttons={WEEKDAY_OPTIONS.map((option) => ({
+              value: String(option.value),
+              label: option.label,
+            }))}
           />
-        </Pressable>
-      </View>
-      <DatePickerModal
-        locale="es"
-        mode="single"
-        visible={datePickerVisible}
-        date={selectedDate}
-        onDismiss={() => setDatePickerVisible(false)}
-        onConfirm={({ date: picked }) => {
-          setDatePickerVisible(false);
-          if (picked) {
-            setDate(dateToDateString(picked));
-          }
-        }}
-      />
+        </View>
+      ) : (
+        <>
+          <View style={styles.field}>
+            <Pressable onPress={() => setDatePickerVisible(true)}>
+              <TextInput
+                label="Fecha"
+                value={selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}
+                editable={false}
+                mode="outlined"
+                right={<TextInput.Icon icon="calendar" />}
+                pointerEvents="none"
+              />
+            </Pressable>
+          </View>
+          <DatePickerModal
+            locale="es"
+            mode="single"
+            visible={datePickerVisible}
+            date={selectedDate}
+            onDismiss={() => setDatePickerVisible(false)}
+            onConfirm={({ date: picked }) => {
+              setDatePickerVisible(false);
+              if (picked) {
+                setDate(dateToDateString(picked));
+              }
+            }}
+          />
+        </>
+      )}
 
       <View style={styles.field}>
         <Menu
@@ -279,7 +358,13 @@ export function TransportPlanFormScreen() {
         </Menu>
       </View>
       {dateError ? (
-        <HelperText type="error">Selecciona la fecha y revisa la hora ingresada</HelperText>
+        <HelperText type="error">
+          {isRecurring && canBeRecurring
+            ? 'Selecciona el día de la semana y la hora'
+            : 'Selecciona la fecha y revisa la hora ingresada'}
+        </HelperText>
+      ) : isRecurring && canBeRecurring ? (
+        <HelperText type="info">Se repite todas las semanas, a partir de hoy</HelperText>
       ) : (
         weekNumber !== null && <HelperText type="info">Semana {weekNumber}</HelperText>
       )}
@@ -363,5 +448,18 @@ const styles = StyleSheet.create({
   },
   timeMenuScroll: {
     maxHeight: 320,
+  },
+  recurringRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  recurringText: {
+    flex: 1,
+  },
+  recurringHint: {
+    opacity: 0.7,
+    marginTop: 2,
   },
 });

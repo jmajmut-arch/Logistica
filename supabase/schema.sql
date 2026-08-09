@@ -37,10 +37,30 @@ create table carriers (
   created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
+-- Reglas de planificación permanente (ej. "todos los lunes 10:00"), hoy usadas solo por
+-- el Administrador para home delivery. Cada regla no se muestra directamente en la
+-- agenda: genera items concretos en transport_plan_items (ver recurrence_rule_id abajo),
+-- que es lo único que el operador ve y contra lo que registra llegadas.
+create table recurring_plan_rules (
+  id bigint generated always as identity primary key,
+  operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
+  site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
+  day_of_week smallint not null check (day_of_week between 0 and 6), -- 0 = lunes ... 6 = domingo
+  block_minutes integer not null check (block_minutes between 0 and 1439),
+  reference text,
+  notes text,
+  active boolean not null default true,
+  created_by bigint not null references users (id) on delete restrict,
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
+);
+
 -- El plan de transporte semanal: cada fila es un viaje concreto (fecha + hora), no una
 -- plantilla recurrente. "Semanal" describe la cadencia con la que el supervisor lo carga,
 -- no la forma de guardarlo — así se puede filtrar/agrupar por semana en la UI sin modelar
--- semanas como entidad aparte.
+-- semanas como entidad aparte. Un item puede venir de una regla permanente
+-- (recurrence_rule_id no nulo); editarlo o eliminarlo solo afecta esa fecha puntual, nunca
+-- a la regla ni a las demás ocurrencias futuras.
 create table transport_plan_items (
   id bigint generated always as identity primary key,
   operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
@@ -49,11 +69,13 @@ create table transport_plan_items (
   scheduled_at bigint not null,
   reference text,
   notes text,
+  recurrence_rule_id bigint references recurring_plan_rules (id) on delete set null,
   created_by bigint not null references users (id) on delete restrict,
   created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 create index transport_plan_items_scheduled_idx on transport_plan_items (scheduled_at);
 create index transport_plan_items_site_idx on transport_plan_items (site_id);
+create index transport_plan_items_recurrence_idx on transport_plan_items (recurrence_rule_id);
 
 -- Registro del operador: elige el área (sitio) y, o bien confirma un item del plan de hoy
 -- (a tiempo o con otro horario), o marca un viaje no planificado (con su propia empresa,
@@ -74,6 +96,7 @@ create unique index load_arrivals_plan_item_unique on load_arrivals (plan_item_i
 alter table users disable row level security;
 alter table sites disable row level security;
 alter table carriers disable row level security;
+alter table recurring_plan_rules disable row level security;
 alter table transport_plan_items disable row level security;
 alter table load_arrivals disable row level security;
 
