@@ -15,9 +15,11 @@ import {
 } from 'react-native-paper';
 
 import { RoleGate } from '@/components/RoleGate';
+import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
 import { userRepository } from '@/data/repositories/userRepository';
+import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
@@ -34,18 +36,21 @@ export function TransportPlanListScreen() {
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
+  const [carriersById, setCarriersById] = useState<Map<number, Carrier>>(new Map());
   const [itemToDelete, setItemToDelete] = useState<TransportPlanItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [items, users, sites] = await Promise.all([
+    const [items, users, sites, carriers] = await Promise.all([
       transportPlanRepository.findAll(),
       userRepository.findAll(),
       siteRepository.findAll(),
+      carrierRepository.findAll(),
     ]);
     setPlanItems(items);
     setUsersById(new Map(users.map((user) => [user.id, user])));
     setSitesById(new Map(sites.map((site) => [site.id, site])));
+    setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
   }, []);
 
   useFocusRefresh(loadData);
@@ -72,8 +77,11 @@ export function TransportPlanListScreen() {
         format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm'),
       ];
       parts.push(site ? site.name : `Sitio #${item.siteId}`);
-      if (item.carrier) {
-        parts.push(item.carrier);
+      if (item.carrierId !== null) {
+        const carrier = carriersById.get(item.carrierId);
+        if (carrier) {
+          parts.push(carrier.name);
+        }
       }
       const creator = usersById.get(item.createdBy);
       parts.push(
@@ -84,7 +92,7 @@ export function TransportPlanListScreen() {
       );
       return parts.join(' · ');
     },
-    [usersById, sitesById],
+    [usersById, sitesById, carriersById],
   );
 
   if (planItems === null) {

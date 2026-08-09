@@ -2,6 +2,7 @@
 -- este proyecto pasó a ser exclusivamente control de planificación de transporte de carga.
 drop table if exists load_arrivals cascade;
 drop table if exists transport_plan_items cascade;
+drop table if exists carriers cascade;
 drop table if exists sites cascade;
 drop table if exists truck_arrivals cascade;
 drop table if exists field_verification_items cascade;
@@ -28,6 +29,14 @@ create table sites (
   created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
+-- Catálogo de empresas de transporte: se selecciona desde acá tanto al planificar como al
+-- registrar un viaje no planificado, en vez de escribir el nombre a mano.
+create table carriers (
+  id bigint generated always as identity primary key,
+  name text not null unique,
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
+);
+
 -- El plan de transporte semanal: cada fila es un viaje concreto (fecha + hora), no una
 -- plantilla recurrente. "Semanal" describe la cadencia con la que el supervisor lo carga,
 -- no la forma de guardarlo — así se puede filtrar/agrupar por semana en la UI sin modelar
@@ -36,8 +45,8 @@ create table transport_plan_items (
   id bigint generated always as identity primary key,
   operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
   site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
   scheduled_at bigint not null,
-  carrier text,
   reference text,
   notes text,
   created_by bigint not null references users (id) on delete restrict,
@@ -46,13 +55,13 @@ create table transport_plan_items (
 create index transport_plan_items_scheduled_idx on transport_plan_items (scheduled_at);
 create index transport_plan_items_site_idx on transport_plan_items (site_id);
 
--- Registro simple del operador: elige el área (sitio) y un bloque horario de 30 minutos;
--- el día es siempre hoy. El item del plan correspondiente se enlaza automáticamente
--- (mismo sitio + mismo día + mismo bloque horario) — ver planItemMatching.ts. Puede quedar
--- sin enlazar (plan_item_id null) si no hay un item de plan que calce.
+-- Registro del operador: elige el área (sitio) y, o bien confirma un item del plan de hoy
+-- (a tiempo o con otro horario), o marca un viaje no planificado (con su propia empresa,
+-- ya que no hay un item de plan del que heredarla). El día siempre es hoy.
 create table load_arrivals (
   id bigint generated always as identity primary key,
   site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
   arrived_at bigint not null,
   plan_item_id bigint references transport_plan_items (id) on delete set null,
   registered_by bigint not null references users (id) on delete restrict,
@@ -64,6 +73,7 @@ create unique index load_arrivals_plan_item_unique on load_arrivals (plan_item_i
 
 alter table users disable row level security;
 alter table sites disable row level security;
+alter table carriers disable row level security;
 alter table transport_plan_items disable row level security;
 alter table load_arrivals disable row level security;
 
@@ -77,3 +87,8 @@ insert into users (name, role) values
 insert into sites (name, type) values
   ('Bodega Central', 'bodega'),
   ('Patio Norte', 'patio');
+
+insert into carriers (name) values
+  ('Empresa Uno'),
+  ('Empresa Dos'),
+  ('Empresa Tres');

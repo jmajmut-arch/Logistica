@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
+import { CarriersStack } from '@/screens/Carriers/CarriersStack';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
 import { SitesStack } from '@/screens/Sites/SitesStack';
@@ -12,6 +13,7 @@ export type AppTabsParamList = {
   Dashboard: undefined;
   TransportPlan: undefined;
   Sites: undefined;
+  Carriers: undefined;
   LoadArrivals: undefined;
 };
 
@@ -21,6 +23,7 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   Dashboard: 'view-dashboard-outline',
   TransportPlan: 'calendar-clock-outline',
   Sites: 'warehouse',
+  Carriers: 'domain',
   LoadArrivals: 'package-variant-closed',
 };
 
@@ -55,6 +58,11 @@ export function AppTabs() {
         name="Sites"
         component={SitesStack}
         options={{ title: 'Sitios', headerShown: false }}
+      />
+      <Tab.Screen
+        name="Carriers"
+        component={CarriersStack}
+        options={{ title: 'Empresas', headerShown: false }}
       />
       <Tab.Screen
         name="LoadArrivals"

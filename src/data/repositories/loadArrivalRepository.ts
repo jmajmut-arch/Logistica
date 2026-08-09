@@ -12,6 +12,12 @@ export const loadArrivalRepository = {
     return rowsToCamelCase<LoadArrival>(data);
   },
 
+  async findById(id: number): Promise<LoadArrival | undefined> {
+    const { data, error } = await supabase.from('load_arrivals').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? rowToCamelCase<LoadArrival>(data) : undefined;
+  },
+
   async create(input: NewLoadArrival): Promise<LoadArrival> {
     const { data, error } = await supabase
       .from('load_arrivals')
@@ -20,5 +26,21 @@ export const loadArrivalRepository = {
       .single();
     if (error) throw error;
     return rowToCamelCase<LoadArrival>(data);
+  },
+
+  async update(id: number, input: NewLoadArrival): Promise<LoadArrival> {
+    const { data, error } = await supabase
+      .from('load_arrivals')
+      .update(objectToSnakeCase(input))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToCamelCase<LoadArrival>(data);
+  },
+
+  async delete(id: number): Promise<void> {
+    const { error } = await supabase.from('load_arrivals').delete().eq('id', id);
+    if (error) throw error;
   },
 };

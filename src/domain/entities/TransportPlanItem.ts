@@ -4,8 +4,8 @@ export interface TransportPlanItem {
   id: number;
   operationType: OperationType;
   siteId: number;
+  carrierId: number | null;
   scheduledAt: number;
-  carrier: string | null;
   reference: string | null;
   notes: string | null;
   createdBy: number;

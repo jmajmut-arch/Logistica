@@ -1,14 +1,26 @@
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Dialog, Divider, List, Menu, Portal, Text, TextInput } from 'react-native-paper';
+import {
+  Button,
+  Dialog,
+  Divider,
+  HelperText,
+  List,
+  Menu,
+  Portal,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 
+import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
+import type { Carrier } from '@/domain/entities/Carrier';
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
@@ -19,7 +31,6 @@ import {
   combineDayAndBlock,
   startOfDay,
   startOfToday,
-  startOfWeek,
   TIME_BLOCKS,
 } from '@/utils/timeBlocks';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
@@ -28,31 +39,22 @@ import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
 
 type Navigation = NativeStackNavigationProp<LoadArrivalsStackParamList, 'LoadArrivalForm'>;
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type ActiveSelection = TransportPlanItem | 'unplanned';
 
-function describePlanItem(item: TransportPlanItem): string {
-  const parts = [
-    format(new Date(item.scheduledAt), "EEE dd-MM HH:mm", { locale: es }),
-    OPERATION_TYPE_LABELS[item.operationType],
-  ];
-  if (item.carrier) {
-    parts.push(item.carrier);
-  }
-  if (item.reference) {
-    parts.push(item.reference);
-  }
-  return parts.join(' · ');
-}
-
 export function LoadArrivalFormScreen() {
   const navigation = useNavigation<Navigation>();
+  const route = useRoute<RouteProp<LoadArrivalsStackParamList, 'LoadArrivalForm'>>();
+  const arrivalId = route.params?.arrivalId;
   const currentUser = useSessionStore((state) => state.currentUser);
 
   const [sites, setSites] = useState<Site[] | null>(null);
+  const [carriers, setCarriers] = useState<Carrier[] | null>(null);
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
+  const [editingArrival, setEditingArrival] = useState<LoadArrival | null>(null);
+  const [loading, setLoading] = useState(arrivalId !== undefined);
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
 
@@ -60,27 +62,72 @@ export function LoadArrivalFormScreen() {
   const [dialogStep, setDialogStep] = useState<'choose' | 'time'>('choose');
   const [blockMinutes, setBlockMinutes] = useState(0);
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
+  const [unplannedCarrierId, setUnplannedCarrierId] = useState(0);
+  const [unplannedCarrierMenuVisible, setUnplannedCarrierMenuVisible] = useState(false);
+  const [unplannedCarrierError, setUnplannedCarrierError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     Promise.all([
       siteRepository.findAll(),
+      carrierRepository.findAll(),
       transportPlanRepository.findAll(),
       loadArrivalRepository.findAll(),
-    ]).then(([loadedSites, loadedPlanItems, loadedArrivals]) => {
+    ]).then(([loadedSites, loadedCarriers, loadedPlanItems, loadedArrivals]) => {
       setSites(loadedSites);
+      setCarriers(loadedCarriers);
       setPlanItems(loadedPlanItems);
       setArrivals(loadedArrivals);
     });
   }, []);
 
-  const weekStart = useMemo(() => startOfWeek(), []);
-  const weekEnd = weekStart + WEEK_MS;
+  useEffect(() => {
+    if (arrivalId === undefined) {
+      return;
+    }
+    loadArrivalRepository.findById(arrivalId).then((found) => {
+      if (found) {
+        setEditingArrival(found);
+        setSiteId(found.siteId);
+      }
+      setLoading(false);
+    });
+  }, [arrivalId]);
+
+  const dayStart = useMemo(() => startOfToday(), []);
+  const dayEnd = dayStart + DAY_MS;
+
+  const carriersById = useMemo(
+    () => new Map((carriers ?? []).map((carrier) => [carrier.id, carrier])),
+    [carriers],
+  );
+
+  const describePlanItem = (item: TransportPlanItem): string => {
+    const parts = [
+      format(new Date(item.scheduledAt), 'EEE dd-MM HH:mm', { locale: es }),
+      OPERATION_TYPE_LABELS[item.operationType],
+    ];
+    if (item.carrierId !== null) {
+      const carrier = carriersById.get(item.carrierId);
+      if (carrier) {
+        parts.push(carrier.name);
+      }
+    }
+    if (item.reference) {
+      parts.push(item.reference);
+    }
+    return parts.join(' · ');
+  };
 
   const registeredPlanItemIds = useMemo(
     () =>
-      new Set((arrivals ?? []).map((arrival) => arrival.planItemId).filter((id): id is number => id !== null)),
-    [arrivals],
+      new Set(
+        (arrivals ?? [])
+          .filter((arrival) => arrival.id !== arrivalId)
+          .map((arrival) => arrival.planItemId)
+          .filter((id): id is number => id !== null),
+      ),
+    [arrivals, arrivalId],
   );
 
   const pendingItemsForSite = useMemo(() => {
@@ -91,12 +138,12 @@ export function LoadArrivalFormScreen() {
       .filter(
         (item) =>
           item.siteId === siteId &&
-          item.scheduledAt >= weekStart &&
-          item.scheduledAt < weekEnd &&
+          item.scheduledAt >= dayStart &&
+          item.scheduledAt < dayEnd &&
           !registeredPlanItemIds.has(item.id),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
-  }, [planItems, siteId, weekStart, weekEnd, registeredPlanItemIds]);
+  }, [planItems, siteId, dayStart, dayEnd, registeredPlanItemIds]);
 
   const onSelectSite = (id: number) => {
     setSiteId(id);
@@ -110,9 +157,14 @@ export function LoadArrivalFormScreen() {
   };
 
   const openUnplanned = () => {
+    const editingUnplanned = editingArrival && editingArrival.planItemId === null ? editingArrival : null;
     setActive('unplanned');
     setDialogStep('time');
-    setBlockMinutes(blockMinutesOf(Date.now()));
+    setUnplannedCarrierError(false);
+    setUnplannedCarrierId(editingUnplanned?.carrierId ?? 0);
+    setBlockMinutes(
+      editingUnplanned ? blockMinutesOf(editingUnplanned.arrivedAt) : blockMinutesOf(Date.now()),
+    );
   };
 
   const closeDialog = () => {
@@ -120,18 +172,24 @@ export function LoadArrivalFormScreen() {
     setDialogStep('choose');
   };
 
-  const submit = async (arrivedAt: number, planItemId: number | null) => {
+  const submit = async (arrivedAt: number, planItemId: number | null, carrierId: number | null) => {
     if (!currentUser) {
       return;
     }
     setSubmitting(true);
     try {
-      await loadArrivalRepository.create({
+      const payload = {
         siteId,
+        carrierId,
         arrivedAt,
         planItemId,
-        registeredBy: currentUser.id,
-      });
+        registeredBy: editingArrival?.registeredBy ?? currentUser.id,
+      };
+      if (arrivalId !== undefined) {
+        await loadArrivalRepository.update(arrivalId, payload);
+      } else {
+        await loadArrivalRepository.create(payload);
+      }
       navigation.goBack();
     } finally {
       setSubmitting(false);
@@ -142,18 +200,25 @@ export function LoadArrivalFormScreen() {
     if (active === null || active === 'unplanned') {
       return;
     }
-    submit(active.scheduledAt, active.id);
+    submit(active.scheduledAt, active.id, active.carrierId);
   };
 
   const confirmOtherTime = () => {
     if (active === null) {
       return;
     }
-    const dayStart = active === 'unplanned' ? startOfToday() : startOfDay(active.scheduledAt);
-    submit(combineDayAndBlock(dayStart, blockMinutes), active === 'unplanned' ? null : active.id);
+    if (active === 'unplanned') {
+      if (unplannedCarrierId === 0) {
+        setUnplannedCarrierError(true);
+        return;
+      }
+      submit(combineDayAndBlock(startOfToday(), blockMinutes), null, unplannedCarrierId);
+      return;
+    }
+    submit(combineDayAndBlock(startOfDay(active.scheduledAt), blockMinutes), active.id, active.carrierId);
   };
 
-  if (sites === null || planItems === null || arrivals === null) {
+  if (sites === null || carriers === null || planItems === null || arrivals === null || loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -163,6 +228,7 @@ export function LoadArrivalFormScreen() {
 
   const selectedSite = sites.find((site) => site.id === siteId);
   const selectedBlock = TIME_BLOCKS.find((block) => block.minutes === blockMinutes);
+  const selectedUnplannedCarrier = carriers.find((carrier) => carrier.id === unplannedCarrierId);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -197,10 +263,10 @@ export function LoadArrivalFormScreen() {
       {siteId !== 0 && (
         <>
           <Text variant="bodyMedium" style={styles.label}>
-            Plan de la semana para {selectedSite?.name}
+            Plan de hoy para {selectedSite?.name}
           </Text>
           {pendingItemsForSite.length === 0 && (
-            <Text style={styles.emptyPlan}>No hay viajes planificados pendientes en este sitio.</Text>
+            <Text style={styles.emptyPlan}>No hay viajes planificados pendientes en este sitio hoy.</Text>
           )}
           {pendingItemsForSite.map((item) => (
             <List.Item
@@ -231,7 +297,7 @@ export function LoadArrivalFormScreen() {
               <Dialog.Title>¿Se cumplió el horario planificado?</Dialog.Title>
               <Dialog.Content>
                 <Text>
-                  Planificado: {format(new Date(active.scheduledAt), "EEE dd-MM HH:mm", { locale: es })}
+                  Planificado: {format(new Date(active.scheduledAt), 'EEE dd-MM HH:mm', { locale: es })}
                 </Text>
               </Dialog.Content>
               <Dialog.Actions>
@@ -267,6 +333,7 @@ export function LoadArrivalFormScreen() {
                         mode="outlined"
                         right={<TextInput.Icon icon="menu-down" />}
                         pointerEvents="none"
+                        style={active === 'unplanned' ? styles.field : undefined}
                       />
                     </Pressable>
                   }
@@ -284,6 +351,43 @@ export function LoadArrivalFormScreen() {
                     ))}
                   </ScrollView>
                 </Menu>
+
+                {active === 'unplanned' && (
+                  <View>
+                    <Menu
+                      visible={unplannedCarrierMenuVisible}
+                      onDismiss={() => setUnplannedCarrierMenuVisible(false)}
+                      anchor={
+                        <Pressable onPress={() => setUnplannedCarrierMenuVisible(true)}>
+                          <TextInput
+                            label="Empresa"
+                            value={selectedUnplannedCarrier?.name ?? ''}
+                            editable={false}
+                            mode="outlined"
+                            right={<TextInput.Icon icon="menu-down" />}
+                            pointerEvents="none"
+                          />
+                        </Pressable>
+                      }
+                    >
+                      {carriers.length === 0 && <Menu.Item title="No hay empresas registradas" disabled />}
+                      {carriers.map((carrier) => (
+                        <Menu.Item
+                          key={carrier.id}
+                          title={carrier.name}
+                          onPress={() => {
+                            setUnplannedCarrierId(carrier.id);
+                            setUnplannedCarrierError(false);
+                            setUnplannedCarrierMenuVisible(false);
+                          }}
+                        />
+                      ))}
+                    </Menu>
+                    {unplannedCarrierError && (
+                      <HelperText type="error">Selecciona la empresa</HelperText>
+                    )}
+                  </View>
+                )}
               </Dialog.Content>
               <Dialog.Actions>
                 <Button onPress={closeDialog}>Cancelar</Button>

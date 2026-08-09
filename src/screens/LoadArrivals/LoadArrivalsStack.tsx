@@ -1,3 +1,4 @@
+import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
@@ -8,10 +9,14 @@ import { LoadArrivalListScreen } from './LoadArrivalListScreen';
 
 export type LoadArrivalsStackParamList = {
   LoadArrivalList: undefined;
-  LoadArrivalForm: undefined;
+  LoadArrivalForm: { arrivalId?: number } | undefined;
 };
 
 const Stack = createNativeStackNavigator<LoadArrivalsStackParamList>();
+
+function formTitle(route: RouteProp<LoadArrivalsStackParamList, 'LoadArrivalForm'>): string {
+  return route.params?.arrivalId ? 'Editar llegada' : 'Registrar llegada';
+}
 
 export function LoadArrivalsStack() {
   return (
@@ -32,7 +37,7 @@ export function LoadArrivalsStack() {
       <Stack.Screen
         name="LoadArrivalForm"
         component={LoadArrivalFormScreen}
-        options={{ title: 'Registrar llegada' }}
+        options={({ route }) => ({ title: formTitle(route) })}
       />
     </Stack.Navigator>
   );

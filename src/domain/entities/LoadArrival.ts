@@ -1,6 +1,7 @@
 export interface LoadArrival {
   id: number;
   siteId: number;
+  carrierId: number | null;
   arrivedAt: number;
   planItemId: number | null;
   registeredBy: number;

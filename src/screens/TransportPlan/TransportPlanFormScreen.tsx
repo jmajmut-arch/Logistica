@@ -6,8 +6,10 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { Button, HelperText, Menu, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 
+import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
+import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import { useSessionStore } from '@/store/sessionStore';
 import type { OperationType } from '@/types/enums';
@@ -66,6 +68,7 @@ export function TransportPlanFormScreen() {
   const currentUser = useSessionStore((state) => state.currentUser);
 
   const [sites, setSites] = useState<Site[] | null>(null);
+  const [carriers, setCarriers] = useState<Carrier[] | null>(null);
   const [loading, setLoading] = useState(planItemId !== undefined);
   const [operationType, setOperationType] = useState<OperationType>('carga_subida');
   const [siteId, setSiteId] = useState(0);
@@ -74,15 +77,18 @@ export function TransportPlanFormScreen() {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [hour, setHour] = useState('');
   const [minute, setMinute] = useState('');
-  const [carrier, setCarrier] = useState('');
+  const [carrierId, setCarrierId] = useState(0);
+  const [carrierMenuVisible, setCarrierMenuVisible] = useState(false);
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [siteError, setSiteError] = useState(false);
   const [dateError, setDateError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [originalCreatedBy, setOriginalCreatedBy] = useState<number | null>(null);
 
   useEffect(() => {
     siteRepository.findAll().then(setSites);
+    carrierRepository.findAll().then(setCarriers);
   }, []);
 
   useEffect(() => {
@@ -99,9 +105,10 @@ export function TransportPlanFormScreen() {
         );
         setHour(pad(scheduled.getHours()));
         setMinute(pad(scheduled.getMinutes()));
-        setCarrier(item.carrier ?? '');
+        setCarrierId(item.carrierId ?? 0);
         setReference(item.reference ?? '');
         setNotes(item.notes ?? '');
+        setOriginalCreatedBy(item.createdBy);
       }
       setLoading(false);
     });
@@ -133,17 +140,17 @@ export function TransportPlanFormScreen() {
           operationType,
           siteId,
           scheduledAt,
-          carrier: carrier.trim() || null,
+          carrierId: carrierId || null,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
-          createdBy: currentUser.id,
+          createdBy: originalCreatedBy ?? currentUser.id,
         });
       } else {
         await transportPlanRepository.create({
           operationType,
           siteId,
           scheduledAt,
-          carrier: null,
+          carrierId: null,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           createdBy: currentUser.id,
@@ -155,7 +162,7 @@ export function TransportPlanFormScreen() {
     }
   };
 
-  if (sites === null || loading) {
+  if (sites === null || carriers === null || loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -164,6 +171,7 @@ export function TransportPlanFormScreen() {
   }
 
   const selectedSite = sites.find((site) => site.id === siteId);
+  const selectedCarrier = carriers.find((carrier) => carrier.id === carrierId);
   const selectedDate = dateStringToDate(date);
 
   return (
@@ -264,13 +272,43 @@ export function TransportPlanFormScreen() {
       )}
 
       {planItemId !== undefined && (
-        <TextInput
-          label="Transportista / cliente (opcional)"
-          value={carrier}
-          onChangeText={setCarrier}
-          mode="outlined"
-          style={styles.field}
-        />
+        <View style={styles.field}>
+          <Menu
+            visible={carrierMenuVisible}
+            onDismiss={() => setCarrierMenuVisible(false)}
+            anchor={
+              <Pressable onPress={() => setCarrierMenuVisible(true)}>
+                <TextInput
+                  label="Empresa (opcional)"
+                  value={selectedCarrier?.name ?? ''}
+                  editable={false}
+                  mode="outlined"
+                  right={<TextInput.Icon icon="menu-down" />}
+                  pointerEvents="none"
+                />
+              </Pressable>
+            }
+          >
+            <Menu.Item
+              title="Sin empresa"
+              onPress={() => {
+                setCarrierId(0);
+                setCarrierMenuVisible(false);
+              }}
+            />
+            {carriers.length === 0 && <Menu.Item title="No hay empresas registradas" disabled />}
+            {carriers.map((carrier) => (
+              <Menu.Item
+                key={carrier.id}
+                title={carrier.name}
+                onPress={() => {
+                  setCarrierId(carrier.id);
+                  setCarrierMenuVisible(false);
+                }}
+              />
+            ))}
+          </Menu>
+        </View>
       )}
       <TextInput
         label="Referencia — guía, pedido, etc. (opcional)"
