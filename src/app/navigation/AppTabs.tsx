@@ -4,12 +4,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
+import { SitesStack } from '@/screens/Sites/SitesStack';
 import { TransportPlanStack } from '@/screens/TransportPlan/TransportPlanStack';
 import { PALETTE } from '@/theme';
 
 export type AppTabsParamList = {
   Dashboard: undefined;
   TransportPlan: undefined;
+  Sites: undefined;
   LoadArrivals: undefined;
 };
 
@@ -18,6 +20,7 @@ const Tab = createBottomTabNavigator<AppTabsParamList>();
 const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Dashboard: 'view-dashboard-outline',
   TransportPlan: 'calendar-clock-outline',
+  Sites: 'warehouse',
   LoadArrivals: 'package-variant-closed',
 };
 
@@ -47,6 +50,11 @@ export function AppTabs() {
         name="TransportPlan"
         component={TransportPlanStack}
         options={{ title: 'Plan semanal', headerShown: false }}
+      />
+      <Tab.Screen
+        name="Sites"
+        component={SitesStack}
+        options={{ title: 'Sitios', headerShown: false }}
       />
       <Tab.Screen
         name="LoadArrivals"

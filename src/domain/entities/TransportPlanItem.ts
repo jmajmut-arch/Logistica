@@ -3,9 +3,8 @@ import type { OperationType } from '@/types/enums';
 export interface TransportPlanItem {
   id: number;
   operationType: OperationType;
+  siteId: number;
   scheduledAt: number;
-  origin: string | null;
-  destination: string | null;
   carrier: string | null;
   reference: string | null;
   notes: string | null;

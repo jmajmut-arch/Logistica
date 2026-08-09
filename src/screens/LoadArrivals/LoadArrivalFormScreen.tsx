@@ -2,110 +2,56 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, HelperText, Menu, Text, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, HelperText, Menu, TextInput } from 'react-native-paper';
 
-import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
-import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
-import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
+import { siteRepository } from '@/data/repositories/siteRepository';
+import type { Site } from '@/domain/entities/Site';
+import { loadArrivalService } from '@/domain/services/loadArrivalService';
 import { useSessionStore } from '@/store/sessionStore';
-import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
+import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
+import { blockMinutesOf, TIME_BLOCKS } from '@/utils/timeBlocks';
 
 import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
 
 type Navigation = NativeStackNavigationProp<LoadArrivalsStackParamList, 'LoadArrivalForm'>;
 
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function describePlanItem(item: TransportPlanItem): string {
-  const parts = [OPERATION_TYPE_LABELS[item.operationType], format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm')];
-  if (item.destination) {
-    parts.push(item.destination);
-  }
-  return parts.join(' · ');
-}
-
 export function LoadArrivalFormScreen() {
   const navigation = useNavigation<Navigation>();
   const currentUser = useSessionStore((state) => state.currentUser);
 
-  const now = new Date();
-  const [pendingItems, setPendingItems] = useState<TransportPlanItem[] | null>(null);
-  const [planItemId, setPlanItemId] = useState(0);
-  const [planItemMenuVisible, setPlanItemMenuVisible] = useState(false);
-  const [hour, setHour] = useState(pad(now.getHours()));
-  const [minute, setMinute] = useState(pad(now.getMinutes()));
-  const [location, setLocation] = useState('');
-  const [notes, setNotes] = useState('');
-  const [planItemError, setPlanItemError] = useState(false);
-  const [timeError, setTimeError] = useState(false);
-  const [locationError, setLocationError] = useState(false);
+  const [sites, setSites] = useState<Site[] | null>(null);
+  const [siteId, setSiteId] = useState(0);
+  const [siteMenuVisible, setSiteMenuVisible] = useState(false);
+  const [blockMinutes, setBlockMinutes] = useState(() => blockMinutesOf(Date.now()));
+  const [blockMenuVisible, setBlockMenuVisible] = useState(false);
+  const [siteError, setSiteError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    Promise.all([transportPlanRepository.findAll(), loadArrivalRepository.findAll()]).then(
-      ([planItems, arrivals]) => {
-        const registeredIds = new Set(arrivals.map((arrival) => arrival.planItemId));
-        setPendingItems(planItems.filter((item) => !registeredIds.has(item.id)));
-      },
-    );
+    siteRepository.findAll().then(setSites);
   }, []);
-
-  const onSelectPlanItem = (item: TransportPlanItem) => {
-    setPlanItemId(item.id);
-    setPlanItemError(false);
-    setPlanItemMenuVisible(false);
-    if (!location.trim()) {
-      setLocation(item.destination ?? item.origin ?? '');
-    }
-  };
 
   const onSubmit = async () => {
     if (!currentUser) {
       return;
     }
-    if (planItemId === 0) {
-      setPlanItemError(true);
+    if (siteId === 0) {
+      setSiteError(true);
       return;
     }
-    setPlanItemError(false);
-
-    const h = Number(hour);
-    const m = Number(minute);
-    if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) {
-      setTimeError(true);
-      return;
-    }
-    setTimeError(false);
-
-    const trimmedLocation = location.trim();
-    if (!trimmedLocation) {
-      setLocationError(true);
-      return;
-    }
-    setLocationError(false);
-
-    const arrivedAt = new Date();
-    arrivedAt.setHours(h, m, 0, 0);
+    setSiteError(false);
 
     setSubmitting(true);
     try {
-      await loadArrivalRepository.create({
-        planItemId,
-        arrivedAt: arrivedAt.getTime(),
-        location: trimmedLocation,
-        registeredBy: currentUser.id,
-        notes: notes.trim() || null,
-      });
+      await loadArrivalService.register({ siteId, blockMinutes, registeredBy: currentUser.id });
       navigation.goBack();
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (pendingItems === null) {
+  if (sites === null) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -113,19 +59,20 @@ export function LoadArrivalFormScreen() {
     );
   }
 
-  const selectedItem = pendingItems.find((item) => item.id === planItemId);
+  const selectedSite = sites.find((site) => site.id === siteId);
+  const selectedBlock = TIME_BLOCKS.find((block) => block.minutes === blockMinutes);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.field}>
         <Menu
-          visible={planItemMenuVisible}
-          onDismiss={() => setPlanItemMenuVisible(false)}
+          visible={siteMenuVisible}
+          onDismiss={() => setSiteMenuVisible(false)}
           anchor={
-            <Pressable onPress={() => setPlanItemMenuVisible(true)}>
+            <Pressable onPress={() => setSiteMenuVisible(true)}>
               <TextInput
-                label="Item del plan"
-                value={selectedItem ? describePlanItem(selectedItem) : ''}
+                label="Área (patio / bodega)"
+                value={selectedSite ? `${selectedSite.name} (${SITE_TYPE_LABELS[selectedSite.type]})` : ''}
                 editable={false}
                 mode="outlined"
                 right={<TextInput.Icon icon="menu-down" />}
@@ -134,57 +81,61 @@ export function LoadArrivalFormScreen() {
             </Pressable>
           }
         >
-          {pendingItems.length === 0 && <Menu.Item title="No hay items pendientes" disabled />}
-          {pendingItems.map((item) => (
-            <Menu.Item key={item.id} title={describePlanItem(item)} onPress={() => onSelectPlanItem(item)} />
+          {sites.length === 0 && <Menu.Item title="No hay sitios registrados" disabled />}
+          {sites.map((site) => (
+            <Menu.Item
+              key={site.id}
+              title={`${site.name} (${SITE_TYPE_LABELS[site.type]})`}
+              onPress={() => {
+                setSiteId(site.id);
+                setSiteError(false);
+                setSiteMenuVisible(false);
+              }}
+            />
           ))}
         </Menu>
-        {planItemError && <HelperText type="error">Selecciona un item del plan</HelperText>}
+        {siteError && <HelperText type="error">Selecciona un área</HelperText>}
       </View>
-
-      <Text variant="bodyMedium" style={styles.label}>
-        Hora de llegada
-      </Text>
-      <View style={styles.timeRow}>
-        <TextInput
-          label="Hora (0-23)"
-          value={hour}
-          onChangeText={setHour}
-          mode="outlined"
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.timeInput}
-        />
-        <TextInput
-          label="Minuto (0-59)"
-          value={minute}
-          onChangeText={setMinute}
-          mode="outlined"
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.timeInput}
-        />
-      </View>
-      {timeError && <HelperText type="error">Revisa la hora ingresada (0-23 / 0-59)</HelperText>}
 
       <TextInput
-        label="Lugar"
-        value={location}
-        onChangeText={setLocation}
+        label="Día"
+        value={format(new Date(), 'dd-MM-yyyy')}
+        editable={false}
         mode="outlined"
         style={styles.field}
       />
-      {locationError && <HelperText type="error">Ingresa el lugar de llegada</HelperText>}
 
-      <TextInput
-        label="Notas (opcional)"
-        value={notes}
-        onChangeText={setNotes}
-        mode="outlined"
-        multiline
-        numberOfLines={3}
-        style={styles.field}
-      />
+      <View style={styles.field}>
+        <Menu
+          visible={blockMenuVisible}
+          onDismiss={() => setBlockMenuVisible(false)}
+          anchor={
+            <Pressable onPress={() => setBlockMenuVisible(true)}>
+              <TextInput
+                label="Hora de llegada"
+                value={selectedBlock?.label ?? ''}
+                editable={false}
+                mode="outlined"
+                right={<TextInput.Icon icon="menu-down" />}
+                pointerEvents="none"
+              />
+            </Pressable>
+          }
+        >
+          <ScrollView style={styles.blockMenuScroll}>
+            {TIME_BLOCKS.map((block) => (
+              <Menu.Item
+                key={block.minutes}
+                title={block.label}
+                onPress={() => {
+                  setBlockMinutes(block.minutes);
+                  setBlockMenuVisible(false);
+                }}
+              />
+            ))}
+          </ScrollView>
+        </Menu>
+      </View>
 
       <Button mode="contained" onPress={onSubmit} loading={submitting} disabled={submitting}>
         Registrar llegada
@@ -206,15 +157,7 @@ const styles = StyleSheet.create({
   field: {
     marginBottom: 12,
   },
-  label: {
-    marginBottom: 8,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  timeInput: {
-    flex: 1,
+  blockMenuScroll: {
+    maxHeight: 320,
   },
 });

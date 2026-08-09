@@ -2,6 +2,7 @@
 -- este proyecto pasó a ser exclusivamente control de planificación de transporte de carga.
 drop table if exists load_arrivals cascade;
 drop table if exists transport_plan_items cascade;
+drop table if exists sites cascade;
 drop table if exists truck_arrivals cascade;
 drop table if exists field_verification_items cascade;
 drop table if exists field_verifications cascade;
@@ -18,6 +19,15 @@ create table users (
   role text not null check (role in ('operator', 'supervisor'))
 );
 
+-- Catálogo de patios y bodegas propias: es el "área" que el operador elige al registrar
+-- una llegada, y a la que el supervisor asocia cada item del plan semanal.
+create table sites (
+  id bigint generated always as identity primary key,
+  name text not null unique,
+  type text not null check (type in ('patio', 'bodega')),
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
+);
+
 -- El plan de transporte semanal: cada fila es un viaje concreto (fecha + hora), no una
 -- plantilla recurrente. "Semanal" describe la cadencia con la que el supervisor lo carga,
 -- no la forma de guardarlo — así se puede filtrar/agrupar por semana en la UI sin modelar
@@ -25,9 +35,8 @@ create table users (
 create table transport_plan_items (
   id bigint generated always as identity primary key,
   operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
+  site_id bigint not null references sites (id) on delete restrict,
   scheduled_at bigint not null,
-  origin text,
-  destination text,
   carrier text,
   reference text,
   notes text,
@@ -35,23 +44,26 @@ create table transport_plan_items (
   created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 create index transport_plan_items_scheduled_idx on transport_plan_items (scheduled_at);
-create index transport_plan_items_type_idx on transport_plan_items (operation_type);
+create index transport_plan_items_site_idx on transport_plan_items (site_id);
 
--- Registro simple del operador: hora real de llegada y lugar, vinculado a un item del plan
--- (a lo más un registro por item) para poder comparar cumplimiento en el dashboard.
+-- Registro simple del operador: elige el área (sitio) y un bloque horario de 30 minutos;
+-- el día es siempre hoy. El item del plan correspondiente se enlaza automáticamente
+-- (mismo sitio + mismo día + mismo bloque horario) — ver planItemMatching.ts. Puede quedar
+-- sin enlazar (plan_item_id null) si no hay un item de plan que calce.
 create table load_arrivals (
   id bigint generated always as identity primary key,
-  plan_item_id bigint not null references transport_plan_items (id) on delete cascade,
+  site_id bigint not null references sites (id) on delete restrict,
   arrived_at bigint not null,
-  location text not null,
+  plan_item_id bigint references transport_plan_items (id) on delete set null,
   registered_by bigint not null references users (id) on delete restrict,
-  notes text,
-  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
-  unique (plan_item_id)
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 create index load_arrivals_arrived_idx on load_arrivals (arrived_at);
+create index load_arrivals_site_idx on load_arrivals (site_id);
+create unique index load_arrivals_plan_item_unique on load_arrivals (plan_item_id) where plan_item_id is not null;
 
 alter table users disable row level security;
+alter table sites disable row level security;
 alter table transport_plan_items disable row level security;
 alter table load_arrivals disable row level security;
 
@@ -61,3 +73,7 @@ grant usage, select on all sequences in schema public to anon, authenticated;
 insert into users (name, role) values
   ('Operador', 'operator'),
   ('Supervisor', 'supervisor');
+
+insert into sites (name, type) values
+  ('Bodega Central', 'bodega'),
+  ('Patio Norte', 'patio');

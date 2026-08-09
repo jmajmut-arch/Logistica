@@ -6,8 +6,10 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, FAB, List, Text } from 'react-native-paper';
 
 import { RoleGate } from '@/components/RoleGate';
+import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
 import { userRepository } from '@/data/repositories/userRepository';
+import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
@@ -21,27 +23,26 @@ export function TransportPlanListScreen() {
   const navigation = useNavigation<Navigation>();
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
+  const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
 
   const loadData = useCallback(async () => {
-    const [items, users] = await Promise.all([
+    const [items, users, sites] = await Promise.all([
       transportPlanRepository.findAll(),
       userRepository.findAll(),
+      siteRepository.findAll(),
     ]);
     setPlanItems(items);
     setUsersById(new Map(users.map((user) => [user.id, user])));
+    setSitesById(new Map(sites.map((site) => [site.id, site])));
   }, []);
 
   useFocusRefresh(loadData);
 
   const describe = useMemo(
     () => (item: TransportPlanItem) => {
+      const site = sitesById.get(item.siteId);
       const parts = [format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm')];
-      if (item.origin) {
-        parts.push(`Desde ${item.origin}`);
-      }
-      if (item.destination) {
-        parts.push(`Hacia ${item.destination}`);
-      }
+      parts.push(site ? site.name : `Sitio #${item.siteId}`);
       if (item.carrier) {
         parts.push(item.carrier);
       }
@@ -54,7 +55,7 @@ export function TransportPlanListScreen() {
       );
       return parts.join(' · ');
     },
-    [usersById],
+    [usersById, sitesById],
   );
 
   if (planItems === null) {

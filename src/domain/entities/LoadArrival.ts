@@ -1,10 +1,9 @@
 export interface LoadArrival {
   id: number;
-  planItemId: number;
+  siteId: number;
   arrivedAt: number;
-  location: string;
+  planItemId: number | null;
   registeredBy: number;
-  notes: string | null;
   createdAt: number;
 }
 

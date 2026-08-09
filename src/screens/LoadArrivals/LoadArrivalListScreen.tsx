@@ -5,11 +5,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, FAB, List, Text } from 'react-native-paper';
 
-import { RoleGate } from '@/components/RoleGate';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
+import { RoleGate } from '@/components/RoleGate';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
+import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
+import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { getPlanItemStatus } from '@/domain/rules/complianceStatus';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
@@ -23,28 +25,32 @@ export function LoadArrivalListScreen() {
   const navigation = useNavigation<Navigation>();
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
   const [planItemsById, setPlanItemsById] = useState<Map<number, TransportPlanItem>>(new Map());
+  const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
 
   const loadData = useCallback(async () => {
-    const [loadedArrivals, planItems] = await Promise.all([
+    const [loadedArrivals, planItems, sites] = await Promise.all([
       loadArrivalRepository.findAll(),
       transportPlanRepository.findAll(),
+      siteRepository.findAll(),
     ]);
     setArrivals(loadedArrivals);
     setPlanItemsById(new Map(planItems.map((item) => [item.id, item])));
+    setSitesById(new Map(sites.map((site) => [site.id, site])));
   }, []);
 
   useFocusRefresh(loadData);
 
   const describe = useMemo(
     () => (arrival: LoadArrival, planItem: TransportPlanItem | undefined) => {
+      const site = sitesById.get(arrival.siteId);
       const parts = [`Llegó ${format(new Date(arrival.arrivedAt), 'dd-MM-yyyy HH:mm')}`];
-      parts.push(arrival.location);
+      parts.push(site ? site.name : `Sitio #${arrival.siteId}`);
       if (planItem) {
-        parts.push(`Planificado ${format(new Date(planItem.scheduledAt), 'dd-MM-yyyy HH:mm')}`);
+        parts.push(`Planificado ${format(new Date(planItem.scheduledAt), 'HH:mm')}`);
       }
       return parts.join(' · ');
     },
-    [],
+    [sitesById],
   );
 
   if (arrivals === null) {
@@ -65,7 +71,7 @@ export function LoadArrivalListScreen() {
           <Text style={styles.empty}>No hay llegadas de carga registradas.</Text>
         }
         renderItem={({ item }) => {
-          const planItem = planItemsById.get(item.planItemId);
+          const planItem = item.planItemId !== null ? planItemsById.get(item.planItemId) : undefined;
           return (
             <List.Item
               title={planItem ? OPERATION_TYPE_LABELS[planItem.operationType] : 'Sin plan asociado'}

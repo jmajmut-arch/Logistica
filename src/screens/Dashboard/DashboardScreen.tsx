@@ -5,8 +5,10 @@ import { ActivityIndicator, Card, Text } from 'react-native-paper';
 
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
+import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
+import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { getPlanItemStatus, type PlanItemStatus } from '@/domain/rules/complianceStatus';
 import { OPERATION_TYPE_LABELS, PLAN_ITEM_STATUS_LABELS } from '@/utils/transportPlanDisplay';
@@ -16,18 +18,36 @@ const STATUS_ORDER: PlanItemStatus[] = ['late', 'pending', 'early', 'on_time'];
 
 export function DashboardScreen() {
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
-  const [arrivalsByPlanItem, setArrivalsByPlanItem] = useState<Map<number, LoadArrival>>(new Map());
+  const [arrivals, setArrivals] = useState<LoadArrival[]>([]);
+  const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
 
   const loadData = useCallback(async () => {
-    const [items, arrivals] = await Promise.all([
+    const [items, loadedArrivals, sites] = await Promise.all([
       transportPlanRepository.findAll(),
       loadArrivalRepository.findAll(),
+      siteRepository.findAll(),
     ]);
     setPlanItems(items);
-    setArrivalsByPlanItem(new Map(arrivals.map((arrival) => [arrival.planItemId, arrival])));
+    setArrivals(loadedArrivals);
+    setSitesById(new Map(sites.map((site) => [site.id, site])));
   }, []);
 
   useFocusRefresh(loadData);
+
+  const arrivalsByPlanItem = useMemo(() => {
+    const map = new Map<number, LoadArrival>();
+    for (const arrival of arrivals) {
+      if (arrival.planItemId !== null) {
+        map.set(arrival.planItemId, arrival);
+      }
+    }
+    return map;
+  }, [arrivals]);
+
+  const unmatchedArrivals = useMemo(
+    () => arrivals.filter((arrival) => arrival.planItemId === null),
+    [arrivals],
+  );
 
   const statusCounts = useMemo(() => {
     const counts = new Map<PlanItemStatus, number>();
@@ -37,6 +57,11 @@ export function DashboardScreen() {
     }
     return counts;
   }, [planItems, arrivalsByPlanItem]);
+
+  const siteName = useCallback(
+    (siteId: number) => sitesById.get(siteId)?.name ?? `Sitio #${siteId}`,
+    [sitesById],
+  );
 
   if (planItems === null) {
     return (
@@ -77,11 +102,10 @@ export function DashboardScreen() {
           const arrival = arrivalsByPlanItem.get(item.id);
           const parts = [
             `Planificado ${format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm')}`,
+            siteName(item.siteId),
           ];
           if (arrival) {
-            parts.push(`Llegó ${format(new Date(arrival.arrivedAt), 'HH:mm')} · ${arrival.location}`);
-          } else if (item.destination) {
-            parts.push(item.destination);
+            parts.push(`Llegó ${format(new Date(arrival.arrivedAt), 'HH:mm')}`);
           }
           return (
             <Card style={styles.itemCard}>
@@ -97,6 +121,25 @@ export function DashboardScreen() {
             </Card>
           );
         }}
+        ListFooterComponent={
+          unmatchedArrivals.length === 0 ? null : (
+            <View>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Llegadas sin plan asociado
+              </Text>
+              {unmatchedArrivals.map((arrival) => (
+                <Card key={arrival.id} style={styles.itemCard}>
+                  <Card.Content>
+                    <Text variant="bodyMedium">{siteName(arrival.siteId)}</Text>
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      Llegó {format(new Date(arrival.arrivedAt), 'dd-MM-yyyy HH:mm')}
+                    </Text>
+                  </Card.Content>
+                </Card>
+              ))}
+            </View>
+          )
+        }
       />
     </View>
   );
