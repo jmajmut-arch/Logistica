@@ -14,6 +14,7 @@ import {
   Text,
 } from 'react-native-paper';
 
+import { EmptyState } from '@/components/EmptyState';
 import { RoleGate } from '@/components/RoleGate';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import type { Site } from '@/domain/entities/Site';
@@ -75,7 +76,9 @@ export function SiteListScreen() {
         data={sites}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={sites.length === 0 && styles.emptyContainer}
-        ListEmptyComponent={<Text style={styles.empty}>No hay patios ni bodegas registrados.</Text>}
+        ListEmptyComponent={
+          <EmptyState icon="warehouse" message="No hay patios ni bodegas registrados." />
+        }
         renderItem={({ item }) => (
           <List.Item
             title={item.name}
@@ -137,11 +140,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  empty: {
-    textAlign: 'center',
-    opacity: 0.7,
-    padding: 24,
   },
   actions: {
     flexDirection: 'row',

@@ -13,6 +13,7 @@ import {
   Text,
 } from 'react-native-paper';
 
+import { EmptyState } from '@/components/EmptyState';
 import { RoleGate } from '@/components/RoleGate';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import type { Carrier } from '@/domain/entities/Carrier';
@@ -62,7 +63,7 @@ export function CarrierListScreen() {
         data={carriers}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={carriers.length === 0 && styles.emptyContainer}
-        ListEmptyComponent={<Text style={styles.empty}>No hay empresas registradas.</Text>}
+        ListEmptyComponent={<EmptyState icon="domain" message="No hay empresas registradas." />}
         renderItem={({ item }) => (
           <List.Item
             title={item.name}
@@ -115,11 +116,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  empty: {
-    textAlign: 'center',
-    opacity: 0.7,
-    padding: 24,
   },
   actions: {
     flexDirection: 'row',

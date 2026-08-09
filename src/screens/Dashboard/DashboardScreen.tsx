@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Card, ProgressBar, Text } from 'react-native-paper';
 
+import { EmptyState } from '@/components/EmptyState';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -204,7 +205,9 @@ export function DashboardScreen() {
         data={todayItems}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={[styles.listContent, todayItems.length === 0 && styles.emptyContainer]}
-        ListEmptyComponent={<Text style={styles.empty}>No hay nada planificado para hoy.</Text>}
+        ListEmptyComponent={
+          <EmptyState icon="calendar-check-outline" message="No hay nada planificado para hoy." />
+        }
         renderItem={({ item }) => {
           const arrival = arrivalsByPlanItem.get(item.id);
           const status = getDisplayStatus(item, arrival, now);
@@ -308,11 +311,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  empty: {
-    textAlign: 'center',
-    opacity: 0.7,
-    padding: 24,
   },
   itemCard: {
     marginBottom: 4,

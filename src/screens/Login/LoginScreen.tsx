@@ -99,9 +99,16 @@ export function LoginScreen() {
             alignItems: 'center',
           }}
         >
-          <View style={styles.badge}>
+          <View style={styles.heroScene}>
+            <View style={styles.heroDashedLine} />
+            <View style={styles.heroWarehouse}>
+              <MaterialCommunityIcons name="warehouse" size={30} color="#38bdf8" />
+            </View>
+            <View style={styles.heroPin}>
+              <MaterialCommunityIcons name="map-marker-radius" size={22} color="#38bdf8" />
+            </View>
             <View style={styles.badgeDiamond}>
-              <MaterialCommunityIcons name="truck-fast-outline" size={30} color="#0b1120" />
+              <MaterialCommunityIcons name="truck-fast-outline" size={28} color="#0b1120" />
             </View>
           </View>
           <Text style={styles.title}>Control de Transporte</Text>
@@ -170,12 +177,48 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
-  badge: {
-    marginBottom: 16,
+  heroScene: {
+    width: 200,
+    height: 96,
+    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroDashedLine: {
+    position: 'absolute',
+    left: 30,
+    right: 30,
+    top: 48,
+    height: 0,
+    borderTopWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(56,189,248,0.35)',
+  },
+  heroWarehouse: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(56,189,248,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroPin: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(56,189,248,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeDiamond: {
-    width: 64,
-    height: 64,
+    width: 60,
+    height: 60,
     borderRadius: 18,
     backgroundColor: '#fb923c',
     alignItems: 'center',

@@ -14,6 +14,7 @@ import {
   Text,
 } from 'react-native-paper';
 
+import { EmptyState } from '@/components/EmptyState';
 import { RoleGate } from '@/components/RoleGate';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -110,7 +111,10 @@ export function TransportPlanListScreen() {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={planItems.length === 0 && styles.emptyContainer}
         ListEmptyComponent={
-          <Text style={styles.empty}>No hay items en el plan de transporte todavía.</Text>
+          <EmptyState
+            icon="calendar-blank-outline"
+            message="No hay items en el plan de transporte todavía."
+          />
         }
         renderItem={({ item }) => (
           <List.Item
@@ -165,11 +169,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  empty: {
-    textAlign: 'center',
-    opacity: 0.7,
-    padding: 24,
   },
   fab: {
     position: 'absolute',

@@ -14,6 +14,7 @@ import {
   Text,
 } from 'react-native-paper';
 
+import { EmptyState } from '@/components/EmptyState';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { RoleGate } from '@/components/RoleGate';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
@@ -104,7 +105,7 @@ export function LoadArrivalListScreen() {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={arrivals.length === 0 && styles.emptyContainer}
         ListEmptyComponent={
-          <Text style={styles.empty}>No hay llegadas de carga registradas.</Text>
+          <EmptyState icon="package-variant-closed" message="No hay llegadas de carga registradas." />
         }
         renderItem={({ item }) => {
           const planItem = item.planItemId !== null ? planItemsById.get(item.planItemId) : undefined;
@@ -164,11 +165,6 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  empty: {
-    textAlign: 'center',
-    opacity: 0.7,
-    padding: 24,
   },
   rightActions: {
     flexDirection: 'row',
