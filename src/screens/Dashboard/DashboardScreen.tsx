@@ -7,6 +7,7 @@ import { ActivityIndicator, Card, Chip, ProgressBar, Text } from 'react-native-p
 import { DonutChart } from '@/components/DonutChart';
 import { EmptyState } from '@/components/EmptyState';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
+import { WeekBarChart } from '@/components/WeekBarChart';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
@@ -31,6 +32,7 @@ import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STATUS_ORDER: DisplayStatus[] = ['overdue', 'late', 'pending', 'early', 'on_time'];
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -119,6 +121,22 @@ export function DashboardScreen() {
   // tratando cualquier item sin llegada registrada como no resuelto todavía.
   const dailyCompliance = useMemo(() => getCompliancePercentage(todayStatuses), [todayStatuses]);
   const weeklyCompliance = useMemo(() => getCompliancePercentage(weekStatuses), [weekStatuses]);
+
+  const weeklyComplianceByDay = useMemo(
+    () =>
+      WEEKDAY_LABELS.map((label, index) => {
+        const start = weekStart + index * DAY_MS;
+        const end = start + DAY_MS;
+        const items = weekItems.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
+        const statuses = items.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id)));
+        return {
+          label,
+          percentage: getCompliancePercentage(statuses),
+          highlight: start === dayStart,
+        };
+      }),
+    [weekItems, weekStart, dayStart, arrivalsByPlanItem],
+  );
 
   const todayStatusCounts = useMemo(() => {
     const counts = new Map<DisplayStatus, number>();
@@ -259,6 +277,15 @@ export function DashboardScreen() {
                     </View>
                   </View>
                 )}
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Cumplimiento de la semana · Semana {weekNumber}
+                </Text>
+                <WeekBarChart data={weeklyComplianceByDay} />
               </Card.Content>
             </Card>
 

@@ -16,53 +16,55 @@ import {
 
 import { EmptyState } from '@/components/EmptyState';
 import { RoleGate } from '@/components/RoleGate';
-import { siteRepository } from '@/data/repositories/siteRepository';
-import type { Site } from '@/domain/entities/Site';
-import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
+import { userRepository } from '@/data/repositories/userRepository';
+import type { User } from '@/domain/entities/User';
+import { useSessionStore } from '@/store/sessionStore';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
+import { ROLE_ICONS, ROLE_LABELS } from '@/utils/userDisplay';
 
-import type { SitesStackParamList } from './SitesStack';
+import type { UsersStackParamList } from './UsersStack';
 
-type Navigation = NativeStackNavigationProp<SitesStackParamList, 'SiteList'>;
+type Navigation = NativeStackNavigationProp<UsersStackParamList, 'UserList'>;
 
 function isForeignKeyViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23503';
 }
 
-export function SiteListScreen() {
+export function UserListScreen() {
   const navigation = useNavigation<Navigation>();
-  const [sites, setSites] = useState<Site[] | null>(null);
-  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
+  const currentUser = useSessionStore((state) => state.currentUser);
+  const [users, setUsers] = useState<User[] | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    setSites(await siteRepository.findAll());
+    setUsers(await userRepository.findAll());
   }, []);
 
   useFocusRefresh(loadData);
 
   const confirmDelete = async () => {
-    if (!siteToDelete) {
+    if (!userToDelete) {
       return;
     }
     setDeleting(true);
     try {
-      await siteRepository.delete(siteToDelete.id);
-      setSiteToDelete(null);
+      await userRepository.delete(userToDelete.id);
+      setUserToDelete(null);
       await loadData();
     } catch (error) {
       setErrorMessage(
         isForeignKeyViolation(error)
-          ? 'No se puede eliminar: este sitio tiene items del plan o llegadas asociadas.'
-          : 'No se pudo eliminar el sitio.',
+          ? 'No se puede eliminar: esta persona tiene planificación o llegadas registradas a su nombre.'
+          : 'No se pudo eliminar la persona.',
       );
     } finally {
       setDeleting(false);
     }
   };
 
-  if (sites === null) {
+  if (users === null) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -73,27 +75,27 @@ export function SiteListScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={sites}
+        data={users}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={sites.length === 0 && styles.emptyContainer}
-        ListEmptyComponent={
-          <EmptyState icon="warehouse" message="No hay patios ni bodegas registrados." />
-        }
+        contentContainerStyle={users.length === 0 && styles.emptyContainer}
+        ListEmptyComponent={<EmptyState icon="account-group-outline" message="No hay personas registradas." />}
         renderItem={({ item }) => (
           <List.Item
             title={item.name}
-            description={SITE_TYPE_LABELS[item.type]}
-            left={(props) => (
-              <List.Icon {...props} icon={item.type === 'patio' ? 'texture-box' : 'warehouse'} />
-            )}
+            description={ROLE_LABELS[item.role]}
+            left={(props) => <List.Icon {...props} icon={ROLE_ICONS[item.role]} />}
             right={() => (
               <RoleGate permission="manageCatalog">
                 <View style={styles.actions}>
                   <IconButton
                     icon="pencil-outline"
-                    onPress={() => navigation.navigate('SiteForm', { siteId: item.id })}
+                    onPress={() => navigation.navigate('UserForm', { userId: item.id })}
                   />
-                  <IconButton icon="delete-outline" onPress={() => setSiteToDelete(item)} />
+                  <IconButton
+                    icon="delete-outline"
+                    disabled={item.id === currentUser?.id}
+                    onPress={() => setUserToDelete(item)}
+                  />
                 </View>
               </RoleGate>
             )}
@@ -101,19 +103,19 @@ export function SiteListScreen() {
         )}
       />
       <RoleGate permission="manageCatalog">
-        <FAB icon="plus" style={styles.fab} onPress={() => navigation.navigate('SiteForm')} />
+        <FAB icon="plus" style={styles.fab} onPress={() => navigation.navigate('UserForm')} />
       </RoleGate>
 
       <Portal>
-        <Dialog visible={siteToDelete !== null} onDismiss={() => setSiteToDelete(null)}>
-          <Dialog.Title>Eliminar sitio</Dialog.Title>
+        <Dialog visible={userToDelete !== null} onDismiss={() => setUserToDelete(null)}>
+          <Dialog.Title>Eliminar persona</Dialog.Title>
           <Dialog.Content>
             <Text>
-              ¿Eliminar &quot;{siteToDelete?.name}&quot;? Esta acción no se puede deshacer.
+              ¿Eliminar &quot;{userToDelete?.name}&quot;? Esta acción no se puede deshacer.
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setSiteToDelete(null)}>Cancelar</Button>
+            <Button onPress={() => setUserToDelete(null)}>Cancelar</Button>
             <Button onPress={confirmDelete} loading={deleting} disabled={deleting}>
               Eliminar
             </Button>

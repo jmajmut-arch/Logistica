@@ -7,7 +7,9 @@ import type { User } from '@/domain/entities/User';
 
 interface SessionState {
   currentUser: User | null;
-  login: (user: User) => void;
+  currentSiteId: number | null;
+  login: (user: User, siteId?: number | null) => void;
+  setSite: (siteId: number | null) => void;
   logout: () => void;
 }
 
@@ -15,8 +17,10 @@ export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
       currentUser: null,
-      login: (user) => set({ currentUser: user }),
-      logout: () => set({ currentUser: null }),
+      currentSiteId: null,
+      login: (user, siteId = null) => set({ currentUser: user, currentSiteId: siteId }),
+      setSite: (siteId) => set({ currentSiteId: siteId }),
+      logout: () => set({ currentUser: null, currentSiteId: null }),
     }),
     {
       name: 'suspel-session',

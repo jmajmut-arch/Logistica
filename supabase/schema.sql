@@ -17,7 +17,7 @@ drop table if exists users cascade;
 create table users (
   id bigint generated always as identity primary key,
   name text not null,
-  role text not null check (role in ('operator', 'supervisor'))
+  role text not null check (role in ('operator', 'supervisor', 'admin'))
 );
 
 -- Catálogo de patios y bodegas propias: es el "área" que el operador elige al registrar
@@ -82,7 +82,8 @@ grant usage, select on all sequences in schema public to anon, authenticated;
 
 insert into users (name, role) values
   ('Operador', 'operator'),
-  ('Supervisor', 'supervisor');
+  ('Supervisor', 'supervisor'),
+  ('Administrador', 'admin');
 
 insert into sites (name, type) values
   ('Bodega Central', 'bodega'),

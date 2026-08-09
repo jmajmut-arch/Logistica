@@ -15,6 +15,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
@@ -25,6 +26,7 @@ import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { useSessionStore } from '@/store/sessionStore';
+import { PALETTE } from '@/theme';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import {
   blockMinutesOf,
@@ -48,6 +50,7 @@ export function LoadArrivalFormScreen() {
   const route = useRoute<RouteProp<LoadArrivalsStackParamList, 'LoadArrivalForm'>>();
   const arrivalId = route.params?.arrivalId;
   const currentUser = useSessionStore((state) => state.currentUser);
+  const currentSiteId = useSessionStore((state) => state.currentSiteId);
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
@@ -55,8 +58,7 @@ export function LoadArrivalFormScreen() {
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
   const [editingArrival, setEditingArrival] = useState<LoadArrival | null>(null);
   const [loading, setLoading] = useState(arrivalId !== undefined);
-  const [siteId, setSiteId] = useState(0);
-  const [siteMenuVisible, setSiteMenuVisible] = useState(false);
+  const siteId = arrivalId !== undefined ? (editingArrival?.siteId ?? 0) : (currentSiteId ?? 0);
 
   const [active, setActive] = useState<ActiveSelection | null>(null);
   const [dialogStep, setDialogStep] = useState<'choose' | 'time'>('choose');
@@ -88,7 +90,6 @@ export function LoadArrivalFormScreen() {
     loadArrivalRepository.findById(arrivalId).then((found) => {
       if (found) {
         setEditingArrival(found);
-        setSiteId(found.siteId);
       }
       setLoading(false);
     });
@@ -144,11 +145,6 @@ export function LoadArrivalFormScreen() {
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
   }, [planItems, siteId, dayStart, dayEnd, registeredPlanItemIds]);
-
-  const onSelectSite = (id: number) => {
-    setSiteId(id);
-    setSiteMenuVisible(false);
-  };
 
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
@@ -232,33 +228,28 @@ export function LoadArrivalFormScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.field}>
-        <Menu
-          visible={siteMenuVisible}
-          onDismiss={() => setSiteMenuVisible(false)}
-          anchor={
-            <Pressable onPress={() => setSiteMenuVisible(true)}>
-              <TextInput
-                label="Área (patio / bodega)"
-                value={selectedSite ? `${selectedSite.name} (${SITE_TYPE_LABELS[selectedSite.type]})` : ''}
-                editable={false}
-                mode="outlined"
-                right={<TextInput.Icon icon="menu-down" />}
-                pointerEvents="none"
-              />
-            </Pressable>
-          }
-        >
-          {sites.length === 0 && <Menu.Item title="No hay sitios registrados" disabled />}
-          {sites.map((site) => (
-            <Menu.Item
-              key={site.id}
-              title={`${site.name} (${SITE_TYPE_LABELS[site.type]})`}
-              onPress={() => onSelectSite(site.id)}
-            />
-          ))}
-        </Menu>
-      </View>
+      {selectedSite ? (
+        <View style={styles.siteBanner}>
+          <MaterialCommunityIcons
+            name={selectedSite.type === 'patio' ? 'texture-box' : 'warehouse'}
+            size={22}
+            color={PALETTE.primary}
+          />
+          <View>
+            <Text variant="labelSmall" style={styles.siteBannerLabel}>
+              Área
+            </Text>
+            <Text variant="bodyLarge">
+              {selectedSite.name} ({SITE_TYPE_LABELS[selectedSite.type]})
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.emptyPlan}>
+          No tienes un sitio asignado. Elige uno tocando el ícono de ubicación en la parte
+          superior.
+        </Text>
+      )}
 
       {siteId !== 0 && (
         <>
@@ -428,6 +419,19 @@ const styles = StyleSheet.create({
   },
   label: {
     marginBottom: 4,
+  },
+  siteBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  siteBannerLabel: {
+    opacity: 0.6,
+    marginBottom: 2,
   },
   listItem: {
     paddingHorizontal: 0,

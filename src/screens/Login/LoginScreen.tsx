@@ -4,23 +4,17 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { siteRepository } from '@/data/repositories/siteRepository';
 import { userRepository } from '@/data/repositories/userRepository';
+import type { Site } from '@/domain/entities/Site';
 import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
+import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
+import { ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from '@/utils/userDisplay';
 
-const ROLE_LABELS: Record<User['role'], string> = {
-  operator: 'Operador',
-  supervisor: 'Supervisor',
-};
-
-const ROLE_ICONS: Record<User['role'], keyof typeof MaterialCommunityIcons.glyphMap> = {
-  operator: 'truck-delivery-outline',
-  supervisor: 'shield-check-outline',
-};
-
-const ROLE_ACCENTS: Record<User['role'], string> = {
-  operator: '#38bdf8',
-  supervisor: '#fb923c',
+const SITE_TYPE_ICONS: Record<Site['type'], keyof typeof MaterialCommunityIcons.glyphMap> = {
+  patio: 'texture-box',
+  bodega: 'warehouse',
 };
 
 function UserCard({ user, onPress, delay }: { user: User; onPress: () => void; delay: number }) {
@@ -36,7 +30,7 @@ function UserCard({ user, onPress, delay }: { user: User; onPress: () => void; d
     }).start();
   }, [anim, delay]);
 
-  const accent = ROLE_ACCENTS[user.role];
+  const accent = ROLE_COLORS[user.role];
 
   return (
     <Animated.View
@@ -66,15 +60,67 @@ function UserCard({ user, onPress, delay }: { user: User; onPress: () => void; d
   );
 }
 
+function SiteCard({ site, onPress, delay }: { site: Site; onPress: () => void; delay: number }) {
+  const [pressed, setPressed] = useState(false);
+  const [anim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      useNativeDriver: false,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        onHoverIn={() => setPressed(true)}
+        onHoverOut={() => setPressed(false)}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        style={[styles.card, pressed && { borderColor: '#38bdf8', transform: [{ scale: 1.015 }] }]}
+      >
+        <View style={[styles.cardIcon, { backgroundColor: 'rgba(56,189,248,0.15)' }]}>
+          <MaterialCommunityIcons name={SITE_TYPE_ICONS[site.type]} size={26} color="#38bdf8" />
+        </View>
+        <View style={styles.cardText}>
+          <Text style={styles.cardName}>{site.name}</Text>
+          <Text style={[styles.cardRole, { color: '#38bdf8' }]}>{SITE_TYPE_LABELS[site.type]}</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.4)" />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export function LoginScreen() {
   const login = useSessionStore((state) => state.login);
   const [demoUsers, setDemoUsers] = useState<User[] | null>(null);
+  const [sites, setSites] = useState<Site[] | null>(null);
+  const [pendingOperator, setPendingOperator] = useState<User | null>(null);
 
   const [heroAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     userRepository.findAll().then(setDemoUsers);
+    siteRepository.findAll().then(setSites);
   }, []);
+
+  const handleSelectUser = (user: User) => {
+    if (user.role === 'operator') {
+      setPendingOperator(user);
+      return;
+    }
+    login(user);
+  };
 
   useEffect(() => {
     Animated.timing(heroAnim, {
@@ -121,21 +167,52 @@ export function LoginScreen() {
         </Animated.View>
 
         <View style={styles.picker}>
-          <Text style={styles.pickerLabel}>Selecciona un usuario para continuar</Text>
-
-          {demoUsers === null ? (
-            <ActivityIndicator style={styles.loader} color="#fb923c" />
+          {pendingOperator === null ? (
+            <>
+              <Text style={styles.pickerLabel}>Selecciona un usuario para continuar</Text>
+              {demoUsers === null ? (
+                <ActivityIndicator style={styles.loader} color="#fb923c" />
+              ) : (
+                <View style={styles.cardList}>
+                  {demoUsers.map((user, index) => (
+                    <UserCard
+                      key={user.id}
+                      user={user}
+                      delay={120 + index * 90}
+                      onPress={() => handleSelectUser(user)}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           ) : (
-            <View style={styles.cardList}>
-              {demoUsers.map((user, index) => (
-                <UserCard
-                  key={user.id}
-                  user={user}
-                  delay={120 + index * 90}
-                  onPress={() => login(user)}
-                />
-              ))}
-            </View>
+            <>
+              <Pressable onPress={() => setPendingOperator(null)} style={styles.backRow}>
+                <MaterialCommunityIcons name="chevron-left" size={20} color="rgba(226,232,240,0.7)" />
+                <Text style={styles.backText}>Elegir otro usuario</Text>
+              </Pressable>
+              <Text style={styles.pickerLabel}>
+                Hola {pendingOperator.name}, ¿dónde estás trabajando hoy?
+              </Text>
+              {sites === null ? (
+                <ActivityIndicator style={styles.loader} color="#fb923c" />
+              ) : sites.length === 0 ? (
+                <Text style={styles.emptySites}>
+                  Todavía no hay patios ni bodegas registrados. Pide a un supervisor que los cree.
+                </Text>
+              ) : (
+                <View style={styles.cardList}>
+                  {sites.map((site, index) => (
+                    <SiteCard
+                      key={site.id}
+                      site={site}
+                      delay={80 + index * 90}
+                      onPress={() => login(pendingOperator, site.id)}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -271,6 +348,23 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 12,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 2,
+    marginBottom: 4,
+  },
+  backText: {
+    color: 'rgba(226,232,240,0.7)',
+    fontSize: 13,
+  },
+  emptySites: {
+    color: 'rgba(226,232,240,0.6)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   cardList: {
     gap: 12,

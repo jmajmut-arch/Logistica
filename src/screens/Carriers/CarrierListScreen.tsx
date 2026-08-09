@@ -69,7 +69,7 @@ export function CarrierListScreen() {
             title={item.name}
             left={(props) => <List.Icon {...props} icon="domain" />}
             right={() => (
-              <RoleGate permission="managePlan">
+              <RoleGate permission="manageCatalog">
                 <View style={styles.actions}>
                   <IconButton
                     icon="pencil-outline"
@@ -82,7 +82,7 @@ export function CarrierListScreen() {
           />
         )}
       />
-      <RoleGate permission="managePlan">
+      <RoleGate permission="manageCatalog">
         <FAB icon="plus" style={styles.fab} onPress={() => navigation.navigate('CarrierForm')} />
       </RoleGate>
 

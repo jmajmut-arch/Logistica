@@ -7,6 +7,8 @@ import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
 import { SitesStack } from '@/screens/Sites/SitesStack';
 import { TransportPlanStack } from '@/screens/TransportPlan/TransportPlanStack';
+import { UsersStack } from '@/screens/Users/UsersStack';
+import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 
 export type AppTabsParamList = {
@@ -14,6 +16,7 @@ export type AppTabsParamList = {
   TransportPlan: undefined;
   Sites: undefined;
   Carriers: undefined;
+  Users: undefined;
   LoadArrivals: undefined;
 };
 
@@ -24,10 +27,13 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   TransportPlan: 'calendar-clock-outline',
   Sites: 'warehouse',
   Carriers: 'domain',
+  Users: 'account-group-outline',
   LoadArrivals: 'package-variant-closed',
 };
 
 export function AppTabs() {
+  const role = useSessionStore((state) => state.currentUser?.role);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -49,26 +55,41 @@ export function AppTabs() {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen
-        name="TransportPlan"
-        component={TransportPlanStack}
-        options={{ title: 'Plan semanal', headerShown: false }}
-      />
-      <Tab.Screen
-        name="Sites"
-        component={SitesStack}
-        options={{ title: 'Sitios', headerShown: false }}
-      />
-      <Tab.Screen
-        name="Carriers"
-        component={CarriersStack}
-        options={{ title: 'Empresas', headerShown: false }}
-      />
-      <Tab.Screen
-        name="LoadArrivals"
-        component={LoadArrivalsStack}
-        options={{ title: 'Llegadas', headerShown: false }}
-      />
+      {role === 'supervisor' && (
+        <Tab.Screen
+          name="TransportPlan"
+          component={TransportPlanStack}
+          options={{ title: 'Plan semanal', headerShown: false }}
+        />
+      )}
+      {role === 'operator' && (
+        <Tab.Screen
+          name="LoadArrivals"
+          component={LoadArrivalsStack}
+          options={{ title: 'Llegadas', headerShown: false }}
+        />
+      )}
+      {role === 'admin' && (
+        <Tab.Screen
+          name="Sites"
+          component={SitesStack}
+          options={{ title: 'Sitios', headerShown: false }}
+        />
+      )}
+      {role === 'admin' && (
+        <Tab.Screen
+          name="Carriers"
+          component={CarriersStack}
+          options={{ title: 'Empresas', headerShown: false }}
+        />
+      )}
+      {role === 'admin' && (
+        <Tab.Screen
+          name="Users"
+          component={UsersStack}
+          options={{ title: 'Personas', headerShown: false }}
+        />
+      )}
     </Tab.Navigator>
   );
 }

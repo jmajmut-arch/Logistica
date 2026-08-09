@@ -1,4 +1,4 @@
-export type Role = 'operator' | 'supervisor';
+export type Role = 'operator' | 'supervisor' | 'admin';
 
 export const OPERATION_TYPES = ['carga_subida', 'retiro_carga', 'home_delivery'] as const;
 
