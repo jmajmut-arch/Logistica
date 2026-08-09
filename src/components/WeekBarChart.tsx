@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { getComplianceColor } from '@/utils/transportPlanDisplay';
@@ -7,6 +7,7 @@ export interface WeekBarChartDay {
   label: string;
   percentage: number | null;
   highlight?: boolean;
+  onPress?: () => void;
 }
 
 interface WeekBarChartProps {
@@ -21,7 +22,7 @@ export function WeekBarChart({ data, maxHeight = 96 }: WeekBarChartProps) {
         const color = getComplianceColor(day.percentage);
         const height = day.percentage === null ? 4 : Math.max(4, (day.percentage / 100) * maxHeight);
         return (
-          <View key={day.label} style={styles.column}>
+          <Pressable key={day.label} style={styles.column} onPress={day.onPress}>
             <Text variant="labelSmall" style={styles.value}>
               {day.percentage === null ? '—' : `${day.percentage}%`}
             </Text>
@@ -34,7 +35,7 @@ export function WeekBarChart({ data, maxHeight = 96 }: WeekBarChartProps) {
             >
               {day.label}
             </Text>
-          </View>
+          </Pressable>
         );
       })}
     </View>
