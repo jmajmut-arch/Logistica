@@ -257,7 +257,9 @@ export function LoadArrivalFormScreen() {
             Plan de hoy para {selectedSite?.name}
           </Text>
           {pendingItemsForSite.length === 0 && (
-            <Text style={styles.emptyPlan}>No hay viajes planificados pendientes en este sitio hoy.</Text>
+            <Text style={styles.emptyPlan}>
+              Hoy no hay carga planificada para {selectedSite?.name ?? 'este sitio'}.
+            </Text>
           )}
           {pendingItemsForSite.map((item) => (
             <List.Item

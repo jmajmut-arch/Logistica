@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Card, Chip, ProgressBar, Text } from 'react-native-paper';
+import { ActivityIndicator, Card, Chip, ProgressBar, SegmentedButtons, Text } from 'react-native-paper';
 
 import { DonutChart } from '@/components/DonutChart';
 import { EmptyState } from '@/components/EmptyState';
@@ -52,6 +52,7 @@ export function DashboardScreen() {
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
   const [now, setNow] = useState(() => Date.now());
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'all'>('all');
+  const [agendaScope, setAgendaScope] = useState<'day' | 'week'>('day');
 
   const loadData = useCallback(async () => {
     const [items, loadedArrivals, sites] = await Promise.all([
@@ -98,7 +99,9 @@ export function DashboardScreen() {
 
   const weekItems = useMemo(
     () =>
-      (planItems ?? []).filter((item) => item.scheduledAt >= weekStart && item.scheduledAt < weekEnd),
+      (planItems ?? [])
+        .filter((item) => item.scheduledAt >= weekStart && item.scheduledAt < weekEnd)
+        .sort((a, b) => a.scheduledAt - b.scheduledAt),
     [planItems, weekStart, weekEnd],
   );
 
@@ -138,13 +141,21 @@ export function DashboardScreen() {
     [weekItems, weekStart, dayStart, arrivalsByPlanItem],
   );
 
-  const todayStatusCounts = useMemo(() => {
+  const weekDisplayStatuses = useMemo(
+    () => weekItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
+    [weekItems, arrivalsByPlanItem, now],
+  );
+
+  function countByStatus(statuses: DisplayStatus[]): Map<DisplayStatus, number> {
     const counts = new Map<DisplayStatus, number>();
-    for (const status of todayDisplayStatuses) {
+    for (const status of statuses) {
       counts.set(status, (counts.get(status) ?? 0) + 1);
     }
     return counts;
-  }, [todayDisplayStatuses]);
+  }
+
+  const todayStatusCounts = useMemo(() => countByStatus(todayDisplayStatuses), [todayDisplayStatuses]);
+  const weekStatusCounts = useMemo(() => countByStatus(weekDisplayStatuses), [weekDisplayStatuses]);
 
   const pendingTodayCount = (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
   const registeredTodayCount = todayItems.length - pendingTodayCount;
@@ -159,14 +170,17 @@ export function DashboardScreen() {
     [weekItems, arrivalsByPlanItem],
   );
 
-  const filteredTodayItems = useMemo(() => {
+  const agendaItems = agendaScope === 'day' ? todayItems : weekItems;
+  const agendaStatusCounts = agendaScope === 'day' ? todayStatusCounts : weekStatusCounts;
+
+  const filteredAgendaItems = useMemo(() => {
     if (statusFilter === 'all') {
-      return todayItems;
+      return agendaItems;
     }
-    return todayItems.filter(
+    return agendaItems.filter(
       (item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === statusFilter,
     );
-  }, [todayItems, statusFilter, arrivalsByPlanItem, now]);
+  }, [agendaItems, statusFilter, arrivalsByPlanItem, now]);
 
   const todayUnplannedArrivals = useMemo(
     () =>
@@ -176,6 +190,19 @@ export function DashboardScreen() {
       ),
     [arrivals, dayStart, dayEnd],
   );
+
+  const weekUnplannedArrivals = useMemo(
+    () =>
+      arrivals
+        .filter(
+          (arrival) =>
+            arrival.planItemId === null && arrival.arrivedAt >= weekStart && arrival.arrivedAt < weekEnd,
+        )
+        .sort((a, b) => a.arrivedAt - b.arrivedAt),
+    [arrivals, weekStart, weekEnd],
+  );
+
+  const agendaUnplannedArrivals = agendaScope === 'day' ? todayUnplannedArrivals : weekUnplannedArrivals;
 
   if (planItems === null) {
     return (
@@ -188,11 +215,11 @@ export function DashboardScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={filteredTodayItems}
+        data={filteredAgendaItems}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={[
           styles.listContent,
-          filteredTodayItems.length === 0 && styles.emptyContainer,
+          filteredAgendaItems.length === 0 && styles.emptyContainer,
         ]}
         ListHeaderComponent={
           <View>
@@ -292,6 +319,44 @@ export function DashboardScreen() {
             <Card style={styles.wideCard}>
               <Card.Content>
                 <Text variant="titleMedium" style={styles.cardTitle}>
+                  Distribución de la semana
+                </Text>
+                {weekItems.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados para esta semana todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={STATUS_ORDER.map((status) => ({
+                        key: status,
+                        value: weekStatusCounts.get(status) ?? 0,
+                        color: DISPLAY_STATUS_COLORS[status],
+                      }))}
+                      centerValue={String(weekItems.length)}
+                      centerLabel={weekItems.length === 1 ? 'viaje' : 'viajes'}
+                    />
+                    <View style={styles.legend}>
+                      {STATUS_ORDER.map((status) => (
+                        <View key={status} style={styles.legendRow}>
+                          <View style={[styles.legendDot, { backgroundColor: DISPLAY_STATUS_COLORS[status] }]} />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {DISPLAY_STATUS_LABELS[status]}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {weekStatusCounts.get(status) ?? 0}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
                   Cumplimiento por tipo · Semana {weekNumber}
                 </Text>
                 {complianceByOperationType.map(({ type, count, percentage }) => (
@@ -315,12 +380,23 @@ export function DashboardScreen() {
               </Card.Content>
             </Card>
 
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Agenda de hoy
-            </Text>
+            <View style={styles.agendaHeaderRow}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                {agendaScope === 'day' ? 'Agenda de hoy' : `Agenda de la semana ${weekNumber}`}
+              </Text>
+            </View>
+            <SegmentedButtons
+              style={styles.agendaToggle}
+              value={agendaScope}
+              onValueChange={(value) => setAgendaScope(value as 'day' | 'week')}
+              buttons={[
+                { value: 'day', label: `Hoy (${todayItems.length})` },
+                { value: 'week', label: `Semana (${weekItems.length})` },
+              ]}
+            />
             <View style={styles.filterRow}>
               <Chip selected={statusFilter === 'all'} onPress={() => setStatusFilter('all')}>
-                Todos ({todayItems.length})
+                Todos ({agendaItems.length})
               </Chip>
               {STATUS_ORDER.map((status) => (
                 <Chip
@@ -328,7 +404,7 @@ export function DashboardScreen() {
                   selected={statusFilter === status}
                   onPress={() => setStatusFilter(status)}
                 >
-                  {DISPLAY_STATUS_LABELS[status]} ({todayStatusCounts.get(status) ?? 0})
+                  {DISPLAY_STATUS_LABELS[status]} ({agendaStatusCounts.get(status) ?? 0})
                 </Chip>
               ))}
             </View>
@@ -338,8 +414,10 @@ export function DashboardScreen() {
           <EmptyState
             icon="calendar-check-outline"
             message={
-              todayItems.length === 0
-                ? 'No hay nada planificado para hoy.'
+              agendaItems.length === 0
+                ? agendaScope === 'day'
+                  ? 'No hay nada planificado para hoy.'
+                  : 'No hay nada planificado para esta semana.'
                 : 'No hay viajes con este estado.'
             }
           />
@@ -347,11 +425,14 @@ export function DashboardScreen() {
         renderItem={({ item }) => {
           const arrival = arrivalsByPlanItem.get(item.id);
           const status = getDisplayStatus(item, arrival, now);
+          const timeFormat = agendaScope === 'day' ? 'HH:mm' : 'EEE dd-MM HH:mm';
           return (
             <Card style={[styles.itemCard, { borderLeftColor: DISPLAY_STATUS_COLORS[status] }]}>
               <Card.Content style={styles.itemContent}>
-                <View style={styles.timeColumn}>
-                  <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
+                <View style={agendaScope === 'day' ? styles.timeColumn : styles.timeColumnWide}>
+                  <Text variant="titleMedium">
+                    {format(new Date(item.scheduledAt), timeFormat, { locale: es })}
+                  </Text>
                   {arrival && (
                     <Text
                       variant="bodySmall"
@@ -374,17 +455,22 @@ export function DashboardScreen() {
           );
         }}
         ListFooterComponent={
-          todayUnplannedArrivals.length === 0 ? null : (
+          agendaUnplannedArrivals.length === 0 ? null : (
             <View>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                Viajes no planificados de hoy
+                {agendaScope === 'day' ? 'Viajes no planificados de hoy' : 'Viajes no planificados de la semana'}
               </Text>
-              {todayUnplannedArrivals.map((arrival) => (
+              {agendaUnplannedArrivals.map((arrival) => (
                 <Card key={arrival.id} style={styles.itemCard}>
                   <Card.Content>
                     <Text variant="bodyMedium">{siteName(arrival.siteId)}</Text>
                     <Text variant="bodySmall" style={styles.itemDescription}>
-                      Llegó {format(new Date(arrival.arrivedAt), 'HH:mm')}
+                      Llegó{' '}
+                      {format(
+                        new Date(arrival.arrivedAt),
+                        agendaScope === 'day' ? 'HH:mm' : 'EEE dd-MM HH:mm',
+                        { locale: es },
+                      )}
                     </Text>
                   </Card.Content>
                 </Card>
@@ -416,6 +502,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: 8,
     marginBottom: 4,
+  },
+  agendaHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  agendaToggle: {
+    marginBottom: 8,
   },
   filterRow: {
     flexDirection: 'row',
@@ -498,6 +592,9 @@ const styles = StyleSheet.create({
   },
   timeColumn: {
     width: 76,
+  },
+  timeColumnWide: {
+    width: 108,
   },
   itemText: {
     flex: 1,
