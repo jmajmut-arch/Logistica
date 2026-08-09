@@ -24,6 +24,8 @@ import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
+import { useSessionStore } from '@/store/sessionStore';
+import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
 import { getWeekNumber } from '@/utils/timeBlocks';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
@@ -34,6 +36,8 @@ type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'Transp
 
 export function TransportPlanListScreen() {
   const navigation = useNavigation<Navigation>();
+  const currentUser = useSessionStore((state) => state.currentUser);
+  const planManagerScope = getPlanManagerScope(currentUser?.role);
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
@@ -104,16 +108,24 @@ export function TransportPlanListScreen() {
     );
   }
 
+  const scopedPlanItems = planItems.filter((item) =>
+    matchesOperatorScope(item.operationType, planManagerScope),
+  );
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={planItems}
+        data={scopedPlanItems}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={planItems.length === 0 && styles.emptyContainer}
+        contentContainerStyle={scopedPlanItems.length === 0 && styles.emptyContainer}
         ListEmptyComponent={
           <EmptyState
             icon="calendar-blank-outline"
-            message="No hay items en el plan de transporte todavía."
+            message={
+              planManagerScope === 'home_delivery'
+                ? 'No hay items en el plan de home delivery todavía.'
+                : 'No hay items en el plan de transporte todavía.'
+            }
           />
         }
         renderItem={({ item }) => (

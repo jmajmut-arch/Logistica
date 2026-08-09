@@ -2,6 +2,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
+import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 
 import { TransportPlanFormScreen } from './TransportPlanFormScreen';
@@ -19,6 +20,9 @@ function formTitle(route: RouteProp<TransportPlanStackParamList, 'TransportPlanF
 }
 
 export function TransportPlanStack() {
+  const role = useSessionStore((state) => state.currentUser?.role);
+  const listTitle = role === 'admin' ? 'Plan home delivery' : 'Plan semanal';
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -32,7 +36,7 @@ export function TransportPlanStack() {
       <Stack.Screen
         name="TransportPlanList"
         component={TransportPlanListScreen}
-        options={{ title: 'Plan semanal' }}
+        options={{ title: listTitle }}
       />
       <Stack.Screen
         name="TransportPlanForm"

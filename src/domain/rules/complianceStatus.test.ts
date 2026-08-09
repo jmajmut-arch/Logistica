@@ -31,24 +31,24 @@ describe('getPlanItemStatus', () => {
 });
 
 describe('getCompliancePercentage', () => {
-  it('returns null when there is nothing decided yet', () => {
+  it('returns null when there is nothing planned', () => {
     expect(getCompliancePercentage([])).toBeNull();
-    expect(getCompliancePercentage(['pending', 'pending'])).toBeNull();
   });
 
-  it('ignores pending items in the calculation', () => {
-    expect(getCompliancePercentage(['on_time', 'pending'])).toBe(100);
+  it('counts every non-arrived item against compliance, pending or not', () => {
+    expect(getCompliancePercentage(['pending', 'pending'])).toBe(0);
+    expect(getCompliancePercentage(['on_time', 'pending'])).toBe(50);
   });
 
   it('rounds to the nearest percent', () => {
     expect(getCompliancePercentage(['on_time', 'late', 'early'])).toBe(33);
   });
 
-  it('is 0 when nothing decided was on time', () => {
+  it('is 0 when nothing planned was on time', () => {
     expect(getCompliancePercentage(['late', 'early'])).toBe(0);
   });
 
-  it('counts overdue as a real miss, unlike pending', () => {
+  it('counts overdue against compliance same as pending', () => {
     expect(getCompliancePercentage(['on_time', 'overdue'])).toBe(50);
     expect(getCompliancePercentage(['overdue'])).toBe(0);
   });

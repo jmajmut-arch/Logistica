@@ -13,6 +13,7 @@ import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import { useSessionStore } from '@/store/sessionStore';
 import type { OperationType } from '@/types/enums';
+import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import { getWeekNumber } from '@/utils/timeBlocks';
 
@@ -69,11 +70,17 @@ export function TransportPlanFormScreen() {
   const route = useRoute<RouteProp<TransportPlanStackParamList, 'TransportPlanForm'>>();
   const planItemId = route.params?.planItemId;
   const currentUser = useSessionStore((state) => state.currentUser);
+  const planManagerScope = getPlanManagerScope(currentUser?.role);
+  const allowedOperationTypes = OPERATION_TYPE_OPTIONS.filter((option) =>
+    matchesOperatorScope(option.value, planManagerScope),
+  );
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
   const [loading, setLoading] = useState(planItemId !== undefined);
-  const [operationType, setOperationType] = useState<OperationType>('carga_subida');
+  const [operationType, setOperationType] = useState<OperationType>(
+    allowedOperationTypes[0]?.value ?? 'carga_subida',
+  );
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [date, setDate] = useState('');
@@ -187,7 +194,7 @@ export function TransportPlanFormScreen() {
       <SegmentedButtons
         value={operationType}
         onValueChange={(value) => setOperationType(value as OperationType)}
-        buttons={OPERATION_TYPE_OPTIONS}
+        buttons={allowedOperationTypes}
         style={styles.field}
       />
 

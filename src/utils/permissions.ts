@@ -7,11 +7,12 @@ export interface Permissions {
 }
 
 const PERMISSIONS_BY_ROLE: Record<Role, Permissions> = {
-  // El administrador mantiene los catálogos (personas, áreas, empresas). El supervisor
-  // carga el plan de transporte semanal. El operador registra las llegadas reales.
+  // El administrador mantiene los catálogos (personas, áreas, empresas) y el plan
+  // semanal de home delivery. El supervisor carga el plan de transporte de patios y
+  // bodegas (carga subida y retiro). El operador registra las llegadas reales.
   // Separación estricta para dejar trazabilidad clara de quién hizo cada cosa.
   admin: {
-    managePlan: false,
+    managePlan: true,
     registerArrivals: false,
     manageCatalog: true,
   },

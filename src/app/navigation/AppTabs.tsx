@@ -14,6 +14,7 @@ import { PALETTE } from '@/theme';
 export type AppTabsParamList = {
   Dashboard: undefined;
   TransportPlan: undefined;
+  HomeDeliveryPlan: undefined;
   Sites: undefined;
   Carriers: undefined;
   Users: undefined;
@@ -25,6 +26,7 @@ const Tab = createBottomTabNavigator<AppTabsParamList>();
 const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Dashboard: 'view-dashboard-outline',
   TransportPlan: 'calendar-clock-outline',
+  HomeDeliveryPlan: 'home-city-outline',
   Sites: 'warehouse',
   Carriers: 'domain',
   Users: 'account-group-outline',
@@ -67,6 +69,13 @@ export function AppTabs() {
           name="LoadArrivals"
           component={LoadArrivalsStack}
           options={{ title: 'Llegadas', headerShown: false }}
+        />
+      )}
+      {role === 'admin' && (
+        <Tab.Screen
+          name="HomeDeliveryPlan"
+          component={TransportPlanStack}
+          options={{ title: 'Home delivery', headerShown: false }}
         />
       )}
       {role === 'admin' && (
