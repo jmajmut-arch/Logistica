@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Card, ProgressBar, Text } from 'react-native-paper';
+import { ActivityIndicator, Card, Chip, ProgressBar, Text } from 'react-native-paper';
 
 import { EmptyState } from '@/components/EmptyState';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
@@ -47,6 +47,7 @@ export function DashboardScreen() {
   const [arrivals, setArrivals] = useState<LoadArrival[]>([]);
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
   const [now, setNow] = useState(() => Date.now());
+  const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'all'>('all');
 
   const loadData = useCallback(async () => {
     const [items, loadedArrivals, sites] = await Promise.all([
@@ -125,7 +126,17 @@ export function DashboardScreen() {
     return counts;
   }, [todayDisplayStatuses]);
 
-  const registeredTodayCount = todayItems.length - (todayStatusCounts.get('pending') ?? 0) - (todayStatusCounts.get('overdue') ?? 0);
+  const pendingTodayCount = (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
+  const registeredTodayCount = todayItems.length - pendingTodayCount;
+
+  const filteredTodayItems = useMemo(() => {
+    if (statusFilter === 'all') {
+      return todayItems;
+    }
+    return todayItems.filter(
+      (item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === statusFilter,
+    );
+  }, [todayItems, statusFilter, arrivalsByPlanItem, now]);
 
   const todayUnplannedArrivals = useMemo(
     () =>
@@ -182,6 +193,14 @@ export function DashboardScreen() {
             />
           </Card.Content>
         </Card>
+        <Card style={styles.complianceTile}>
+          <Card.Content>
+            <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
+              {pendingTodayCount}
+            </Text>
+            <Text variant="labelMedium">Viajes pendientes hoy</Text>
+          </Card.Content>
+        </Card>
       </View>
 
       <View style={styles.grid}>
@@ -200,13 +219,33 @@ export function DashboardScreen() {
       <Text variant="titleMedium" style={styles.sectionTitle}>
         Agenda de hoy
       </Text>
+      <View style={styles.filterRow}>
+        <Chip selected={statusFilter === 'all'} onPress={() => setStatusFilter('all')}>
+          Todos ({todayItems.length})
+        </Chip>
+        {STATUS_ORDER.map((status) => (
+          <Chip key={status} selected={statusFilter === status} onPress={() => setStatusFilter(status)}>
+            {DISPLAY_STATUS_LABELS[status]} ({todayStatusCounts.get(status) ?? 0})
+          </Chip>
+        ))}
+      </View>
       <FlatList
         style={styles.list}
-        data={todayItems}
+        data={filteredTodayItems}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={[styles.listContent, todayItems.length === 0 && styles.emptyContainer]}
+        contentContainerStyle={[
+          styles.listContent,
+          filteredTodayItems.length === 0 && styles.emptyContainer,
+        ]}
         ListEmptyComponent={
-          <EmptyState icon="calendar-check-outline" message="No hay nada planificado para hoy." />
+          <EmptyState
+            icon="calendar-check-outline"
+            message={
+              todayItems.length === 0
+                ? 'No hay nada planificado para hoy.'
+                : 'No hay viajes con este estado.'
+            }
+          />
         }
         renderItem={({ item }) => {
           const arrival = arrivalsByPlanItem.get(item.id);
@@ -282,6 +321,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: 8,
     marginBottom: 4,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
   },
   grid: {
     flexDirection: 'row',
