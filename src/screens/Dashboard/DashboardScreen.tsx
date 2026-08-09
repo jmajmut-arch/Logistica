@@ -8,11 +8,14 @@ import {
   Card,
   Chip,
   Dialog,
+  IconButton,
   Portal,
   ProgressBar,
   SegmentedButtons,
   Text,
 } from 'react-native-paper';
+import { DatePickerModal } from 'react-native-paper-dates';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { DonutChart } from '@/components/DonutChart';
 import { EmptyState } from '@/components/EmptyState';
@@ -30,9 +33,10 @@ import {
   type DisplayStatus,
 } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
+import { PALETTE } from '@/theme';
 import { OPERATION_TYPES } from '@/types/enums';
 import { matchesOperatorScope } from '@/utils/operatorScope';
-import { getWeekNumber, startOfToday, startOfWeek } from '@/utils/timeBlocks';
+import { getWeekNumber, startOfDay, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
   DISPLAY_STATUS_COLORS,
   DISPLAY_STATUS_LABELS,
@@ -88,6 +92,8 @@ export function DashboardScreen() {
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'all'>('all');
   const [agendaScope, setAgendaScope] = useState<'day' | 'week'>('day');
   const [detail, setDetail] = useState<DetailState | null>(null);
+  const [customRange, setCustomRange] = useState<{ start: number; end: number } | null>(null);
+  const [rangePickerVisible, setRangePickerVisible] = useState(false);
 
   const openDetail = useCallback((title: string, items: TransportPlanItem[]) => {
     setDetail({ kind: 'items', title, items });
@@ -190,6 +196,42 @@ export function DashboardScreen() {
     [arrivals, weekStart, weekEnd, isOperatorScoped, currentSiteId],
   );
 
+  // Rango de fechas personalizado, elegido a mano: se calcula igual que hoy/semana pero
+  // con límites arbitrarios en vez de fijos.
+  const customRangeItems = useMemo(() => {
+    if (!customRange) {
+      return [];
+    }
+    const rangeEnd = customRange.end + DAY_MS;
+    return scopedPlanItems
+      .filter((item) => item.scheduledAt >= customRange.start && item.scheduledAt < rangeEnd)
+      .sort((a, b) => a.scheduledAt - b.scheduledAt);
+  }, [scopedPlanItems, customRange]);
+
+  const customRangeUnplannedArrivals = useMemo(() => {
+    if (!customRange) {
+      return [];
+    }
+    const rangeEnd = customRange.end + DAY_MS;
+    return arrivals.filter(
+      (arrival) =>
+        arrival.planItemId === null &&
+        arrival.arrivedAt >= customRange.start &&
+        arrival.arrivedAt < rangeEnd &&
+        (!isOperatorScoped || arrival.siteId === currentSiteId),
+    );
+  }, [arrivals, customRange, isOperatorScoped, currentSiteId]);
+
+  const customRangeDisplayStatuses = useMemo(
+    () => customRangeItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
+    [customRangeItems, arrivalsByPlanItem, now],
+  );
+
+  const customRangeCompliance = useMemo(
+    () => combinedCompliance(customRangeDisplayStatuses, customRangeUnplannedArrivals.length),
+    [customRangeDisplayStatuses, customRangeUnplannedArrivals],
+  );
+
   const todayDisplayStatuses = useMemo(
     () => todayItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
     [todayItems, arrivalsByPlanItem, now],
@@ -243,6 +285,10 @@ export function DashboardScreen() {
 
   const todayStatusCounts = useMemo(() => countByStatus(todayDisplayStatuses), [todayDisplayStatuses]);
   const weekStatusCounts = useMemo(() => countByStatus(weekDisplayStatuses), [weekDisplayStatuses]);
+  const customRangeStatusCounts = useMemo(
+    () => countByStatus(customRangeDisplayStatuses),
+    [customRangeDisplayStatuses],
+  );
 
   const pendingTodayCount = (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
   const registeredTodayCount = todayItems.length - pendingTodayCount;
@@ -389,6 +435,107 @@ export function DashboardScreen() {
                 </Card.Content>
               </Card>
             </View>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Rango personalizado
+                </Text>
+                <View style={styles.rangePickerRow}>
+                  <Pressable onPress={() => setRangePickerVisible(true)} style={styles.rangePickerButton}>
+                    <MaterialCommunityIcons name="calendar-range" size={20} color={PALETTE.primary} />
+                    <Text variant="bodyMedium" style={styles.rangePickerText}>
+                      {customRange
+                        ? `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')}`
+                        : 'Elegir rango de fechas'}
+                    </Text>
+                  </Pressable>
+                  {customRange && (
+                    <IconButton icon="close" size={18} onPress={() => setCustomRange(null)} />
+                  )}
+                </View>
+
+                {customRange &&
+                  (customRangeItems.length === 0 && customRangeUnplannedArrivals.length === 0 ? (
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      No hay viajes planificados ni registrados en este rango.
+                    </Text>
+                  ) : (
+                    <>
+                      <Pressable
+                        style={styles.rangeComplianceRow}
+                        onPress={() =>
+                          openDetail(
+                            `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')} (${customRangeItems.length})`,
+                            customRangeItems,
+                          )
+                        }
+                      >
+                        <Text
+                          variant="displaySmall"
+                          style={{ color: getComplianceColor(customRangeCompliance) }}
+                        >
+                          {customRangeCompliance === null ? '—' : `${customRangeCompliance}%`}
+                        </Text>
+                        <Text variant="labelMedium">Cumplimiento del rango</Text>
+                      </Pressable>
+                      <View style={styles.donutRow}>
+                        <DonutChart
+                          segments={EXTENDED_STATUS_ORDER.map((status) => ({
+                            key: status,
+                            value:
+                              status === 'out_of_plan'
+                                ? customRangeUnplannedArrivals.length
+                                : (customRangeStatusCounts.get(status) ?? 0),
+                            color: EXTENDED_STATUS_COLORS[status],
+                          }))}
+                          centerValue={String(
+                            customRangeItems.length + customRangeUnplannedArrivals.length,
+                          )}
+                          centerLabel={
+                            customRangeItems.length + customRangeUnplannedArrivals.length === 1
+                              ? 'viaje'
+                              : 'viajes'
+                          }
+                        />
+                        <View style={styles.legend}>
+                          {EXTENDED_STATUS_ORDER.map((status) => (
+                            <Pressable
+                              key={status}
+                              style={styles.legendRow}
+                              onPress={() => {
+                                if (status === 'out_of_plan') {
+                                  openUnplannedDetail('No planificado · rango', customRangeUnplannedArrivals);
+                                  return;
+                                }
+                                openDetail(
+                                  `${EXTENDED_STATUS_LABELS[status]} · rango`,
+                                  customRangeItems.filter(
+                                    (item) =>
+                                      getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
+                                  ),
+                                );
+                              }}
+                            >
+                              <View
+                                style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]}
+                              />
+                              <Text variant="bodyMedium" style={styles.legendLabel}>
+                                {EXTENDED_STATUS_LABELS[status]}
+                              </Text>
+                              <Text variant="bodyMedium" style={styles.legendCount}>
+                                {status === 'out_of_plan'
+                                  ? customRangeUnplannedArrivals.length
+                                  : (customRangeStatusCounts.get(status) ?? 0)}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    </>
+                  ))}
+              </Card.Content>
+            </Card>
 
             <Card style={styles.wideCard}>
               <Card.Content>
@@ -631,6 +778,21 @@ export function DashboardScreen() {
         }
       />
 
+      <DatePickerModal
+        locale="es"
+        mode="range"
+        visible={rangePickerVisible}
+        startDate={customRange ? new Date(customRange.start) : undefined}
+        endDate={customRange ? new Date(customRange.end) : undefined}
+        onDismiss={() => setRangePickerVisible(false)}
+        onConfirm={({ startDate, endDate }) => {
+          setRangePickerVisible(false);
+          if (startDate && endDate) {
+            setCustomRange({ start: startOfDay(startDate.getTime()), end: startOfDay(endDate.getTime()) });
+          }
+        }}
+      />
+
       <Portal>
         <Dialog visible={detail !== null} onDismiss={() => setDetail(null)} style={styles.detailDialog}>
           <Dialog.Title>{detail?.title}</Dialog.Title>
@@ -728,6 +890,25 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     marginBottom: 12,
+  },
+  rangePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rangePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    paddingVertical: 8,
+  },
+  rangePickerText: {
+    color: PALETTE.primary,
+  },
+  rangeComplianceRow: {
+    marginTop: 8,
+    marginBottom: 4,
   },
   donutRow: {
     flexDirection: 'row',
