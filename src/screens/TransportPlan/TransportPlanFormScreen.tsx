@@ -155,7 +155,7 @@ export function TransportPlanFormScreen() {
           operationType,
           siteId,
           scheduledAt,
-          carrierId: null,
+          carrierId: carrierId || null,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           createdBy: currentUser.id,
@@ -320,45 +320,43 @@ export function TransportPlanFormScreen() {
         weekNumber !== null && <HelperText type="info">Semana {weekNumber}</HelperText>
       )}
 
-      {planItemId !== undefined && (
-        <View style={styles.field}>
-          <Menu
-            visible={carrierMenuVisible}
-            onDismiss={() => setCarrierMenuVisible(false)}
-            anchor={
-              <Pressable onPress={() => setCarrierMenuVisible(true)}>
-                <TextInput
-                  label="Empresa (opcional)"
-                  value={selectedCarrier?.name ?? ''}
-                  editable={false}
-                  mode="outlined"
-                  right={<TextInput.Icon icon="menu-down" />}
-                  pointerEvents="none"
-                />
-              </Pressable>
-            }
-          >
+      <View style={styles.field}>
+        <Menu
+          visible={carrierMenuVisible}
+          onDismiss={() => setCarrierMenuVisible(false)}
+          anchor={
+            <Pressable onPress={() => setCarrierMenuVisible(true)}>
+              <TextInput
+                label="Empresa de transporte (opcional)"
+                value={selectedCarrier?.name ?? ''}
+                editable={false}
+                mode="outlined"
+                right={<TextInput.Icon icon="menu-down" />}
+                pointerEvents="none"
+              />
+            </Pressable>
+          }
+        >
+          <Menu.Item
+            title="Sin empresa"
+            onPress={() => {
+              setCarrierId(0);
+              setCarrierMenuVisible(false);
+            }}
+          />
+          {carriers.length === 0 && <Menu.Item title="No hay empresas registradas" disabled />}
+          {carriers.map((carrier) => (
             <Menu.Item
-              title="Sin empresa"
+              key={carrier.id}
+              title={carrier.name}
               onPress={() => {
-                setCarrierId(0);
+                setCarrierId(carrier.id);
                 setCarrierMenuVisible(false);
               }}
             />
-            {carriers.length === 0 && <Menu.Item title="No hay empresas registradas" disabled />}
-            {carriers.map((carrier) => (
-              <Menu.Item
-                key={carrier.id}
-                title={carrier.name}
-                onPress={() => {
-                  setCarrierId(carrier.id);
-                  setCarrierMenuVisible(false);
-                }}
-              />
-            ))}
-          </Menu>
-        </View>
-      )}
+          ))}
+        </Menu>
+      </View>
       <TextInput
         label="Referencia — guía, pedido, etc. (opcional)"
         value={reference}
