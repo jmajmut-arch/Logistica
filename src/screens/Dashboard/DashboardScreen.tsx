@@ -36,14 +36,22 @@ import { getWeekNumber, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
   DISPLAY_STATUS_COLORS,
   DISPLAY_STATUS_LABELS,
+  EXTENDED_STATUS_COLORS,
+  EXTENDED_STATUS_LABELS,
   getComplianceColor,
   OPERATION_TYPE_LABELS,
+  type ExtendedDisplayStatus,
 } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STATUS_ORDER: DisplayStatus[] = ['overdue', 'late', 'pending', 'early', 'on_time'];
+const EXTENDED_STATUS_ORDER: ExtendedDisplayStatus[] = [...STATUS_ORDER, 'out_of_plan'];
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+type DetailState =
+  | { kind: 'items'; title: string; items: TransportPlanItem[] }
+  | { kind: 'unplanned'; title: string; arrivals: LoadArrival[] };
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -57,6 +65,17 @@ function arrivalDelta(scheduledAt: number, arrivedAt: number): string {
   return diffMinutes > 0 ? `+${diffMinutes} min` : `${diffMinutes} min`;
 }
 
+/** Cuenta las cargas fuera de plan como incumplimiento adicional del período: no tienen
+ * horario contra el cual medirse, pero sí bajan el % porque el plan no las anticipó. */
+function combinedCompliance(planStatuses: DisplayStatus[], unplannedCount: number): number | null {
+  const total = planStatuses.length + unplannedCount;
+  if (total === 0) {
+    return null;
+  }
+  const onTime = planStatuses.filter((status) => status === 'on_time').length;
+  return Math.round((onTime / total) * 100);
+}
+
 export function DashboardScreen() {
   const currentUser = useSessionStore((state) => state.currentUser);
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
@@ -68,10 +87,14 @@ export function DashboardScreen() {
   const [now, setNow] = useState(() => Date.now());
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'all'>('all');
   const [agendaScope, setAgendaScope] = useState<'day' | 'week'>('day');
-  const [detail, setDetail] = useState<{ title: string; items: TransportPlanItem[] } | null>(null);
+  const [detail, setDetail] = useState<DetailState | null>(null);
 
   const openDetail = useCallback((title: string, items: TransportPlanItem[]) => {
-    setDetail({ title, items });
+    setDetail({ kind: 'items', title, items });
+  }, []);
+
+  const openUnplannedDetail = useCallback((title: string, unplannedArrivals: LoadArrival[]) => {
+    setDetail({ kind: 'unplanned', title, arrivals: unplannedArrivals });
   }, []);
 
   const loadData = useCallback(async () => {
@@ -139,6 +162,34 @@ export function DashboardScreen() {
     [scopedPlanItems, weekStart, weekEnd],
   );
 
+  // Cargas que llegaron sin estar planificadas: se suman como incumplimiento adicional
+  // en los gráficos y % de cumplimiento, además de listarse aparte en la agenda.
+  const todayUnplannedArrivals = useMemo(
+    () =>
+      arrivals.filter(
+        (arrival) =>
+          arrival.planItemId === null &&
+          arrival.arrivedAt >= dayStart &&
+          arrival.arrivedAt < dayEnd &&
+          (!isOperatorScoped || arrival.siteId === currentSiteId),
+      ),
+    [arrivals, dayStart, dayEnd, isOperatorScoped, currentSiteId],
+  );
+
+  const weekUnplannedArrivals = useMemo(
+    () =>
+      arrivals
+        .filter(
+          (arrival) =>
+            arrival.planItemId === null &&
+            arrival.arrivedAt >= weekStart &&
+            arrival.arrivedAt < weekEnd &&
+            (!isOperatorScoped || arrival.siteId === currentSiteId),
+        )
+        .sort((a, b) => a.arrivedAt - b.arrivedAt),
+    [arrivals, weekStart, weekEnd, isOperatorScoped, currentSiteId],
+  );
+
   const todayDisplayStatuses = useMemo(
     () => todayItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
     [todayItems, arrivalsByPlanItem, now],
@@ -149,16 +200,16 @@ export function DashboardScreen() {
     [weekItems, arrivalsByPlanItem, now],
   );
 
-  // El % de cumplimiento usa el estado "de pantalla" (con la distinción overdue): un
-  // pendiente cuya hora ya pasó cuenta como incumplimiento, no se ignora como uno que
-  // todavía no toca.
+  // El % de cumplimiento usa el estado "de pantalla" (con la distinción overdue) y suma
+  // las cargas fuera de plan como incumplimiento adicional: un pendiente cuya hora ya
+  // pasó, o una carga que llegó sin estar planificada, cuentan igual en contra del %.
   const dailyCompliance = useMemo(
-    () => getCompliancePercentage(todayDisplayStatuses),
-    [todayDisplayStatuses],
+    () => combinedCompliance(todayDisplayStatuses, todayUnplannedArrivals.length),
+    [todayDisplayStatuses, todayUnplannedArrivals],
   );
   const weeklyCompliance = useMemo(
-    () => getCompliancePercentage(weekDisplayStatuses),
-    [weekDisplayStatuses],
+    () => combinedCompliance(weekDisplayStatuses, weekUnplannedArrivals.length),
+    [weekDisplayStatuses, weekUnplannedArrivals],
   );
 
   const weeklyComplianceByDay = useMemo(
@@ -168,14 +219,18 @@ export function DashboardScreen() {
         const end = start + DAY_MS;
         const items = weekItems.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
         const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
+        const unplannedCount = weekUnplannedArrivals.filter(
+          (arrival) => arrival.arrivedAt >= start && arrival.arrivedAt < end,
+        ).length;
         return {
           label,
-          percentage: getCompliancePercentage(statuses),
+          percentage: combinedCompliance(statuses, unplannedCount),
           highlight: start === dayStart,
           items,
+          unplannedCount,
         };
       }),
-    [weekItems, weekStart, dayStart, arrivalsByPlanItem, now],
+    [weekItems, weekUnplannedArrivals, weekStart, dayStart, arrivalsByPlanItem, now],
   );
 
   function countByStatus(statuses: DisplayStatus[]): Map<DisplayStatus, number> {
@@ -213,32 +268,6 @@ export function DashboardScreen() {
       (item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === statusFilter,
     );
   }, [agendaItems, statusFilter, arrivalsByPlanItem, now]);
-
-  const todayUnplannedArrivals = useMemo(
-    () =>
-      arrivals.filter(
-        (arrival) =>
-          arrival.planItemId === null &&
-          arrival.arrivedAt >= dayStart &&
-          arrival.arrivedAt < dayEnd &&
-          (!isOperatorScoped || arrival.siteId === currentSiteId),
-      ),
-    [arrivals, dayStart, dayEnd, isOperatorScoped, currentSiteId],
-  );
-
-  const weekUnplannedArrivals = useMemo(
-    () =>
-      arrivals
-        .filter(
-          (arrival) =>
-            arrival.planItemId === null &&
-            arrival.arrivedAt >= weekStart &&
-            arrival.arrivedAt < weekEnd &&
-            (!isOperatorScoped || arrival.siteId === currentSiteId),
-        )
-        .sort((a, b) => a.arrivedAt - b.arrivedAt),
-    [arrivals, weekStart, weekEnd, isOperatorScoped, currentSiteId],
-  );
 
   const agendaUnplannedArrivals = agendaScope === 'day' ? todayUnplannedArrivals : weekUnplannedArrivals;
 
@@ -301,6 +330,8 @@ export function DashboardScreen() {
               Semana {weekNumber}
               {todayItems.length > 0 &&
                 ` · ${registeredTodayCount} de ${todayItems.length} registrados hoy`}
+              {todayUnplannedArrivals.length > 0 &&
+                ` · ${todayUnplannedArrivals.length} no planificados`}
             </Text>
 
             <View style={styles.grid}>
@@ -364,42 +395,53 @@ export function DashboardScreen() {
                 <Text variant="titleMedium" style={styles.cardTitle}>
                   Distribución de hoy
                 </Text>
-                {todayItems.length === 0 ? (
+                {todayItems.length === 0 && todayUnplannedArrivals.length === 0 ? (
                   <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes planificados para hoy todavía.
+                    No hay viajes planificados ni registrados para hoy todavía.
                   </Text>
                 ) : (
                   <View style={styles.donutRow}>
                     <DonutChart
-                      segments={STATUS_ORDER.map((status) => ({
+                      segments={EXTENDED_STATUS_ORDER.map((status) => ({
                         key: status,
-                        value: todayStatusCounts.get(status) ?? 0,
-                        color: DISPLAY_STATUS_COLORS[status],
+                        value:
+                          status === 'out_of_plan'
+                            ? todayUnplannedArrivals.length
+                            : (todayStatusCounts.get(status) ?? 0),
+                        color: EXTENDED_STATUS_COLORS[status],
                       }))}
-                      centerValue={String(todayItems.length)}
-                      centerLabel={todayItems.length === 1 ? 'viaje' : 'viajes'}
+                      centerValue={String(todayItems.length + todayUnplannedArrivals.length)}
+                      centerLabel={
+                        todayItems.length + todayUnplannedArrivals.length === 1 ? 'viaje' : 'viajes'
+                      }
                     />
                     <View style={styles.legend}>
-                      {STATUS_ORDER.map((status) => (
+                      {EXTENDED_STATUS_ORDER.map((status) => (
                         <Pressable
                           key={status}
                           style={styles.legendRow}
-                          onPress={() =>
+                          onPress={() => {
+                            if (status === 'out_of_plan') {
+                              openUnplannedDetail('No planificado · hoy', todayUnplannedArrivals);
+                              return;
+                            }
                             openDetail(
-                              `${DISPLAY_STATUS_LABELS[status]} · hoy`,
+                              `${EXTENDED_STATUS_LABELS[status]} · hoy`,
                               todayItems.filter(
                                 (item) =>
                                   getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
                               ),
-                            )
-                          }
+                            );
+                          }}
                         >
-                          <View style={[styles.legendDot, { backgroundColor: DISPLAY_STATUS_COLORS[status] }]} />
+                          <View style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]} />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {DISPLAY_STATUS_LABELS[status]}
+                            {EXTENDED_STATUS_LABELS[status]}
                           </Text>
                           <Text variant="bodyMedium" style={styles.legendCount}>
-                            {todayStatusCounts.get(status) ?? 0}
+                            {status === 'out_of_plan'
+                              ? todayUnplannedArrivals.length
+                              : (todayStatusCounts.get(status) ?? 0)}
                           </Text>
                         </Pressable>
                       ))}
@@ -418,7 +460,12 @@ export function DashboardScreen() {
                   data={weeklyComplianceByDay.map((day) => ({
                     ...day,
                     onPress: () =>
-                      openDetail(`${capitalize(day.label)} (${day.items.length})`, day.items),
+                      openDetail(
+                        `${capitalize(day.label)} — ${day.items.length} planificados${
+                          day.unplannedCount > 0 ? ` (+${day.unplannedCount} no planificados)` : ''
+                        }`,
+                        day.items,
+                      ),
                   }))}
                 />
               </Card.Content>
@@ -429,42 +476,53 @@ export function DashboardScreen() {
                 <Text variant="titleMedium" style={styles.cardTitle}>
                   Distribución de la semana
                 </Text>
-                {weekItems.length === 0 ? (
+                {weekItems.length === 0 && weekUnplannedArrivals.length === 0 ? (
                   <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes planificados para esta semana todavía.
+                    No hay viajes planificados ni registrados para esta semana todavía.
                   </Text>
                 ) : (
                   <View style={styles.donutRow}>
                     <DonutChart
-                      segments={STATUS_ORDER.map((status) => ({
+                      segments={EXTENDED_STATUS_ORDER.map((status) => ({
                         key: status,
-                        value: weekStatusCounts.get(status) ?? 0,
-                        color: DISPLAY_STATUS_COLORS[status],
+                        value:
+                          status === 'out_of_plan'
+                            ? weekUnplannedArrivals.length
+                            : (weekStatusCounts.get(status) ?? 0),
+                        color: EXTENDED_STATUS_COLORS[status],
                       }))}
-                      centerValue={String(weekItems.length)}
-                      centerLabel={weekItems.length === 1 ? 'viaje' : 'viajes'}
+                      centerValue={String(weekItems.length + weekUnplannedArrivals.length)}
+                      centerLabel={
+                        weekItems.length + weekUnplannedArrivals.length === 1 ? 'viaje' : 'viajes'
+                      }
                     />
                     <View style={styles.legend}>
-                      {STATUS_ORDER.map((status) => (
+                      {EXTENDED_STATUS_ORDER.map((status) => (
                         <Pressable
                           key={status}
                           style={styles.legendRow}
-                          onPress={() =>
+                          onPress={() => {
+                            if (status === 'out_of_plan') {
+                              openUnplannedDetail('No planificado · semana', weekUnplannedArrivals);
+                              return;
+                            }
                             openDetail(
-                              `${DISPLAY_STATUS_LABELS[status]} · semana`,
+                              `${EXTENDED_STATUS_LABELS[status]} · semana`,
                               weekItems.filter(
                                 (item) =>
                                   getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
                               ),
-                            )
-                          }
+                            );
+                          }}
                         >
-                          <View style={[styles.legendDot, { backgroundColor: DISPLAY_STATUS_COLORS[status] }]} />
+                          <View style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]} />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {DISPLAY_STATUS_LABELS[status]}
+                            {EXTENDED_STATUS_LABELS[status]}
                           </Text>
                           <Text variant="bodyMedium" style={styles.legendCount}>
-                            {weekStatusCounts.get(status) ?? 0}
+                            {status === 'out_of_plan'
+                              ? weekUnplannedArrivals.length
+                              : (weekStatusCounts.get(status) ?? 0)}
                           </Text>
                         </Pressable>
                       ))}
@@ -578,11 +636,27 @@ export function DashboardScreen() {
           <Dialog.Title>{detail?.title}</Dialog.Title>
           <Dialog.ScrollArea style={styles.detailScrollArea}>
             <ScrollView contentContainerStyle={styles.detailScrollContent}>
-              {detail?.items.length === 0 ? (
-                <Text style={styles.itemDescription}>No hay viajes en este grupo.</Text>
-              ) : (
-                detail?.items.map((item) => renderPlanItemCard(item, true))
-              )}
+              {detail?.kind === 'items' &&
+                (detail.items.length === 0 ? (
+                  <Text style={styles.itemDescription}>No hay viajes en este grupo.</Text>
+                ) : (
+                  detail.items.map((item) => renderPlanItemCard(item, true))
+                ))}
+              {detail?.kind === 'unplanned' &&
+                (detail.arrivals.length === 0 ? (
+                  <Text style={styles.itemDescription}>No hay cargas fuera de plan en este grupo.</Text>
+                ) : (
+                  detail.arrivals.map((arrival) => (
+                    <Card key={arrival.id} style={styles.itemCard}>
+                      <Card.Content>
+                        <Text variant="bodyMedium">{siteName(arrival.siteId)}</Text>
+                        <Text variant="bodySmall" style={styles.itemDescription}>
+                          Llegó {format(new Date(arrival.arrivedAt), 'EEE dd-MM HH:mm', { locale: es })}
+                        </Text>
+                      </Card.Content>
+                    </Card>
+                  ))
+                ))}
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>

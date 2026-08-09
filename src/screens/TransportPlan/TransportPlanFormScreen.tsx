@@ -15,7 +15,7 @@ import { useSessionStore } from '@/store/sessionStore';
 import type { OperationType } from '@/types/enums';
 import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
-import { getWeekNumber } from '@/utils/timeBlocks';
+import { blockMinutesOf, combineDayAndBlock, getWeekNumber, startOfDay, TIME_BLOCKS } from '@/utils/timeBlocks';
 
 import type { TransportPlanStackParamList } from './TransportPlanStack';
 
@@ -27,26 +27,15 @@ const OPERATION_TYPE_OPTIONS: { value: OperationType; label: string }[] = [
   { value: 'home_delivery', label: 'Home delivery' },
 ];
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
-
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function parseScheduledAt(date: string, hour: string, minute: string): number | null {
-  if (!DATE_PATTERN.test(date)) {
+function parseScheduledAt(date: string, blockMinutes: number | null): number | null {
+  if (!DATE_PATTERN.test(date) || blockMinutes === null) {
     return null;
   }
   const [year, month, day] = date.split('-').map(Number);
-  const h = Number(hour);
-  const m = Number(minute);
-  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) {
-    return null;
-  }
-  const parsed = new Date(year, month - 1, day, h, m, 0, 0);
-  if (parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
-    return null;
-  }
-  return parsed.getTime();
+  const dayStart = startOfDay(new Date(year, month - 1, day).getTime());
+  return combineDayAndBlock(dayStart, blockMinutes);
 }
 
 function pad(value: number): string {
@@ -85,10 +74,8 @@ export function TransportPlanFormScreen() {
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [hour, setHour] = useState('');
-  const [hourMenuVisible, setHourMenuVisible] = useState(false);
-  const [minute, setMinute] = useState('');
-  const [minuteMenuVisible, setMinuteMenuVisible] = useState(false);
+  const [blockMinutes, setBlockMinutes] = useState<number | null>(null);
+  const [blockMenuVisible, setBlockMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
   const [carrierMenuVisible, setCarrierMenuVisible] = useState(false);
   const [reference, setReference] = useState('');
@@ -115,8 +102,7 @@ export function TransportPlanFormScreen() {
         setDate(
           `${scheduled.getFullYear()}-${pad(scheduled.getMonth() + 1)}-${pad(scheduled.getDate())}`,
         );
-        setHour(pad(scheduled.getHours()));
-        setMinute(pad(scheduled.getMinutes()));
+        setBlockMinutes(blockMinutesOf(item.scheduledAt));
         setCarrierId(item.carrierId ?? 0);
         setReference(item.reference ?? '');
         setNotes(item.notes ?? '');
@@ -126,7 +112,10 @@ export function TransportPlanFormScreen() {
     });
   }, [planItemId]);
 
-  const scheduledAt = useMemo(() => parseScheduledAt(date.trim(), hour, minute), [date, hour, minute]);
+  const scheduledAt = useMemo(
+    () => parseScheduledAt(date.trim(), blockMinutes),
+    [date, blockMinutes],
+  );
   const weekNumber = scheduledAt !== null ? getWeekNumber(scheduledAt) : null;
 
   const onSubmit = async () => {
@@ -185,6 +174,7 @@ export function TransportPlanFormScreen() {
   const selectedSite = sites.find((site) => site.id === siteId);
   const selectedCarrier = carriers.find((carrier) => carrier.id === carrierId);
   const selectedDate = dateStringToDate(date);
+  const selectedBlock = TIME_BLOCKS.find((block) => block.minutes === blockMinutes);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -257,69 +247,36 @@ export function TransportPlanFormScreen() {
         }}
       />
 
-      <View style={styles.timeRow}>
-        <View style={styles.timeInput}>
-          <Menu
-            visible={hourMenuVisible}
-            onDismiss={() => setHourMenuVisible(false)}
-            anchor={
-              <Pressable onPress={() => setHourMenuVisible(true)}>
-                <TextInput
-                  label="Hora"
-                  value={hour}
-                  editable={false}
-                  mode="outlined"
-                  right={<TextInput.Icon icon="menu-down" />}
-                  pointerEvents="none"
-                />
-              </Pressable>
-            }
-          >
-            <ScrollView style={styles.timeMenuScroll}>
-              {HOUR_OPTIONS.map((option) => (
-                <Menu.Item
-                  key={option}
-                  title={option}
-                  onPress={() => {
-                    setHour(option);
-                    setHourMenuVisible(false);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          </Menu>
-        </View>
-        <View style={styles.timeInput}>
-          <Menu
-            visible={minuteMenuVisible}
-            onDismiss={() => setMinuteMenuVisible(false)}
-            anchor={
-              <Pressable onPress={() => setMinuteMenuVisible(true)}>
-                <TextInput
-                  label="Minuto"
-                  value={minute}
-                  editable={false}
-                  mode="outlined"
-                  right={<TextInput.Icon icon="menu-down" />}
-                  pointerEvents="none"
-                />
-              </Pressable>
-            }
-          >
-            <ScrollView style={styles.timeMenuScroll}>
-              {MINUTE_OPTIONS.map((option) => (
-                <Menu.Item
-                  key={option}
-                  title={option}
-                  onPress={() => {
-                    setMinute(option);
-                    setMinuteMenuVisible(false);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          </Menu>
-        </View>
+      <View style={styles.field}>
+        <Menu
+          visible={blockMenuVisible}
+          onDismiss={() => setBlockMenuVisible(false)}
+          anchor={
+            <Pressable onPress={() => setBlockMenuVisible(true)}>
+              <TextInput
+                label="Hora"
+                value={selectedBlock?.label ?? ''}
+                editable={false}
+                mode="outlined"
+                right={<TextInput.Icon icon="menu-down" />}
+                pointerEvents="none"
+              />
+            </Pressable>
+          }
+        >
+          <ScrollView style={styles.timeMenuScroll}>
+            {TIME_BLOCKS.map((block) => (
+              <Menu.Item
+                key={block.minutes}
+                title={block.label}
+                onPress={() => {
+                  setBlockMinutes(block.minutes);
+                  setBlockMenuVisible(false);
+                }}
+              />
+            ))}
+          </ScrollView>
+        </Menu>
       </View>
       {dateError ? (
         <HelperText type="error">Selecciona la fecha y revisa la hora ingresada</HelperText>
@@ -403,14 +360,6 @@ const styles = StyleSheet.create({
   },
   label: {
     marginBottom: 8,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  timeInput: {
-    flex: 1,
   },
   timeMenuScroll: {
     maxHeight: 320,

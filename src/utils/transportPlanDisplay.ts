@@ -31,6 +31,21 @@ export const DISPLAY_STATUS_COLORS: Record<DisplayStatus, string> = {
   overdue: '#DC2626',
 };
 
+// Estado extendido solo para gráficos/estadísticas del dashboard: además de los estados
+// del plan, suma las cargas que llegaron sin estar planificadas ("Viaje no planificado"),
+// para que el panorama de tráfico real del sitio no las deje afuera.
+export type ExtendedDisplayStatus = DisplayStatus | 'out_of_plan';
+
+export const EXTENDED_STATUS_LABELS: Record<ExtendedDisplayStatus, string> = {
+  ...DISPLAY_STATUS_LABELS,
+  out_of_plan: 'No planificado',
+};
+
+export const EXTENDED_STATUS_COLORS: Record<ExtendedDisplayStatus, string> = {
+  ...DISPLAY_STATUS_COLORS,
+  out_of_plan: '#a78bfa',
+};
+
 /** Color según umbral de % de cumplimiento, para las tarjetas del dashboard. */
 export function getComplianceColor(percentage: number | null): string {
   if (percentage === null) {
