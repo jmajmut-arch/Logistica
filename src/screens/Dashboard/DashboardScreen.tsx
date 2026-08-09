@@ -31,6 +31,7 @@ import {
 } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
 import { OPERATION_TYPES } from '@/types/enums';
+import { matchesOperatorScope } from '@/utils/operatorScope';
 import { getWeekNumber, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
   DISPLAY_STATUS_COLORS,
@@ -59,6 +60,7 @@ function arrivalDelta(scheduledAt: number, arrivedAt: number): string {
 export function DashboardScreen() {
   const currentUser = useSessionStore((state) => state.currentUser);
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
+  const currentOperatorScope = useSessionStore((state) => state.currentOperatorScope);
 
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [arrivals, setArrivals] = useState<LoadArrival[]>([]);
@@ -107,14 +109,19 @@ export function DashboardScreen() {
     [sitesById],
   );
 
-  // Al operador se le acota todo el dashboard a su propio patio/bodega (el elegido al
-  // iniciar sesión); supervisor y administrador siguen viendo todos los sitios.
+  // Al operador se le acota todo el dashboard a su propio patio/bodega y al frente de
+  // trabajo elegidos al iniciar sesión; supervisor y administrador siguen viendo todo.
   const isOperatorScoped = currentUser?.role === 'operator' && currentSiteId !== null;
 
   const scopedPlanItems = useMemo(() => {
     const items = planItems ?? [];
-    return isOperatorScoped ? items.filter((item) => item.siteId === currentSiteId) : items;
-  }, [planItems, isOperatorScoped, currentSiteId]);
+    return isOperatorScoped
+      ? items.filter(
+          (item) =>
+            item.siteId === currentSiteId && matchesOperatorScope(item.operationType, currentOperatorScope),
+        )
+      : items;
+  }, [planItems, isOperatorScoped, currentSiteId, currentOperatorScope]);
 
   const todayItems = useMemo(
     () =>

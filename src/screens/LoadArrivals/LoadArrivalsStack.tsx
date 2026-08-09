@@ -9,7 +9,9 @@ import { LoadArrivalListScreen } from './LoadArrivalListScreen';
 
 export type LoadArrivalsStackParamList = {
   LoadArrivalList: undefined;
-  LoadArrivalForm: { arrivalId?: number } | undefined;
+  LoadArrivalForm:
+    | { arrivalId?: number; planItemId?: number; openUnplanned?: boolean }
+    | undefined;
 };
 
 const Stack = createNativeStackNavigator<LoadArrivalsStackParamList>();

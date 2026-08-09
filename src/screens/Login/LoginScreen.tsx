@@ -9,6 +9,8 @@ import { userRepository } from '@/data/repositories/userRepository';
 import type { Site } from '@/domain/entities/Site';
 import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
+import { OPERATOR_SCOPES, type OperatorScope } from '@/types/enums';
+import { OPERATOR_SCOPE_ICONS, OPERATOR_SCOPE_LABELS } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import { ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from '@/utils/userDisplay';
 
@@ -101,11 +103,60 @@ function SiteCard({ site, onPress, delay }: { site: Site; onPress: () => void; d
   );
 }
 
+function ScopeCard({
+  scope,
+  onPress,
+  delay,
+}: {
+  scope: OperatorScope;
+  onPress: () => void;
+  delay: number;
+}) {
+  const [pressed, setPressed] = useState(false);
+  const [anim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      useNativeDriver: false,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        onHoverIn={() => setPressed(true)}
+        onHoverOut={() => setPressed(false)}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        style={[styles.card, pressed && { borderColor: '#fb923c', transform: [{ scale: 1.015 }] }]}
+      >
+        <View style={[styles.cardIcon, { backgroundColor: 'rgba(251,146,60,0.15)' }]}>
+          <MaterialCommunityIcons name={OPERATOR_SCOPE_ICONS[scope]} size={26} color="#fb923c" />
+        </View>
+        <View style={styles.cardText}>
+          <Text style={styles.cardName}>{OPERATOR_SCOPE_LABELS[scope]}</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.4)" />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export function LoginScreen() {
   const login = useSessionStore((state) => state.login);
   const [demoUsers, setDemoUsers] = useState<User[] | null>(null);
   const [sites, setSites] = useState<Site[] | null>(null);
   const [pendingOperator, setPendingOperator] = useState<User | null>(null);
+  const [pendingSite, setPendingSite] = useState<Site | null>(null);
 
   const [heroAnim] = useState(() => new Animated.Value(0));
 
@@ -185,7 +236,7 @@ export function LoginScreen() {
                 </View>
               )}
             </>
-          ) : (
+          ) : pendingSite === null ? (
             <>
               <Pressable onPress={() => setPendingOperator(null)} style={styles.backRow}>
                 <MaterialCommunityIcons name="chevron-left" size={20} color="rgba(226,232,240,0.7)" />
@@ -207,11 +258,29 @@ export function LoginScreen() {
                       key={site.id}
                       site={site}
                       delay={80 + index * 90}
-                      onPress={() => login(pendingOperator, site.id)}
+                      onPress={() => setPendingSite(site)}
                     />
                   ))}
                 </View>
               )}
+            </>
+          ) : (
+            <>
+              <Pressable onPress={() => setPendingSite(null)} style={styles.backRow}>
+                <MaterialCommunityIcons name="chevron-left" size={20} color="rgba(226,232,240,0.7)" />
+                <Text style={styles.backText}>Elegir otro sitio</Text>
+              </Pressable>
+              <Text style={styles.pickerLabel}>¿Qué vas a registrar hoy en {pendingSite.name}?</Text>
+              <View style={styles.cardList}>
+                {OPERATOR_SCOPES.map((scope, index) => (
+                  <ScopeCard
+                    key={scope}
+                    scope={scope}
+                    delay={80 + index * 90}
+                    onPress={() => login(pendingOperator, pendingSite.id, scope)}
+                  />
+                ))}
+              </View>
             </>
           )}
         </View>

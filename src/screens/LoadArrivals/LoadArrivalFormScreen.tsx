@@ -28,6 +28,7 @@ import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
+import { matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import {
   blockMinutesOf,
@@ -52,6 +53,7 @@ export function LoadArrivalFormScreen() {
   const arrivalId = route.params?.arrivalId;
   const currentUser = useSessionStore((state) => state.currentUser);
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
+  const currentOperatorScope = useSessionStore((state) => state.currentOperatorScope);
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
@@ -69,6 +71,7 @@ export function LoadArrivalFormScreen() {
   const [unplannedCarrierMenuVisible, setUnplannedCarrierMenuVisible] = useState(false);
   const [unplannedCarrierError, setUnplannedCarrierError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [autoOpened, setAutoOpened] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -125,10 +128,11 @@ export function LoadArrivalFormScreen() {
           item.siteId === siteId &&
           item.scheduledAt >= dayStart &&
           item.scheduledAt < dayEnd &&
-          !registeredPlanItemIds.has(item.id),
+          !registeredPlanItemIds.has(item.id) &&
+          matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
-  }, [planItems, siteId, dayStart, dayEnd, registeredPlanItemIds]);
+  }, [planItems, siteId, dayStart, dayEnd, registeredPlanItemIds, currentOperatorScope]);
 
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
@@ -146,6 +150,39 @@ export function LoadArrivalFormScreen() {
       editingUnplanned ? blockMinutesOf(editingUnplanned.arrivedAt) : blockMinutesOf(Date.now()),
     );
   };
+
+  useEffect(() => {
+    if (autoOpened || arrivalId !== undefined || planItems === null) {
+      return;
+    }
+    const requestedPlanItemId = route.params?.planItemId;
+    const shouldOpenUnplanned = route.params?.openUnplanned === true;
+    if (requestedPlanItemId === undefined && !shouldOpenUnplanned) {
+      return;
+    }
+    // Se difiere a un microtask porque estamos reaccionando a datos recién cargados
+    // (no derivándolos): react-hooks/set-state-in-effect exige que el setState no sea
+    // la primera acción síncrona del efecto.
+    Promise.resolve().then(() => {
+      if (requestedPlanItemId !== undefined) {
+        const item = pendingItemsForSite.find((candidate) => candidate.id === requestedPlanItemId);
+        if (!item) {
+          return;
+        }
+        setActive(item);
+        setDialogStep('choose');
+        setBlockMinutes(blockMinutesOf(item.scheduledAt));
+        setAutoOpened(true);
+        return;
+      }
+      setActive('unplanned');
+      setDialogStep('time');
+      setUnplannedCarrierError(false);
+      setUnplannedCarrierId(0);
+      setBlockMinutes(blockMinutesOf(Date.now()));
+      setAutoOpened(true);
+    });
+  }, [autoOpened, arrivalId, planItems, pendingItemsForSite, route.params]);
 
   const closeDialog = () => {
     setActive(null);

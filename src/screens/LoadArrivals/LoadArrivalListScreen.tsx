@@ -6,6 +6,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
+  Card,
   Dialog,
   FAB,
   IconButton,
@@ -13,6 +14,7 @@ import {
   Portal,
   Text,
 } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { EmptyState } from '@/components/EmptyState';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
@@ -26,6 +28,10 @@ import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { getPlanItemStatus } from '@/domain/rules/complianceStatus';
+import { useSessionStore } from '@/store/sessionStore';
+import { PALETTE } from '@/theme';
+import { matchesOperatorScope } from '@/utils/operatorScope';
+import { startOfToday } from '@/utils/timeBlocks';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
@@ -33,9 +39,14 @@ import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
 
 type Navigation = NativeStackNavigationProp<LoadArrivalsStackParamList, 'LoadArrivalList'>;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export function LoadArrivalListScreen() {
   const navigation = useNavigation<Navigation>();
+  const currentSiteId = useSessionStore((state) => state.currentSiteId);
+  const currentOperatorScope = useSessionStore((state) => state.currentOperatorScope);
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
+  const [planItems, setPlanItems] = useState<TransportPlanItem[]>([]);
   const [planItemsById, setPlanItemsById] = useState<Map<number, TransportPlanItem>>(new Map());
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
   const [carriersById, setCarriersById] = useState<Map<number, Carrier>>(new Map());
@@ -43,19 +54,47 @@ export function LoadArrivalListScreen() {
   const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [loadedArrivals, planItems, sites, carriers] = await Promise.all([
+    const [loadedArrivals, loadedPlanItems, sites, carriers] = await Promise.all([
       loadArrivalRepository.findAll(),
       transportPlanRepository.findAll(),
       siteRepository.findAll(),
       carrierRepository.findAll(),
     ]);
     setArrivals(loadedArrivals);
-    setPlanItemsById(new Map(planItems.map((item) => [item.id, item])));
+    setPlanItems(loadedPlanItems);
+    setPlanItemsById(new Map(loadedPlanItems.map((item) => [item.id, item])));
     setSitesById(new Map(sites.map((site) => [site.id, site])));
     setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
   }, []);
 
   useFocusRefresh(loadData);
+
+  const dayStart = useMemo(() => startOfToday(), []);
+  const dayEnd = dayStart + DAY_MS;
+
+  const registeredPlanItemIds = useMemo(
+    () =>
+      new Set(
+        (arrivals ?? []).map((arrival) => arrival.planItemId).filter((id): id is number => id !== null),
+      ),
+    [arrivals],
+  );
+
+  const pendingItemsForSite = useMemo(() => {
+    if (currentSiteId === null) {
+      return [];
+    }
+    return planItems
+      .filter(
+        (item) =>
+          item.siteId === currentSiteId &&
+          item.scheduledAt >= dayStart &&
+          item.scheduledAt < dayEnd &&
+          !registeredPlanItemIds.has(item.id) &&
+          matchesOperatorScope(item.operationType, currentOperatorScope),
+      )
+      .sort((a, b) => a.scheduledAt - b.scheduledAt);
+  }, [planItems, currentSiteId, dayStart, dayEnd, registeredPlanItemIds, currentOperatorScope]);
 
   const confirmDelete = async () => {
     if (!arrivalToDelete) {
@@ -103,9 +142,71 @@ export function LoadArrivalListScreen() {
       <FlatList
         data={arrivals}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={arrivals.length === 0 && styles.emptyContainer}
-        ListEmptyComponent={
-          <EmptyState icon="package-variant-closed" message="No hay llegadas de carga registradas." />
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <RoleGate permission="registerArrivals">
+            <View>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Pendientes de hoy
+              </Text>
+              {currentSiteId === null ? (
+                <Text style={styles.emptyPending}>
+                  No tienes un sitio asignado. Elígelo desde el ícono de ubicación arriba.
+                </Text>
+              ) : pendingItemsForSite.length === 0 ? (
+                <Text style={styles.emptyPending}>Ya registraste todo lo planificado para hoy.</Text>
+              ) : (
+                pendingItemsForSite.map((item) => {
+                  const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
+                  return (
+                    <Card
+                      key={item.id}
+                      style={styles.pendingCard}
+                      onPress={() => navigation.navigate('LoadArrivalForm', { planItemId: item.id })}
+                    >
+                      <Card.Content style={styles.pendingContent}>
+                        <View style={styles.pendingTime}>
+                          <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
+                        </View>
+                        <View style={styles.pendingText}>
+                          <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
+                          {carrier && (
+                            <Text variant="bodySmall" style={styles.pendingDetail}>
+                              {carrier.name}
+                            </Text>
+                          )}
+                        </View>
+                        <MaterialCommunityIcons name="chevron-right" size={22} color={PALETTE.textMuted} />
+                      </Card.Content>
+                    </Card>
+                  );
+                })
+              )}
+              {currentSiteId !== null && (
+                <Card
+                  style={styles.pendingCard}
+                  onPress={() => navigation.navigate('LoadArrivalForm', { openUnplanned: true })}
+                >
+                  <Card.Content style={styles.pendingContent}>
+                    <MaterialCommunityIcons name="plus-circle-outline" size={24} color={PALETTE.primary} />
+                    <View style={styles.pendingText}>
+                      <Text variant="bodyMedium">Viaje no planificado</Text>
+                      <Text variant="bodySmall" style={styles.pendingDetail}>
+                        Llegó algo que no estaba en el plan
+                      </Text>
+                    </View>
+                  </Card.Content>
+                </Card>
+              )}
+
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Registradas
+              </Text>
+              {arrivals.length === 0 && (
+                <EmptyState icon="package-variant-closed" message="No hay llegadas de carga registradas." />
+              )}
+            </View>
+          </RoleGate>
         }
         renderItem={({ item }) => {
           const planItem = item.planItemId !== null ? planItemsById.get(item.planItemId) : undefined;
@@ -162,9 +263,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
+  listContent: {
+    paddingBottom: 88,
+  },
+  sectionTitle: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyPending: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    opacity: 0.7,
+  },
+  pendingCard: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  pendingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pendingTime: {
+    width: 56,
+  },
+  pendingText: {
+    flex: 1,
+    gap: 2,
+  },
+  pendingDetail: {
+    opacity: 0.7,
   },
   rightActions: {
     flexDirection: 'row',
