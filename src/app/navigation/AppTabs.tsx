@@ -8,6 +8,7 @@ import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { FieldVerificationsStack } from '@/screens/FieldVerifications/FieldVerificationsStack';
 import { StorageLimitsScreen } from '@/screens/StorageLimits/StorageLimitsScreen';
 import { SubstancesStack } from '@/screens/Substances/SubstancesStack';
+import { TruckArrivalsStack } from '@/screens/TruckArrivals/TruckArrivalsStack';
 import { PALETTE } from '@/theme';
 
 export type AppTabsParamList = {
@@ -16,6 +17,7 @@ export type AppTabsParamList = {
   CompatibilityMatrix: undefined;
   StorageLimits: undefined;
   FieldVerifications: undefined;
+  TruckArrivals: undefined;
   Alerts: undefined;
 };
 
@@ -27,6 +29,7 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   CompatibilityMatrix: 'grid',
   StorageLimits: 'gauge',
   FieldVerifications: 'clipboard-check-outline',
+  TruckArrivals: 'truck-outline',
   Alerts: 'alert-circle-outline',
 };
 
@@ -71,6 +74,11 @@ export function AppTabs() {
         name="FieldVerifications"
         component={FieldVerificationsStack}
         options={{ title: 'Verificaciones', headerShown: false }}
+      />
+      <Tab.Screen
+        name="TruckArrivals"
+        component={TruckArrivalsStack}
+        options={{ title: 'Camiones', headerShown: false }}
       />
       <Tab.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alertas' }} />
     </Tab.Navigator>

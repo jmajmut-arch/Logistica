@@ -1,3 +1,4 @@
+drop table if exists truck_arrivals cascade;
 drop table if exists field_verification_items cascade;
 drop table if exists field_verifications cascade;
 drop table if exists alerts cascade;
@@ -102,6 +103,19 @@ create table field_verification_items (
 );
 create index field_verification_items_verification_idx on field_verification_items (verification_id);
 
+create table truck_arrivals (
+  id bigint generated always as identity primary key,
+  plate text not null,
+  carrier text,
+  location text not null check (location in ('bodega', 'patio')),
+  scheduled_at bigint,
+  arrived_at bigint not null,
+  registered_by bigint not null references users (id) on delete restrict,
+  notes text,
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
+);
+create index truck_arrivals_arrived_idx on truck_arrivals (arrived_at);
+
 alter table users disable row level security;
 alter table zones disable row level security;
 alter table zone_class_limits disable row level security;
@@ -110,6 +124,7 @@ alter table substances disable row level security;
 alter table alerts disable row level security;
 alter table field_verifications disable row level security;
 alter table field_verification_items disable row level security;
+alter table truck_arrivals disable row level security;
 
 grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;

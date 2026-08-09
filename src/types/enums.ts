@@ -28,3 +28,7 @@ export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type AlertStatus = 'pending' | 'resolved';
 
 export type VerificationResult = 'cumple' | 'no_cumple' | 'no_aplica';
+
+export const TRUCK_LOCATIONS = ['bodega', 'patio'] as const;
+
+export type TruckLocation = (typeof TRUCK_LOCATIONS)[number];

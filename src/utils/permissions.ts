@@ -5,6 +5,7 @@ export interface Permissions {
   resolveAlerts: boolean;
   configureRules: boolean;
   performVerifications: boolean;
+  registerTruckArrivals: boolean;
 }
 
 const PERMISSIONS_BY_ROLE: Record<Role, Permissions> = {
@@ -13,6 +14,7 @@ const PERMISSIONS_BY_ROLE: Record<Role, Permissions> = {
     resolveAlerts: false,
     configureRules: false,
     performVerifications: true,
+    registerTruckArrivals: true,
   },
   // El rol HSE se fusionó con Supervisor: supervisor concentra todos los permisos.
   supervisor: {
@@ -20,6 +22,7 @@ const PERMISSIONS_BY_ROLE: Record<Role, Permissions> = {
     resolveAlerts: true,
     configureRules: true,
     performVerifications: true,
+    registerTruckArrivals: true,
   },
 };
 
