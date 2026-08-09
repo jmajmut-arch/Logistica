@@ -1,4 +1,4 @@
-import { getCompliancePercentage, getPlanItemStatus } from '@/domain/rules/complianceStatus';
+import { getCompliancePercentage, getDisplayStatus, getPlanItemStatus } from '@/domain/rules/complianceStatus';
 
 describe('getPlanItemStatus', () => {
   it('is pending when there is no arrival yet', () => {
@@ -46,5 +46,23 @@ describe('getCompliancePercentage', () => {
 
   it('is 0 when nothing decided was on time', () => {
     expect(getCompliancePercentage(['late', 'early'])).toBe(0);
+  });
+});
+
+describe('getDisplayStatus', () => {
+  const scheduledAt = 1_000_000;
+
+  it('is overdue when pending and the scheduled time already passed', () => {
+    expect(getDisplayStatus({ scheduledAt }, undefined, scheduledAt + 60_000)).toBe('overdue');
+  });
+
+  it('is pending when not yet due', () => {
+    expect(getDisplayStatus({ scheduledAt }, undefined, scheduledAt - 60_000)).toBe('pending');
+  });
+
+  it('passes through resolved statuses unchanged regardless of now', () => {
+    expect(
+      getDisplayStatus({ scheduledAt }, { arrivedAt: scheduledAt }, scheduledAt + 60_000),
+    ).toBe('on_time');
   });
 });

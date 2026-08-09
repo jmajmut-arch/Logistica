@@ -1,4 +1,4 @@
-import type { PlanItemStatus } from '@/domain/rules/complianceStatus';
+import type { DisplayStatus, PlanItemStatus } from '@/domain/rules/complianceStatus';
 import type { OperationType } from '@/types/enums';
 
 export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
@@ -19,6 +19,16 @@ export const PLAN_ITEM_STATUS_COLORS: Record<PlanItemStatus, string> = {
   on_time: '#2E7D32',
   late: '#B3261E',
   early: '#0284C7',
+};
+
+export const DISPLAY_STATUS_LABELS: Record<DisplayStatus, string> = {
+  ...PLAN_ITEM_STATUS_LABELS,
+  overdue: 'Atrasado — sin registrar',
+};
+
+export const DISPLAY_STATUS_COLORS: Record<DisplayStatus, string> = {
+  ...PLAN_ITEM_STATUS_COLORS,
+  overdue: '#DC2626',
 };
 
 /** Color según umbral de % de cumplimiento, para las tarjetas del dashboard. */

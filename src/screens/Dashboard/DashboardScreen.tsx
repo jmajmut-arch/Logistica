@@ -13,20 +13,21 @@ import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import {
   getCompliancePercentage,
+  getDisplayStatus,
   getPlanItemStatus,
-  type PlanItemStatus,
+  type DisplayStatus,
 } from '@/domain/rules/complianceStatus';
 import { getWeekNumber, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
+  DISPLAY_STATUS_COLORS,
+  DISPLAY_STATUS_LABELS,
   getComplianceColor,
   OPERATION_TYPE_LABELS,
-  PLAN_ITEM_STATUS_COLORS,
-  PLAN_ITEM_STATUS_LABELS,
 } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const STATUS_ORDER: PlanItemStatus[] = ['late', 'pending', 'early', 'on_time'];
+const STATUS_ORDER: DisplayStatus[] = ['overdue', 'late', 'pending', 'early', 'on_time'];
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -44,6 +45,7 @@ export function DashboardScreen() {
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [arrivals, setArrivals] = useState<LoadArrival[]>([]);
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
+  const [now, setNow] = useState(() => Date.now());
 
   const loadData = useCallback(async () => {
     const [items, loadedArrivals, sites] = await Promise.all([
@@ -54,6 +56,7 @@ export function DashboardScreen() {
     setPlanItems(items);
     setArrivals(loadedArrivals);
     setSitesById(new Map(sites.map((site) => [site.id, site])));
+    setNow(Date.now());
   }, []);
 
   useFocusRefresh(loadData);
@@ -98,21 +101,30 @@ export function DashboardScreen() {
     [todayItems, arrivalsByPlanItem],
   );
 
+  const todayDisplayStatuses = useMemo(
+    () => todayItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
+    [todayItems, arrivalsByPlanItem, now],
+  );
+
   const weekStatuses = useMemo(
     () => weekItems.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id))),
     [weekItems, arrivalsByPlanItem],
   );
 
+  // El % de cumplimiento usa el estado "puro" (sin la distinción overdue), que sigue
+  // tratando cualquier item sin llegada registrada como no resuelto todavía.
   const dailyCompliance = useMemo(() => getCompliancePercentage(todayStatuses), [todayStatuses]);
   const weeklyCompliance = useMemo(() => getCompliancePercentage(weekStatuses), [weekStatuses]);
 
   const todayStatusCounts = useMemo(() => {
-    const counts = new Map<PlanItemStatus, number>();
-    for (const status of todayStatuses) {
+    const counts = new Map<DisplayStatus, number>();
+    for (const status of todayDisplayStatuses) {
       counts.set(status, (counts.get(status) ?? 0) + 1);
     }
     return counts;
-  }, [todayStatuses]);
+  }, [todayDisplayStatuses]);
+
+  const registeredTodayCount = todayItems.length - (todayStatusCounts.get('pending') ?? 0) - (todayStatusCounts.get('overdue') ?? 0);
 
   const todayUnplannedArrivals = useMemo(
     () =>
@@ -138,6 +150,8 @@ export function DashboardScreen() {
       </Text>
       <Text variant="bodySmall" style={styles.weekLabel}>
         Semana {weekNumber}
+        {todayItems.length > 0 &&
+          ` · ${registeredTodayCount} de ${todayItems.length} registrados hoy`}
       </Text>
 
       <View style={styles.grid}>
@@ -173,10 +187,10 @@ export function DashboardScreen() {
         {STATUS_ORDER.map((status) => (
           <Card key={status} style={styles.tile}>
             <Card.Content>
-              <Text variant="displaySmall" style={{ color: PLAN_ITEM_STATUS_COLORS[status] }}>
+              <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS[status] }}>
                 {todayStatusCounts.get(status) ?? 0}
               </Text>
-              <Text variant="labelMedium">{PLAN_ITEM_STATUS_LABELS[status]}</Text>
+              <Text variant="labelMedium">{DISPLAY_STATUS_LABELS[status]}</Text>
             </Card.Content>
           </Card>
         ))}
@@ -193,16 +207,16 @@ export function DashboardScreen() {
         ListEmptyComponent={<Text style={styles.empty}>No hay nada planificado para hoy.</Text>}
         renderItem={({ item }) => {
           const arrival = arrivalsByPlanItem.get(item.id);
-          const status = getPlanItemStatus(item, arrival);
+          const status = getDisplayStatus(item, arrival, now);
           return (
-            <Card style={[styles.itemCard, { borderLeftColor: PLAN_ITEM_STATUS_COLORS[status] }]}>
+            <Card style={[styles.itemCard, { borderLeftColor: DISPLAY_STATUS_COLORS[status] }]}>
               <Card.Content style={styles.itemContent}>
                 <View style={styles.timeColumn}>
                   <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
                   {arrival && (
                     <Text
                       variant="bodySmall"
-                      style={[styles.itemDescription, { color: PLAN_ITEM_STATUS_COLORS[status] }]}
+                      style={[styles.itemDescription, { color: DISPLAY_STATUS_COLORS[status] }]}
                     >
                       {format(new Date(arrival.arrivedAt), 'HH:mm')} ·{' '}
                       {arrivalDelta(item.scheduledAt, arrival.arrivedAt)}
@@ -282,7 +296,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   tile: {
-    minWidth: 120,
+    minWidth: 110,
     flexGrow: 1,
   },
   list: {

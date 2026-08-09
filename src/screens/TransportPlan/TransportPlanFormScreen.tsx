@@ -26,6 +26,9 @@ const OPERATION_TYPE_OPTIONS: { value: OperationType; label: string }[] = [
   { value: 'home_delivery', label: 'Home delivery' },
 ];
 
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function parseScheduledAt(date: string, hour: string, minute: string): number | null {
@@ -76,7 +79,9 @@ export function TransportPlanFormScreen() {
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [hour, setHour] = useState('');
+  const [hourMenuVisible, setHourMenuVisible] = useState(false);
   const [minute, setMinute] = useState('');
+  const [minuteMenuVisible, setMinuteMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
   const [carrierMenuVisible, setCarrierMenuVisible] = useState(false);
   const [reference, setReference] = useState('');
@@ -246,24 +251,68 @@ export function TransportPlanFormScreen() {
       />
 
       <View style={styles.timeRow}>
-        <TextInput
-          label="Hora (0-23)"
-          value={hour}
-          onChangeText={setHour}
-          mode="outlined"
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.timeInput}
-        />
-        <TextInput
-          label="Minuto (0-59)"
-          value={minute}
-          onChangeText={setMinute}
-          mode="outlined"
-          keyboardType="number-pad"
-          maxLength={2}
-          style={styles.timeInput}
-        />
+        <View style={styles.timeInput}>
+          <Menu
+            visible={hourMenuVisible}
+            onDismiss={() => setHourMenuVisible(false)}
+            anchor={
+              <Pressable onPress={() => setHourMenuVisible(true)}>
+                <TextInput
+                  label="Hora"
+                  value={hour}
+                  editable={false}
+                  mode="outlined"
+                  right={<TextInput.Icon icon="menu-down" />}
+                  pointerEvents="none"
+                />
+              </Pressable>
+            }
+          >
+            <ScrollView style={styles.timeMenuScroll}>
+              {HOUR_OPTIONS.map((option) => (
+                <Menu.Item
+                  key={option}
+                  title={option}
+                  onPress={() => {
+                    setHour(option);
+                    setHourMenuVisible(false);
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </Menu>
+        </View>
+        <View style={styles.timeInput}>
+          <Menu
+            visible={minuteMenuVisible}
+            onDismiss={() => setMinuteMenuVisible(false)}
+            anchor={
+              <Pressable onPress={() => setMinuteMenuVisible(true)}>
+                <TextInput
+                  label="Minuto"
+                  value={minute}
+                  editable={false}
+                  mode="outlined"
+                  right={<TextInput.Icon icon="menu-down" />}
+                  pointerEvents="none"
+                />
+              </Pressable>
+            }
+          >
+            <ScrollView style={styles.timeMenuScroll}>
+              {MINUTE_OPTIONS.map((option) => (
+                <Menu.Item
+                  key={option}
+                  title={option}
+                  onPress={() => {
+                    setMinute(option);
+                    setMinuteMenuVisible(false);
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </Menu>
+        </View>
       </View>
       {dateError ? (
         <HelperText type="error">Selecciona la fecha y revisa la hora ingresada</HelperText>
@@ -357,5 +406,8 @@ const styles = StyleSheet.create({
   },
   timeInput: {
     flex: 1,
+  },
+  timeMenuScroll: {
+    maxHeight: 320,
   },
 });

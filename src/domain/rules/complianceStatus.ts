@@ -35,3 +35,23 @@ export function getCompliancePercentage(statuses: PlanItemStatus[]): number | nu
   const onTime = decided.filter((status) => status === 'on_time').length;
   return Math.round((onTime / decided.length) * 100);
 }
+
+export type DisplayStatus = PlanItemStatus | 'overdue';
+
+/**
+ * Igual que getPlanItemStatus, pero distingue un "pendiente" cuya hora planificada ya
+ * pasó ("overdue" — necesita atención ahora) de uno que todavía no toca. Es una capa
+ * puramente visual: no afecta el cálculo de % de cumplimiento, que sigue tratando ambos
+ * casos como no resueltos todavía.
+ */
+export function getDisplayStatus(
+  planItem: Pick<TransportPlanItem, 'scheduledAt'>,
+  arrival: Pick<LoadArrival, 'arrivedAt'> | undefined,
+  now: number = Date.now(),
+): DisplayStatus {
+  const status = getPlanItemStatus(planItem, arrival);
+  if (status === 'pending' && planItem.scheduledAt < now) {
+    return 'overdue';
+  }
+  return status;
+}
