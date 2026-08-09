@@ -1,8 +1,10 @@
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Menu, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import { DatePickerModal } from 'react-native-paper-dates';
 
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
@@ -45,6 +47,18 @@ function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+function dateStringToDate(value: string): Date | undefined {
+  if (!DATE_PATTERN.test(value)) {
+    return undefined;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function dateToDateString(value: Date): string {
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
 export function TransportPlanFormScreen() {
   const navigation = useNavigation<Navigation>();
   const route = useRoute<RouteProp<TransportPlanStackParamList, 'TransportPlanForm'>>();
@@ -57,6 +71,7 @@ export function TransportPlanFormScreen() {
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [date, setDate] = useState('');
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [hour, setHour] = useState('');
   const [minute, setMinute] = useState('');
   const [carrier, setCarrier] = useState('');
@@ -149,6 +164,7 @@ export function TransportPlanFormScreen() {
   }
 
   const selectedSite = sites.find((site) => site.id === siteId);
+  const selectedDate = dateStringToDate(date);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -195,13 +211,30 @@ export function TransportPlanFormScreen() {
         {siteError && <HelperText type="error">Selecciona un área</HelperText>}
       </View>
 
-      <TextInput
-        label="Fecha (AAAA-MM-DD)"
-        value={date}
-        onChangeText={setDate}
-        mode="outlined"
-        placeholder="2026-08-10"
-        style={styles.field}
+      <View style={styles.field}>
+        <Pressable onPress={() => setDatePickerVisible(true)}>
+          <TextInput
+            label="Fecha"
+            value={selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}
+            editable={false}
+            mode="outlined"
+            right={<TextInput.Icon icon="calendar" />}
+            pointerEvents="none"
+          />
+        </Pressable>
+      </View>
+      <DatePickerModal
+        locale="es"
+        mode="single"
+        visible={datePickerVisible}
+        date={selectedDate}
+        onDismiss={() => setDatePickerVisible(false)}
+        onConfirm={({ date: picked }) => {
+          setDatePickerVisible(false);
+          if (picked) {
+            setDate(dateToDateString(picked));
+          }
+        }}
       />
 
       <View style={styles.timeRow}>
@@ -225,7 +258,7 @@ export function TransportPlanFormScreen() {
         />
       </View>
       {dateError ? (
-        <HelperText type="error">Revisa la fecha (AAAA-MM-DD) y la hora ingresadas</HelperText>
+        <HelperText type="error">Selecciona la fecha y revisa la hora ingresada</HelperText>
       ) : (
         weekNumber !== null && <HelperText type="info">Semana {weekNumber}</HelperText>
       )}
