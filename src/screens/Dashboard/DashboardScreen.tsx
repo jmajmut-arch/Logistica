@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Card, Chip, ProgressBar, Text } from 'react-native-paper';
 
+import { DonutChart } from '@/components/DonutChart';
 import { EmptyState } from '@/components/EmptyState';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
@@ -18,6 +19,7 @@ import {
   getPlanItemStatus,
   type DisplayStatus,
 } from '@/domain/rules/complianceStatus';
+import { OPERATION_TYPES } from '@/types/enums';
 import { getWeekNumber, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
   DISPLAY_STATUS_COLORS,
@@ -129,6 +131,16 @@ export function DashboardScreen() {
   const pendingTodayCount = (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
   const registeredTodayCount = todayItems.length - pendingTodayCount;
 
+  const complianceByOperationType = useMemo(
+    () =>
+      OPERATION_TYPES.map((type) => {
+        const items = weekItems.filter((item) => item.operationType === type);
+        const statuses = items.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id)));
+        return { type, count: items.length, percentage: getCompliancePercentage(statuses) };
+      }),
+    [weekItems, arrivalsByPlanItem],
+  );
+
   const filteredTodayItems = useMemo(() => {
     if (statusFilter === 'all') {
       return todayItems;
@@ -157,86 +169,144 @@ export function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <Text variant="titleLarge" style={styles.dateHeader}>
-        {capitalize(format(new Date(dayStart), "EEEE dd 'de' MMMM", { locale: es }))}
-      </Text>
-      <Text variant="bodySmall" style={styles.weekLabel}>
-        Semana {weekNumber}
-        {todayItems.length > 0 &&
-          ` · ${registeredTodayCount} de ${todayItems.length} registrados hoy`}
-      </Text>
-
-      <View style={styles.grid}>
-        <Card style={styles.complianceTile}>
-          <Card.Content>
-            <Text variant="displaySmall" style={{ color: getComplianceColor(dailyCompliance) }}>
-              {dailyCompliance === null ? '—' : `${dailyCompliance}%`}
-            </Text>
-            <Text variant="labelMedium">Cumplimiento hoy</Text>
-            <ProgressBar
-              style={styles.progressBar}
-              progress={(dailyCompliance ?? 0) / 100}
-              color={getComplianceColor(dailyCompliance)}
-            />
-          </Card.Content>
-        </Card>
-        <Card style={styles.complianceTile}>
-          <Card.Content>
-            <Text variant="displaySmall" style={{ color: getComplianceColor(weeklyCompliance) }}>
-              {weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}
-            </Text>
-            <Text variant="labelMedium">Cumplimiento semana</Text>
-            <ProgressBar
-              style={styles.progressBar}
-              progress={(weeklyCompliance ?? 0) / 100}
-              color={getComplianceColor(weeklyCompliance)}
-            />
-          </Card.Content>
-        </Card>
-        <Card style={styles.complianceTile}>
-          <Card.Content>
-            <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
-              {pendingTodayCount}
-            </Text>
-            <Text variant="labelMedium">Viajes pendientes hoy</Text>
-          </Card.Content>
-        </Card>
-      </View>
-
-      <View style={styles.grid}>
-        {STATUS_ORDER.map((status) => (
-          <Card key={status} style={styles.tile}>
-            <Card.Content>
-              <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS[status] }}>
-                {todayStatusCounts.get(status) ?? 0}
-              </Text>
-              <Text variant="labelMedium">{DISPLAY_STATUS_LABELS[status]}</Text>
-            </Card.Content>
-          </Card>
-        ))}
-      </View>
-
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Agenda de hoy
-      </Text>
-      <View style={styles.filterRow}>
-        <Chip selected={statusFilter === 'all'} onPress={() => setStatusFilter('all')}>
-          Todos ({todayItems.length})
-        </Chip>
-        {STATUS_ORDER.map((status) => (
-          <Chip key={status} selected={statusFilter === status} onPress={() => setStatusFilter(status)}>
-            {DISPLAY_STATUS_LABELS[status]} ({todayStatusCounts.get(status) ?? 0})
-          </Chip>
-        ))}
-      </View>
       <FlatList
-        style={styles.list}
         data={filteredTodayItems}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={[
           styles.listContent,
           filteredTodayItems.length === 0 && styles.emptyContainer,
         ]}
+        ListHeaderComponent={
+          <View>
+            <Text variant="titleLarge" style={styles.dateHeader}>
+              {capitalize(format(new Date(dayStart), "EEEE dd 'de' MMMM", { locale: es }))}
+            </Text>
+            <Text variant="bodySmall" style={styles.weekLabel}>
+              Semana {weekNumber}
+              {todayItems.length > 0 &&
+                ` · ${registeredTodayCount} de ${todayItems.length} registrados hoy`}
+            </Text>
+
+            <View style={styles.grid}>
+              <Card style={styles.complianceTile}>
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: getComplianceColor(dailyCompliance) }}>
+                    {dailyCompliance === null ? '—' : `${dailyCompliance}%`}
+                  </Text>
+                  <Text variant="labelMedium">Cumplimiento hoy</Text>
+                  <ProgressBar
+                    style={styles.progressBar}
+                    progress={(dailyCompliance ?? 0) / 100}
+                    color={getComplianceColor(dailyCompliance)}
+                  />
+                </Card.Content>
+              </Card>
+              <Card style={styles.complianceTile}>
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: getComplianceColor(weeklyCompliance) }}>
+                    {weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}
+                  </Text>
+                  <Text variant="labelMedium">Cumplimiento semana</Text>
+                  <ProgressBar
+                    style={styles.progressBar}
+                    progress={(weeklyCompliance ?? 0) / 100}
+                    color={getComplianceColor(weeklyCompliance)}
+                  />
+                </Card.Content>
+              </Card>
+              <Card style={styles.complianceTile}>
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
+                    {pendingTodayCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes pendientes hoy</Text>
+                </Card.Content>
+              </Card>
+            </View>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Distribución de hoy
+                </Text>
+                {todayItems.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados para hoy todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={STATUS_ORDER.map((status) => ({
+                        key: status,
+                        value: todayStatusCounts.get(status) ?? 0,
+                        color: DISPLAY_STATUS_COLORS[status],
+                      }))}
+                      centerValue={String(todayItems.length)}
+                      centerLabel={todayItems.length === 1 ? 'viaje' : 'viajes'}
+                    />
+                    <View style={styles.legend}>
+                      {STATUS_ORDER.map((status) => (
+                        <View key={status} style={styles.legendRow}>
+                          <View style={[styles.legendDot, { backgroundColor: DISPLAY_STATUS_COLORS[status] }]} />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {DISPLAY_STATUS_LABELS[status]}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {todayStatusCounts.get(status) ?? 0}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Cumplimiento por tipo · Semana {weekNumber}
+                </Text>
+                {complianceByOperationType.map(({ type, count, percentage }) => (
+                  <View key={type} style={styles.typeRow}>
+                    <View style={styles.typeHeaderRow}>
+                      <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[type]}</Text>
+                      <Text variant="bodyMedium" style={{ color: getComplianceColor(percentage) }}>
+                        {percentage === null ? '—' : `${percentage}%`}
+                      </Text>
+                    </View>
+                    <ProgressBar
+                      style={styles.progressBar}
+                      progress={(percentage ?? 0) / 100}
+                      color={getComplianceColor(percentage)}
+                    />
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      {count} {count === 1 ? 'viaje planificado' : 'viajes planificados'} esta semana
+                    </Text>
+                  </View>
+                ))}
+              </Card.Content>
+            </Card>
+
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Agenda de hoy
+            </Text>
+            <View style={styles.filterRow}>
+              <Chip selected={statusFilter === 'all'} onPress={() => setStatusFilter('all')}>
+                Todos ({todayItems.length})
+              </Chip>
+              {STATUS_ORDER.map((status) => (
+                <Chip
+                  key={status}
+                  selected={statusFilter === status}
+                  onPress={() => setStatusFilter(status)}
+                >
+                  {DISPLAY_STATUS_LABELS[status]} ({todayStatusCounts.get(status) ?? 0})
+                </Chip>
+              ))}
+            </View>
+          </View>
+        }
         ListEmptyComponent={
           <EmptyState
             icon="calendar-check-outline"
@@ -303,8 +373,6 @@ export function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    gap: 8,
   },
   center: {
     flex: 1,
@@ -316,7 +384,7 @@ const styles = StyleSheet.create({
   },
   weekLabel: {
     opacity: 0.7,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   sectionTitle: {
     marginTop: 8,
@@ -332,25 +400,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   complianceTile: {
     minWidth: 150,
     flexGrow: 1,
+  },
+  wideCard: {
+    marginBottom: 12,
+  },
+  cardTitle: {
+    marginBottom: 12,
+  },
+  donutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    flexWrap: 'wrap',
+  },
+  legend: {
+    flex: 1,
+    minWidth: 150,
+    gap: 8,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLabel: {
+    flex: 1,
+  },
+  legendCount: {
+    fontWeight: '700',
+  },
+  typeRow: {
+    marginBottom: 14,
+  },
+  typeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   progressBar: {
     marginTop: 8,
     height: 6,
     borderRadius: 3,
   },
-  tile: {
-    minWidth: 110,
-    flexGrow: 1,
-  },
-  list: {
-    flex: 1,
-  },
   listContent: {
+    padding: 16,
     gap: 8,
   },
   emptyContainer: {

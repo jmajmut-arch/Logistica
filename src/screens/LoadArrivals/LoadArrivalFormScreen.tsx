@@ -300,10 +300,20 @@ export function LoadArrivalFormScreen() {
                   Planificado: {format(new Date(active.scheduledAt), 'EEE dd-MM HH:mm', { locale: es })}
                 </Text>
               </Dialog.Content>
-              <Dialog.Actions>
-                <Button onPress={closeDialog}>Cancelar</Button>
-                <Button onPress={() => setDialogStep('time')}>Otro horario</Button>
-                <Button mode="contained" onPress={confirmOnSchedule} loading={submitting} disabled={submitting}>
+              <Dialog.Actions style={styles.dialogActions}>
+                <Button compact onPress={closeDialog}>
+                  Cancelar
+                </Button>
+                <Button compact onPress={() => setDialogStep('time')}>
+                  Otro horario
+                </Button>
+                <Button
+                  compact
+                  mode="contained"
+                  onPress={confirmOnSchedule}
+                  loading={submitting}
+                  disabled={submitting}
+                >
                   Sí, cumplió
                 </Button>
               </Dialog.Actions>
@@ -434,5 +444,10 @@ const styles = StyleSheet.create({
   },
   blockMenuScroll: {
     maxHeight: 320,
+  },
+  dialogActions: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    rowGap: 4,
   },
 });
