@@ -27,7 +27,6 @@ import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import {
   getCompliancePercentage,
   getDisplayStatus,
-  getPlanItemStatus,
   type DisplayStatus,
 } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
@@ -133,25 +132,27 @@ export function DashboardScreen() {
     [scopedPlanItems, weekStart, weekEnd],
   );
 
-  const todayStatuses = useMemo(
-    () => todayItems.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id))),
-    [todayItems, arrivalsByPlanItem],
-  );
-
   const todayDisplayStatuses = useMemo(
     () => todayItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
     [todayItems, arrivalsByPlanItem, now],
   );
 
-  const weekStatuses = useMemo(
-    () => weekItems.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id))),
-    [weekItems, arrivalsByPlanItem],
+  const weekDisplayStatuses = useMemo(
+    () => weekItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
+    [weekItems, arrivalsByPlanItem, now],
   );
 
-  // El % de cumplimiento usa el estado "puro" (sin la distinción overdue), que sigue
-  // tratando cualquier item sin llegada registrada como no resuelto todavía.
-  const dailyCompliance = useMemo(() => getCompliancePercentage(todayStatuses), [todayStatuses]);
-  const weeklyCompliance = useMemo(() => getCompliancePercentage(weekStatuses), [weekStatuses]);
+  // El % de cumplimiento usa el estado "de pantalla" (con la distinción overdue): un
+  // pendiente cuya hora ya pasó cuenta como incumplimiento, no se ignora como uno que
+  // todavía no toca.
+  const dailyCompliance = useMemo(
+    () => getCompliancePercentage(todayDisplayStatuses),
+    [todayDisplayStatuses],
+  );
+  const weeklyCompliance = useMemo(
+    () => getCompliancePercentage(weekDisplayStatuses),
+    [weekDisplayStatuses],
+  );
 
   const weeklyComplianceByDay = useMemo(
     () =>
@@ -159,7 +160,7 @@ export function DashboardScreen() {
         const start = weekStart + index * DAY_MS;
         const end = start + DAY_MS;
         const items = weekItems.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
-        const statuses = items.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id)));
+        const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
         return {
           label,
           percentage: getCompliancePercentage(statuses),
@@ -167,12 +168,7 @@ export function DashboardScreen() {
           items,
         };
       }),
-    [weekItems, weekStart, dayStart, arrivalsByPlanItem],
-  );
-
-  const weekDisplayStatuses = useMemo(
-    () => weekItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
-    [weekItems, arrivalsByPlanItem, now],
+    [weekItems, weekStart, dayStart, arrivalsByPlanItem, now],
   );
 
   function countByStatus(statuses: DisplayStatus[]): Map<DisplayStatus, number> {
@@ -193,10 +189,10 @@ export function DashboardScreen() {
     () =>
       OPERATION_TYPES.map((type) => {
         const items = weekItems.filter((item) => item.operationType === type);
-        const statuses = items.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id)));
+        const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
         return { type, count: items.length, percentage: getCompliancePercentage(statuses), items };
       }),
-    [weekItems, arrivalsByPlanItem],
+    [weekItems, arrivalsByPlanItem, now],
   );
 
   const agendaItems = agendaScope === 'day' ? todayItems : weekItems;

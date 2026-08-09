@@ -47,6 +47,11 @@ describe('getCompliancePercentage', () => {
   it('is 0 when nothing decided was on time', () => {
     expect(getCompliancePercentage(['late', 'early'])).toBe(0);
   });
+
+  it('counts overdue as a real miss, unlike pending', () => {
+    expect(getCompliancePercentage(['on_time', 'overdue'])).toBe(50);
+    expect(getCompliancePercentage(['overdue'])).toBe(0);
+  });
 });
 
 describe('getDisplayStatus', () => {

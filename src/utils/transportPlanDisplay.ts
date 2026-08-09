@@ -23,7 +23,7 @@ export const PLAN_ITEM_STATUS_COLORS: Record<PlanItemStatus, string> = {
 
 export const DISPLAY_STATUS_LABELS: Record<DisplayStatus, string> = {
   ...PLAN_ITEM_STATUS_LABELS,
-  overdue: 'Atrasado — sin registrar',
+  overdue: 'Fuera de planificación',
 };
 
 export const DISPLAY_STATUS_COLORS: Record<DisplayStatus, string> = {

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
+  Card,
   Dialog,
   Divider,
   HelperText,
@@ -102,23 +103,6 @@ export function LoadArrivalFormScreen() {
     () => new Map((carriers ?? []).map((carrier) => [carrier.id, carrier])),
     [carriers],
   );
-
-  const describePlanItem = (item: TransportPlanItem): string => {
-    const parts = [
-      format(new Date(item.scheduledAt), 'EEE dd-MM HH:mm', { locale: es }),
-      OPERATION_TYPE_LABELS[item.operationType],
-    ];
-    if (item.carrierId !== null) {
-      const carrier = carriersById.get(item.carrierId);
-      if (carrier) {
-        parts.push(carrier.name);
-      }
-    }
-    if (item.reference) {
-      parts.push(item.reference);
-    }
-    return parts.join(' · ');
-  };
 
   const registeredPlanItemIds = useMemo(
     () =>
@@ -261,16 +245,32 @@ export function LoadArrivalFormScreen() {
               Hoy no hay carga planificada para {selectedSite?.name ?? 'este sitio'}.
             </Text>
           )}
-          {pendingItemsForSite.map((item) => (
-            <List.Item
-              key={item.id}
-              title={OPERATION_TYPE_LABELS[item.operationType]}
-              description={describePlanItem(item)}
-              left={(props) => <List.Icon {...props} icon="calendar-clock-outline" />}
-              onPress={() => openPlanItem(item)}
-              style={styles.listItem}
-            />
-          ))}
+          {pendingItemsForSite.map((item) => {
+            const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
+            return (
+              <Card key={item.id} style={styles.planItemCard} onPress={() => openPlanItem(item)}>
+                <Card.Content style={styles.planItemContent}>
+                  <View style={styles.planItemTime}>
+                    <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
+                  </View>
+                  <View style={styles.planItemText}>
+                    <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
+                    {carrier && (
+                      <Text variant="bodySmall" style={styles.planItemDetail}>
+                        {carrier.name}
+                      </Text>
+                    )}
+                    {item.reference && (
+                      <Text variant="bodySmall" style={styles.planItemDetail}>
+                        {item.reference}
+                      </Text>
+                    )}
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={PALETTE.textMuted} />
+                </Card.Content>
+              </Card>
+            );
+          })}
 
           <Divider style={styles.divider} />
           <List.Item
@@ -437,6 +437,24 @@ const styles = StyleSheet.create({
   },
   listItem: {
     paddingHorizontal: 0,
+  },
+  planItemCard: {
+    marginBottom: 8,
+  },
+  planItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  planItemTime: {
+    width: 60,
+  },
+  planItemText: {
+    flex: 1,
+    gap: 2,
+  },
+  planItemDetail: {
+    opacity: 0.7,
   },
   emptyPlan: {
     opacity: 0.7,
