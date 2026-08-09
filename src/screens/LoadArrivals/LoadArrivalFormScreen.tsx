@@ -1,9 +1,10 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Divider, HelperText, Menu, RadioButton, Text, TextInput } from 'react-native-paper';
+import { Button, Dialog, Divider, List, Menu, Portal, Text, TextInput } from 'react-native-paper';
 
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -11,21 +12,31 @@ import { transportPlanRepository } from '@/data/repositories/transportPlanReposi
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
-import { loadArrivalService } from '@/domain/services/loadArrivalService';
 import { useSessionStore } from '@/store/sessionStore';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
-import { blockMinutesOf, startOfToday, TIME_BLOCKS } from '@/utils/timeBlocks';
+import {
+  blockMinutesOf,
+  combineDayAndBlock,
+  startOfDay,
+  startOfToday,
+  startOfWeek,
+  TIME_BLOCKS,
+} from '@/utils/timeBlocks';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 
 import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
 
 type Navigation = NativeStackNavigationProp<LoadArrivalsStackParamList, 'LoadArrivalForm'>;
 
-const UNPLANNED = 'unplanned';
-const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+type ActiveSelection = TransportPlanItem | 'unplanned';
 
 function describePlanItem(item: TransportPlanItem): string {
-  const parts = [format(new Date(item.scheduledAt), 'HH:mm'), OPERATION_TYPE_LABELS[item.operationType]];
+  const parts = [
+    format(new Date(item.scheduledAt), "EEE dd-MM HH:mm", { locale: es }),
+    OPERATION_TYPE_LABELS[item.operationType],
+  ];
   if (item.carrier) {
     parts.push(item.carrier);
   }
@@ -44,11 +55,11 @@ export function LoadArrivalFormScreen() {
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
-  const [selection, setSelection] = useState('');
-  const [blockMinutes, setBlockMinutes] = useState(() => blockMinutesOf(Date.now()));
+
+  const [active, setActive] = useState<ActiveSelection | null>(null);
+  const [dialogStep, setDialogStep] = useState<'choose' | 'time'>('choose');
+  const [blockMinutes, setBlockMinutes] = useState(0);
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
-  const [siteError, setSiteError] = useState(false);
-  const [selectionError, setSelectionError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -63,11 +74,12 @@ export function LoadArrivalFormScreen() {
     });
   }, []);
 
-  const dayStart = useMemo(() => startOfToday(), []);
-  const dayEnd = dayStart + DAY_MS;
+  const weekStart = useMemo(() => startOfWeek(), []);
+  const weekEnd = weekStart + WEEK_MS;
 
   const registeredPlanItemIds = useMemo(
-    () => new Set((arrivals ?? []).map((arrival) => arrival.planItemId).filter((id): id is number => id !== null)),
+    () =>
+      new Set((arrivals ?? []).map((arrival) => arrival.planItemId).filter((id): id is number => id !== null)),
     [arrivals],
   );
 
@@ -79,61 +91,66 @@ export function LoadArrivalFormScreen() {
       .filter(
         (item) =>
           item.siteId === siteId &&
-          item.scheduledAt >= dayStart &&
-          item.scheduledAt < dayEnd &&
+          item.scheduledAt >= weekStart &&
+          item.scheduledAt < weekEnd &&
           !registeredPlanItemIds.has(item.id),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
-  }, [planItems, siteId, dayStart, dayEnd, registeredPlanItemIds]);
+  }, [planItems, siteId, weekStart, weekEnd, registeredPlanItemIds]);
 
   const onSelectSite = (id: number) => {
     setSiteId(id);
-    setSiteError(false);
     setSiteMenuVisible(false);
-    setSelection('');
   };
 
-  const onSelectionChange = (value: string) => {
-    setSelection(value);
-    setSelectionError(false);
-    if (value === UNPLANNED) {
-      setBlockMinutes(blockMinutesOf(Date.now()));
-      return;
-    }
-    const item = pendingItemsForSite.find((candidate) => String(candidate.id) === value);
-    if (item) {
-      setBlockMinutes(blockMinutesOf(item.scheduledAt));
-    }
+  const openPlanItem = (item: TransportPlanItem) => {
+    setActive(item);
+    setDialogStep('choose');
+    setBlockMinutes(blockMinutesOf(item.scheduledAt));
   };
 
-  const onSubmit = async () => {
+  const openUnplanned = () => {
+    setActive('unplanned');
+    setDialogStep('time');
+    setBlockMinutes(blockMinutesOf(Date.now()));
+  };
+
+  const closeDialog = () => {
+    setActive(null);
+    setDialogStep('choose');
+  };
+
+  const submit = async (arrivedAt: number, planItemId: number | null) => {
     if (!currentUser) {
       return;
     }
-    if (siteId === 0) {
-      setSiteError(true);
-      return;
-    }
-    setSiteError(false);
-
-    if (!selection) {
-      setSelectionError(true);
-      return;
-    }
-    setSelectionError(false);
-
     setSubmitting(true);
     try {
-      await loadArrivalService.register({
+      await loadArrivalRepository.create({
         siteId,
-        blockMinutes,
-        planItemId: selection === UNPLANNED ? null : Number(selection),
+        arrivedAt,
+        planItemId,
         registeredBy: currentUser.id,
       });
       navigation.goBack();
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const confirmOnSchedule = () => {
+    if (active === null || active === 'unplanned') {
+      return;
+    }
+    submit(active.scheduledAt, active.id);
+  };
+
+  const confirmOtherTime = () => {
+    if (active === null) {
+      return;
+    }
+    const dayStart = active === 'unplanned' ? startOfToday() : startOfDay(active.scheduledAt);
+    submit(combineDayAndBlock(dayStart, blockMinutes), active === 'unplanned' ? null : active.id);
   };
 
   if (sites === null || planItems === null || arrivals === null) {
@@ -175,77 +192,109 @@ export function LoadArrivalFormScreen() {
             />
           ))}
         </Menu>
-        {siteError && <HelperText type="error">Selecciona un área</HelperText>}
       </View>
-
-      <TextInput
-        label="Día"
-        value={format(new Date(), 'dd-MM-yyyy')}
-        editable={false}
-        mode="outlined"
-        style={styles.field}
-      />
 
       {siteId !== 0 && (
         <>
           <Text variant="bodyMedium" style={styles.label}>
-            Plan de hoy para {selectedSite?.name}
+            Plan de la semana para {selectedSite?.name}
           </Text>
-          <RadioButton.Group value={selection} onValueChange={onSelectionChange}>
-            {pendingItemsForSite.length === 0 && (
-              <Text style={styles.emptyPlan}>No hay viajes planificados pendientes en este sitio hoy.</Text>
-            )}
-            {pendingItemsForSite.map((item) => (
-              <RadioButton.Item
-                key={item.id}
-                label={describePlanItem(item)}
-                value={String(item.id)}
-              />
-            ))}
-            <Divider style={styles.divider} />
-            <RadioButton.Item label="Viaje no planificado (extra)" value={UNPLANNED} />
-          </RadioButton.Group>
-          {selectionError && (
-            <HelperText type="error">Elige un viaje o &quot;Viaje no planificado&quot;</HelperText>
+          {pendingItemsForSite.length === 0 && (
+            <Text style={styles.emptyPlan}>No hay viajes planificados pendientes en este sitio.</Text>
           )}
+          {pendingItemsForSite.map((item) => (
+            <List.Item
+              key={item.id}
+              title={OPERATION_TYPE_LABELS[item.operationType]}
+              description={describePlanItem(item)}
+              left={(props) => <List.Icon {...props} icon="calendar-clock-outline" />}
+              onPress={() => openPlanItem(item)}
+              style={styles.listItem}
+            />
+          ))}
 
-          <View style={styles.field}>
-            <Menu
-              visible={blockMenuVisible}
-              onDismiss={() => setBlockMenuVisible(false)}
-              anchor={
-                <Pressable onPress={() => setBlockMenuVisible(true)}>
-                  <TextInput
-                    label="Hora de llegada"
-                    value={selectedBlock?.label ?? ''}
-                    editable={false}
-                    mode="outlined"
-                    right={<TextInput.Icon icon="menu-down" />}
-                    pointerEvents="none"
-                  />
-                </Pressable>
-              }
-            >
-              <ScrollView style={styles.blockMenuScroll}>
-                {TIME_BLOCKS.map((block) => (
-                  <Menu.Item
-                    key={block.minutes}
-                    title={block.label}
-                    onPress={() => {
-                      setBlockMinutes(block.minutes);
-                      setBlockMenuVisible(false);
-                    }}
-                  />
-                ))}
-              </ScrollView>
-            </Menu>
-          </View>
-
-          <Button mode="contained" onPress={onSubmit} loading={submitting} disabled={submitting}>
-            Registrar llegada
-          </Button>
+          <Divider style={styles.divider} />
+          <List.Item
+            title="Viaje no planificado"
+            description="Llegó algo que no estaba en el plan"
+            left={(props) => <List.Icon {...props} icon="plus-circle-outline" />}
+            onPress={openUnplanned}
+            style={styles.listItem}
+          />
         </>
       )}
+
+      <Portal>
+        <Dialog visible={active !== null} onDismiss={closeDialog}>
+          {active !== null && active !== 'unplanned' && dialogStep === 'choose' && (
+            <>
+              <Dialog.Title>¿Se cumplió el horario planificado?</Dialog.Title>
+              <Dialog.Content>
+                <Text>
+                  Planificado: {format(new Date(active.scheduledAt), "EEE dd-MM HH:mm", { locale: es })}
+                </Text>
+              </Dialog.Content>
+              <Dialog.Actions>
+                <Button onPress={closeDialog}>Cancelar</Button>
+                <Button onPress={() => setDialogStep('time')}>Otro horario</Button>
+                <Button mode="contained" onPress={confirmOnSchedule} loading={submitting} disabled={submitting}>
+                  Sí, cumplió
+                </Button>
+              </Dialog.Actions>
+            </>
+          )}
+
+          {active !== null && dialogStep === 'time' && (
+            <>
+              <Dialog.Title>Hora de llegada</Dialog.Title>
+              <Dialog.Content>
+                <Text style={styles.dialogDayLabel}>
+                  Día:{' '}
+                  {format(
+                    new Date(active === 'unplanned' ? startOfToday() : startOfDay(active.scheduledAt)),
+                    'dd-MM-yyyy',
+                  )}
+                </Text>
+                <Menu
+                  visible={blockMenuVisible}
+                  onDismiss={() => setBlockMenuVisible(false)}
+                  anchor={
+                    <Pressable onPress={() => setBlockMenuVisible(true)}>
+                      <TextInput
+                        label="Hora"
+                        value={selectedBlock?.label ?? ''}
+                        editable={false}
+                        mode="outlined"
+                        right={<TextInput.Icon icon="menu-down" />}
+                        pointerEvents="none"
+                      />
+                    </Pressable>
+                  }
+                >
+                  <ScrollView style={styles.blockMenuScroll}>
+                    {TIME_BLOCKS.map((block) => (
+                      <Menu.Item
+                        key={block.minutes}
+                        title={block.label}
+                        onPress={() => {
+                          setBlockMinutes(block.minutes);
+                          setBlockMenuVisible(false);
+                        }}
+                      />
+                    ))}
+                  </ScrollView>
+                </Menu>
+              </Dialog.Content>
+              <Dialog.Actions>
+                <Button onPress={closeDialog}>Cancelar</Button>
+                <Button mode="contained" onPress={confirmOtherTime} loading={submitting} disabled={submitting}>
+                  Confirmar
+                </Button>
+              </Dialog.Actions>
+            </>
+          )}
+        </Dialog>
+      </Portal>
     </ScrollView>
   );
 }
@@ -266,12 +315,18 @@ const styles = StyleSheet.create({
   label: {
     marginBottom: 4,
   },
+  listItem: {
+    paddingHorizontal: 0,
+  },
   emptyPlan: {
     opacity: 0.7,
     marginBottom: 8,
   },
   divider: {
-    marginVertical: 4,
+    marginVertical: 8,
+  },
+  dialogDayLabel: {
+    marginBottom: 12,
   },
   blockMenuScroll: {
     maxHeight: 320,

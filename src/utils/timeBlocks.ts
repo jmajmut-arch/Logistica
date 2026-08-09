@@ -31,11 +31,16 @@ export function blockMinutesOf(timestamp: number): number {
   return Math.floor(minutesSinceMidnight / BLOCK_MINUTES) * BLOCK_MINUTES;
 }
 
+/** Inicio del día (00:00 hora local) que contiene `reference` (por defecto hoy). */
+export function startOfDay(reference: number = Date.now()): number {
+  const date = new Date(reference);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
 /** Fecha de hoy en hora local, a las 00:00. */
 export function startOfToday(): number {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now.getTime();
+  return startOfDay();
 }
 
 /** Combina el inicio de un día (00:00 local) con un bloque horario. */
