@@ -1,3 +1,4 @@
+import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
@@ -8,10 +9,14 @@ import { TransportPlanListScreen } from './TransportPlanListScreen';
 
 export type TransportPlanStackParamList = {
   TransportPlanList: undefined;
-  TransportPlanForm: undefined;
+  TransportPlanForm: { planItemId?: number } | undefined;
 };
 
 const Stack = createNativeStackNavigator<TransportPlanStackParamList>();
+
+function formTitle(route: RouteProp<TransportPlanStackParamList, 'TransportPlanForm'>): string {
+  return route.params?.planItemId ? 'Editar item del plan' : 'Nuevo item del plan';
+}
 
 export function TransportPlanStack() {
   return (
@@ -32,7 +37,7 @@ export function TransportPlanStack() {
       <Stack.Screen
         name="TransportPlanForm"
         component={TransportPlanFormScreen}
-        options={{ title: 'Nuevo item del plan' }}
+        options={({ route }) => ({ title: formTitle(route) })}
       />
     </Stack.Navigator>
   );

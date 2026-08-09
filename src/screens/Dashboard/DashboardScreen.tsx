@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Card, Text } from 'react-native-paper';
+import { ActivityIndicator, Card, ProgressBar, Text } from 'react-native-paper';
 
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
@@ -16,8 +16,13 @@ import {
   getPlanItemStatus,
   type PlanItemStatus,
 } from '@/domain/rules/complianceStatus';
-import { OPERATION_TYPE_LABELS, PLAN_ITEM_STATUS_LABELS } from '@/utils/transportPlanDisplay';
-import { startOfToday, startOfWeek } from '@/utils/timeBlocks';
+import { getWeekNumber, startOfToday, startOfWeek } from '@/utils/timeBlocks';
+import {
+  getComplianceColor,
+  OPERATION_TYPE_LABELS,
+  PLAN_ITEM_STATUS_COLORS,
+  PLAN_ITEM_STATUS_LABELS,
+} from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -25,6 +30,14 @@ const STATUS_ORDER: PlanItemStatus[] = ['late', 'pending', 'early', 'on_time'];
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function arrivalDelta(scheduledAt: number, arrivedAt: number): string {
+  const diffMinutes = Math.round((arrivedAt - scheduledAt) / 60_000);
+  if (diffMinutes === 0) {
+    return 'en punto';
+  }
+  return diffMinutes > 0 ? `+${diffMinutes} min` : `${diffMinutes} min`;
 }
 
 export function DashboardScreen() {
@@ -49,6 +62,7 @@ export function DashboardScreen() {
   const dayEnd = dayStart + DAY_MS;
   const weekStart = useMemo(() => startOfWeek(), []);
   const weekEnd = weekStart + 7 * DAY_MS;
+  const weekNumber = useMemo(() => getWeekNumber(weekStart), [weekStart]);
 
   const arrivalsByPlanItem = useMemo(() => {
     const map = new Map<number, LoadArrival>();
@@ -100,7 +114,7 @@ export function DashboardScreen() {
     return counts;
   }, [todayStatuses]);
 
-  const todayUnmatchedArrivals = useMemo(
+  const todayUnplannedArrivals = useMemo(
     () =>
       arrivals.filter(
         (arrival) =>
@@ -122,18 +136,35 @@ export function DashboardScreen() {
       <Text variant="titleLarge" style={styles.dateHeader}>
         {capitalize(format(new Date(dayStart), "EEEE dd 'de' MMMM", { locale: es }))}
       </Text>
+      <Text variant="bodySmall" style={styles.weekLabel}>
+        Semana {weekNumber}
+      </Text>
 
       <View style={styles.grid}>
         <Card style={styles.complianceTile}>
           <Card.Content>
-            <Text variant="displaySmall">{dailyCompliance === null ? '—' : `${dailyCompliance}%`}</Text>
+            <Text variant="displaySmall" style={{ color: getComplianceColor(dailyCompliance) }}>
+              {dailyCompliance === null ? '—' : `${dailyCompliance}%`}
+            </Text>
             <Text variant="labelMedium">Cumplimiento hoy</Text>
+            <ProgressBar
+              style={styles.progressBar}
+              progress={(dailyCompliance ?? 0) / 100}
+              color={getComplianceColor(dailyCompliance)}
+            />
           </Card.Content>
         </Card>
         <Card style={styles.complianceTile}>
           <Card.Content>
-            <Text variant="displaySmall">{weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}</Text>
+            <Text variant="displaySmall" style={{ color: getComplianceColor(weeklyCompliance) }}>
+              {weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}
+            </Text>
             <Text variant="labelMedium">Cumplimiento semana</Text>
+            <ProgressBar
+              style={styles.progressBar}
+              progress={(weeklyCompliance ?? 0) / 100}
+              color={getComplianceColor(weeklyCompliance)}
+            />
           </Card.Content>
         </Card>
       </View>
@@ -142,7 +173,9 @@ export function DashboardScreen() {
         {STATUS_ORDER.map((status) => (
           <Card key={status} style={styles.tile}>
             <Card.Content>
-              <Text variant="displaySmall">{todayStatusCounts.get(status) ?? 0}</Text>
+              <Text variant="displaySmall" style={{ color: PLAN_ITEM_STATUS_COLORS[status] }}>
+                {todayStatusCounts.get(status) ?? 0}
+              </Text>
               <Text variant="labelMedium">{PLAN_ITEM_STATUS_LABELS[status]}</Text>
             </Card.Content>
           </Card>
@@ -160,14 +193,19 @@ export function DashboardScreen() {
         ListEmptyComponent={<Text style={styles.empty}>No hay nada planificado para hoy.</Text>}
         renderItem={({ item }) => {
           const arrival = arrivalsByPlanItem.get(item.id);
+          const status = getPlanItemStatus(item, arrival);
           return (
-            <Card style={styles.itemCard}>
+            <Card style={[styles.itemCard, { borderLeftColor: PLAN_ITEM_STATUS_COLORS[status] }]}>
               <Card.Content style={styles.itemContent}>
                 <View style={styles.timeColumn}>
                   <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
                   {arrival && (
-                    <Text variant="bodySmall" style={styles.itemDescription}>
-                      Llegó {format(new Date(arrival.arrivedAt), 'HH:mm')}
+                    <Text
+                      variant="bodySmall"
+                      style={[styles.itemDescription, { color: PLAN_ITEM_STATUS_COLORS[status] }]}
+                    >
+                      {format(new Date(arrival.arrivedAt), 'HH:mm')} ·{' '}
+                      {arrivalDelta(item.scheduledAt, arrival.arrivedAt)}
                     </Text>
                   )}
                 </View>
@@ -177,18 +215,18 @@ export function DashboardScreen() {
                     {siteName(item.siteId)}
                   </Text>
                 </View>
-                <PlanItemStatusBadge status={getPlanItemStatus(item, arrival)} />
+                <PlanItemStatusBadge status={status} />
               </Card.Content>
             </Card>
           );
         }}
         ListFooterComponent={
-          todayUnmatchedArrivals.length === 0 ? null : (
+          todayUnplannedArrivals.length === 0 ? null : (
             <View>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                Llegadas de hoy sin plan asociado
+                Viajes no planificados de hoy
               </Text>
-              {todayUnmatchedArrivals.map((arrival) => (
+              {todayUnplannedArrivals.map((arrival) => (
                 <Card key={arrival.id} style={styles.itemCard}>
                   <Card.Content>
                     <Text variant="bodyMedium">{siteName(arrival.siteId)}</Text>
@@ -218,7 +256,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dateHeader: {
-    marginBottom: 4,
+    marginBottom: 0,
+  },
+  weekLabel: {
+    opacity: 0.7,
+    marginBottom: 8,
   },
   sectionTitle: {
     marginTop: 8,
@@ -233,6 +275,11 @@ const styles = StyleSheet.create({
   complianceTile: {
     minWidth: 150,
     flexGrow: 1,
+  },
+  progressBar: {
+    marginTop: 8,
+    height: 6,
+    borderRadius: 3,
   },
   tile: {
     minWidth: 120,
@@ -255,6 +302,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     marginBottom: 4,
+    borderLeftWidth: 4,
   },
   itemContent: {
     flexDirection: 'row',
@@ -262,7 +310,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   timeColumn: {
-    width: 64,
+    width: 76,
   },
   itemText: {
     flex: 1,

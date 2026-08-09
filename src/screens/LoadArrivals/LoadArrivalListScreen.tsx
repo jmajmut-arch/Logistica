@@ -74,7 +74,7 @@ export function LoadArrivalListScreen() {
           const planItem = item.planItemId !== null ? planItemsById.get(item.planItemId) : undefined;
           return (
             <List.Item
-              title={planItem ? OPERATION_TYPE_LABELS[planItem.operationType] : 'Sin plan asociado'}
+              title={planItem ? OPERATION_TYPE_LABELS[planItem.operationType] : 'Viaje no planificado'}
               description={describe(item, planItem)}
               left={(props) => <List.Icon {...props} icon="package-variant-closed" />}
               right={() =>

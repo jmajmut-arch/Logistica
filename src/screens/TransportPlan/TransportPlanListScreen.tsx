@@ -3,7 +3,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, FAB, List, Text } from 'react-native-paper';
+import {
+  ActivityIndicator,
+  Button,
+  Dialog,
+  FAB,
+  IconButton,
+  List,
+  Portal,
+  Text,
+} from 'react-native-paper';
 
 import { RoleGate } from '@/components/RoleGate';
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -12,6 +21,7 @@ import { userRepository } from '@/data/repositories/userRepository';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
+import { getWeekNumber } from '@/utils/timeBlocks';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
@@ -24,6 +34,8 @@ export function TransportPlanListScreen() {
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
+  const [itemToDelete, setItemToDelete] = useState<TransportPlanItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     const [items, users, sites] = await Promise.all([
@@ -38,10 +50,27 @@ export function TransportPlanListScreen() {
 
   useFocusRefresh(loadData);
 
+  const confirmDelete = async () => {
+    if (!itemToDelete) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await transportPlanRepository.delete(itemToDelete.id);
+      setItemToDelete(null);
+      await loadData();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const describe = useMemo(
     () => (item: TransportPlanItem) => {
       const site = sitesById.get(item.siteId);
-      const parts = [format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm')];
+      const parts = [
+        `Semana ${getWeekNumber(item.scheduledAt)}`,
+        format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm'),
+      ];
       parts.push(site ? site.name : `Sitio #${item.siteId}`);
       if (item.carrier) {
         parts.push(item.carrier);
@@ -81,6 +110,12 @@ export function TransportPlanListScreen() {
             description={describe(item)}
             descriptionNumberOfLines={2}
             left={(props) => <List.Icon {...props} icon="calendar-clock-outline" />}
+            onPress={() => navigation.navigate('TransportPlanForm', { planItemId: item.id })}
+            right={() => (
+              <RoleGate permission="managePlan">
+                <IconButton icon="delete-outline" onPress={() => setItemToDelete(item)} />
+              </RoleGate>
+            )}
           />
         )}
       />
@@ -91,6 +126,21 @@ export function TransportPlanListScreen() {
           onPress={() => navigation.navigate('TransportPlanForm')}
         />
       </RoleGate>
+
+      <Portal>
+        <Dialog visible={itemToDelete !== null} onDismiss={() => setItemToDelete(null)}>
+          <Dialog.Title>Eliminar item del plan</Dialog.Title>
+          <Dialog.Content>
+            <Text>Esta acción no se puede deshacer.</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setItemToDelete(null)}>Cancelar</Button>
+            <Button onPress={confirmDelete} loading={deleting} disabled={deleting}>
+              Eliminar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }

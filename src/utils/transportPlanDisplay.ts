@@ -20,3 +20,17 @@ export const PLAN_ITEM_STATUS_COLORS: Record<PlanItemStatus, string> = {
   late: '#B3261E',
   early: '#0284C7',
 };
+
+/** Color según umbral de % de cumplimiento, para las tarjetas del dashboard. */
+export function getComplianceColor(percentage: number | null): string {
+  if (percentage === null) {
+    return '#6B7280';
+  }
+  if (percentage >= 90) {
+    return '#2E7D32';
+  }
+  if (percentage >= 70) {
+    return '#C77700';
+  }
+  return '#B3261E';
+}

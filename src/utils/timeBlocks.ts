@@ -43,12 +43,26 @@ export function combineDayAndBlock(dayStart: number, blockMinutes: number): numb
   return dayStart + blockMinutes * 60_000;
 }
 
-/** Lunes de la semana actual, a las 00:00 hora local. */
-export function startOfWeek(): number {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const day = now.getDay(); // 0 = domingo, 1 = lunes, ...
+/** Lunes de la semana que contiene `reference` (por defecto hoy), a las 00:00 hora local. */
+export function startOfWeek(reference: number = Date.now()): number {
+  const date = new Date(reference);
+  date.setHours(0, 0, 0, 0);
+  const day = date.getDay(); // 0 = domingo, 1 = lunes, ...
   const daysSinceMonday = (day + 6) % 7;
-  now.setDate(now.getDate() - daysSinceMonday);
-  return now.getTime();
+  date.setDate(date.getDate() - daysSinceMonday);
+  return date.getTime();
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Número de semana del año (1-52/53) para `timestamp`, contando semanas de lunes a
+ * domingo desde el 1 de enero. Es una numeración simple (no ISO-8601 estricta) — suficiente
+ * para identificar "la semana X" en la planificación sin modelar semanas como entidad.
+ */
+export function getWeekNumber(timestamp: number): number {
+  const weekStart = startOfWeek(timestamp);
+  const year = new Date(timestamp).getFullYear();
+  const firstWeekStart = startOfWeek(new Date(year, 0, 1).getTime());
+  return Math.round((weekStart - firstWeekStart) / WEEK_MS) + 1;
 }
