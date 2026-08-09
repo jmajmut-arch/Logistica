@@ -42,3 +42,13 @@ export function startOfToday(): number {
 export function combineDayAndBlock(dayStart: number, blockMinutes: number): number {
   return dayStart + blockMinutes * 60_000;
 }
+
+/** Lunes de la semana actual, a las 00:00 hora local. */
+export function startOfWeek(): number {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const day = now.getDay(); // 0 = domingo, 1 = lunes, ...
+  const daysSinceMonday = (day + 6) % 7;
+  now.setDate(now.getDate() - daysSinceMonday);
+  return now.getTime();
+}

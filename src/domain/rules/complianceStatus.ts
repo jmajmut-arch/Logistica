@@ -22,3 +22,16 @@ export function getPlanItemStatus(
   }
   return 'on_time';
 }
+
+/**
+ * % de items "a tiempo" sobre los que ya se resolvieron (excluye pendientes, porque
+ * todavía no sabemos si van a cumplir). Devuelve null si no hay ninguno resuelto aún.
+ */
+export function getCompliancePercentage(statuses: PlanItemStatus[]): number | null {
+  const decided = statuses.filter((status) => status !== 'pending');
+  if (decided.length === 0) {
+    return null;
+  }
+  const onTime = decided.filter((status) => status === 'on_time').length;
+  return Math.round((onTime / decided.length) * 100);
+}

@@ -1,8 +1,18 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, FAB, List, Text } from 'react-native-paper';
+import {
+  ActivityIndicator,
+  Button,
+  Dialog,
+  FAB,
+  IconButton,
+  List,
+  Portal,
+  Snackbar,
+  Text,
+} from 'react-native-paper';
 
 import { RoleGate } from '@/components/RoleGate';
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -14,13 +24,42 @@ import type { SitesStackParamList } from './SitesStack';
 
 type Navigation = NativeStackNavigationProp<SitesStackParamList, 'SiteList'>;
 
+function isForeignKeyViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23503';
+}
+
 export function SiteListScreen() {
   const navigation = useNavigation<Navigation>();
   const [sites, setSites] = useState<Site[] | null>(null);
+  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useFocusRefresh(async () => {
+  const loadData = useCallback(async () => {
     setSites(await siteRepository.findAll());
-  });
+  }, []);
+
+  useFocusRefresh(loadData);
+
+  const confirmDelete = async () => {
+    if (!siteToDelete) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await siteRepository.delete(siteToDelete.id);
+      setSiteToDelete(null);
+      await loadData();
+    } catch (error) {
+      setErrorMessage(
+        isForeignKeyViolation(error)
+          ? 'No se puede eliminar: este sitio tiene items del plan o llegadas asociadas.'
+          : 'No se pudo eliminar el sitio.',
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (sites === null) {
     return (
@@ -44,12 +83,44 @@ export function SiteListScreen() {
             left={(props) => (
               <List.Icon {...props} icon={item.type === 'patio' ? 'texture-box' : 'warehouse'} />
             )}
+            right={() => (
+              <RoleGate permission="managePlan">
+                <View style={styles.actions}>
+                  <IconButton
+                    icon="pencil-outline"
+                    onPress={() => navigation.navigate('SiteForm', { siteId: item.id })}
+                  />
+                  <IconButton icon="delete-outline" onPress={() => setSiteToDelete(item)} />
+                </View>
+              </RoleGate>
+            )}
           />
         )}
       />
       <RoleGate permission="managePlan">
         <FAB icon="plus" style={styles.fab} onPress={() => navigation.navigate('SiteForm')} />
       </RoleGate>
+
+      <Portal>
+        <Dialog visible={siteToDelete !== null} onDismiss={() => setSiteToDelete(null)}>
+          <Dialog.Title>Eliminar sitio</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              ¿Eliminar &quot;{siteToDelete?.name}&quot;? Esta acción no se puede deshacer.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setSiteToDelete(null)}>Cancelar</Button>
+            <Button onPress={confirmDelete} loading={deleting} disabled={deleting}>
+              Eliminar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar visible={errorMessage !== null} onDismiss={() => setErrorMessage(null)} duration={4000}>
+        {errorMessage}
+      </Snackbar>
     </View>
   );
 }
@@ -71,6 +142,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
     padding: 24,
+  },
+  actions: {
+    flexDirection: 'row',
   },
   fab: {
     position: 'absolute',

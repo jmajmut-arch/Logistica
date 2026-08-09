@@ -1,7 +1,7 @@
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, HelperText, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -19,10 +19,27 @@ const SITE_TYPE_OPTIONS: { value: SiteType; label: string }[] = [
 
 export function SiteFormScreen() {
   const navigation = useNavigation<Navigation>();
+  const route = useRoute<RouteProp<SitesStackParamList, 'SiteForm'>>();
+  const siteId = route.params?.siteId;
+
   const [name, setName] = useState('');
   const [type, setType] = useState<SiteType>('bodega');
   const [nameError, setNameError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(siteId !== undefined);
+
+  useEffect(() => {
+    if (siteId === undefined) {
+      return;
+    }
+    siteRepository.findById(siteId).then((site) => {
+      if (site) {
+        setName(site.name);
+        setType(site.type);
+      }
+      setLoading(false);
+    });
+  }, [siteId]);
 
   const onSubmit = async () => {
     const trimmedName = name.trim();
@@ -34,12 +51,24 @@ export function SiteFormScreen() {
 
     setSubmitting(true);
     try {
-      await siteRepository.create({ name: trimmedName, type });
+      if (siteId !== undefined) {
+        await siteRepository.update(siteId, { name: trimmedName, type });
+      } else {
+        await siteRepository.create({ name: trimmedName, type });
+      }
       navigation.goBack();
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -64,7 +93,7 @@ export function SiteFormScreen() {
       />
 
       <Button mode="contained" onPress={onSubmit} loading={submitting} disabled={submitting}>
-        Guardar sitio
+        {siteId !== undefined ? 'Guardar cambios' : 'Guardar sitio'}
       </Button>
     </ScrollView>
   );
@@ -74,6 +103,11 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 4,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   field: {
     marginBottom: 12,

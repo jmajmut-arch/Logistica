@@ -1,4 +1,4 @@
-import { getPlanItemStatus } from '@/domain/rules/complianceStatus';
+import { getCompliancePercentage, getPlanItemStatus } from '@/domain/rules/complianceStatus';
 
 describe('getPlanItemStatus', () => {
   it('is pending when there is no arrival yet', () => {
@@ -27,5 +27,24 @@ describe('getPlanItemStatus', () => {
     expect(
       getPlanItemStatus({ scheduledAt }, { arrivedAt: scheduledAt - 16 * 60_000 }),
     ).toBe('early');
+  });
+});
+
+describe('getCompliancePercentage', () => {
+  it('returns null when there is nothing decided yet', () => {
+    expect(getCompliancePercentage([])).toBeNull();
+    expect(getCompliancePercentage(['pending', 'pending'])).toBeNull();
+  });
+
+  it('ignores pending items in the calculation', () => {
+    expect(getCompliancePercentage(['on_time', 'pending'])).toBe(100);
+  });
+
+  it('rounds to the nearest percent', () => {
+    expect(getCompliancePercentage(['on_time', 'late', 'early'])).toBe(33);
+  });
+
+  it('is 0 when nothing decided was on time', () => {
+    expect(getCompliancePercentage(['late', 'early'])).toBe(0);
   });
 });

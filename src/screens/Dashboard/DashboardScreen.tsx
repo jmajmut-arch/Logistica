@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Card, Text } from 'react-native-paper';
@@ -10,11 +11,21 @@ import { transportPlanRepository } from '@/data/repositories/transportPlanReposi
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
-import { getPlanItemStatus, type PlanItemStatus } from '@/domain/rules/complianceStatus';
+import {
+  getCompliancePercentage,
+  getPlanItemStatus,
+  type PlanItemStatus,
+} from '@/domain/rules/complianceStatus';
 import { OPERATION_TYPE_LABELS, PLAN_ITEM_STATUS_LABELS } from '@/utils/transportPlanDisplay';
+import { startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
 const STATUS_ORDER: PlanItemStatus[] = ['late', 'pending', 'early', 'on_time'];
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export function DashboardScreen() {
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
@@ -34,6 +45,11 @@ export function DashboardScreen() {
 
   useFocusRefresh(loadData);
 
+  const dayStart = useMemo(() => startOfToday(), []);
+  const dayEnd = dayStart + DAY_MS;
+  const weekStart = useMemo(() => startOfWeek(), []);
+  const weekEnd = weekStart + 7 * DAY_MS;
+
   const arrivalsByPlanItem = useMemo(() => {
     const map = new Map<number, LoadArrival>();
     for (const arrival of arrivals) {
@@ -44,23 +60,53 @@ export function DashboardScreen() {
     return map;
   }, [arrivals]);
 
-  const unmatchedArrivals = useMemo(
-    () => arrivals.filter((arrival) => arrival.planItemId === null),
-    [arrivals],
-  );
-
-  const statusCounts = useMemo(() => {
-    const counts = new Map<PlanItemStatus, number>();
-    for (const item of planItems ?? []) {
-      const status = getPlanItemStatus(item, arrivalsByPlanItem.get(item.id));
-      counts.set(status, (counts.get(status) ?? 0) + 1);
-    }
-    return counts;
-  }, [planItems, arrivalsByPlanItem]);
-
   const siteName = useCallback(
     (siteId: number) => sitesById.get(siteId)?.name ?? `Sitio #${siteId}`,
     [sitesById],
+  );
+
+  const todayItems = useMemo(
+    () =>
+      (planItems ?? [])
+        .filter((item) => item.scheduledAt >= dayStart && item.scheduledAt < dayEnd)
+        .sort((a, b) => a.scheduledAt - b.scheduledAt),
+    [planItems, dayStart, dayEnd],
+  );
+
+  const weekItems = useMemo(
+    () =>
+      (planItems ?? []).filter((item) => item.scheduledAt >= weekStart && item.scheduledAt < weekEnd),
+    [planItems, weekStart, weekEnd],
+  );
+
+  const todayStatuses = useMemo(
+    () => todayItems.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id))),
+    [todayItems, arrivalsByPlanItem],
+  );
+
+  const weekStatuses = useMemo(
+    () => weekItems.map((item) => getPlanItemStatus(item, arrivalsByPlanItem.get(item.id))),
+    [weekItems, arrivalsByPlanItem],
+  );
+
+  const dailyCompliance = useMemo(() => getCompliancePercentage(todayStatuses), [todayStatuses]);
+  const weeklyCompliance = useMemo(() => getCompliancePercentage(weekStatuses), [weekStatuses]);
+
+  const todayStatusCounts = useMemo(() => {
+    const counts = new Map<PlanItemStatus, number>();
+    for (const status of todayStatuses) {
+      counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+    return counts;
+  }, [todayStatuses]);
+
+  const todayUnmatchedArrivals = useMemo(
+    () =>
+      arrivals.filter(
+        (arrival) =>
+          arrival.planItemId === null && arrival.arrivedAt >= dayStart && arrival.arrivedAt < dayEnd,
+      ),
+    [arrivals, dayStart, dayEnd],
   );
 
   if (planItems === null) {
@@ -73,14 +119,30 @@ export function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Cumplimiento del plan de transporte
+      <Text variant="titleLarge" style={styles.dateHeader}>
+        {capitalize(format(new Date(dayStart), "EEEE dd 'de' MMMM", { locale: es }))}
       </Text>
+
+      <View style={styles.grid}>
+        <Card style={styles.complianceTile}>
+          <Card.Content>
+            <Text variant="displaySmall">{dailyCompliance === null ? '—' : `${dailyCompliance}%`}</Text>
+            <Text variant="labelMedium">Cumplimiento hoy</Text>
+          </Card.Content>
+        </Card>
+        <Card style={styles.complianceTile}>
+          <Card.Content>
+            <Text variant="displaySmall">{weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}</Text>
+            <Text variant="labelMedium">Cumplimiento semana</Text>
+          </Card.Content>
+        </Card>
+      </View>
+
       <View style={styles.grid}>
         {STATUS_ORDER.map((status) => (
           <Card key={status} style={styles.tile}>
             <Card.Content>
-              <Text variant="displaySmall">{statusCounts.get(status) ?? 0}</Text>
+              <Text variant="displaySmall">{todayStatusCounts.get(status) ?? 0}</Text>
               <Text variant="labelMedium">{PLAN_ITEM_STATUS_LABELS[status]}</Text>
             </Card.Content>
           </Card>
@@ -88,32 +150,31 @@ export function DashboardScreen() {
       </View>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Plan vs. llegada real
+        Agenda de hoy
       </Text>
       <FlatList
         style={styles.list}
-        data={planItems}
+        data={todayItems}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={[styles.listContent, planItems.length === 0 && styles.emptyContainer]}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No hay items en el plan de transporte todavía.</Text>
-        }
+        contentContainerStyle={[styles.listContent, todayItems.length === 0 && styles.emptyContainer]}
+        ListEmptyComponent={<Text style={styles.empty}>No hay nada planificado para hoy.</Text>}
         renderItem={({ item }) => {
           const arrival = arrivalsByPlanItem.get(item.id);
-          const parts = [
-            `Planificado ${format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm')}`,
-            siteName(item.siteId),
-          ];
-          if (arrival) {
-            parts.push(`Llegó ${format(new Date(arrival.arrivedAt), 'HH:mm')}`);
-          }
           return (
             <Card style={styles.itemCard}>
               <Card.Content style={styles.itemContent}>
+                <View style={styles.timeColumn}>
+                  <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
+                  {arrival && (
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      Llegó {format(new Date(arrival.arrivedAt), 'HH:mm')}
+                    </Text>
+                  )}
+                </View>
                 <View style={styles.itemText}>
                   <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
                   <Text variant="bodySmall" style={styles.itemDescription}>
-                    {parts.join(' · ')}
+                    {siteName(item.siteId)}
                   </Text>
                 </View>
                 <PlanItemStatusBadge status={getPlanItemStatus(item, arrival)} />
@@ -122,17 +183,17 @@ export function DashboardScreen() {
           );
         }}
         ListFooterComponent={
-          unmatchedArrivals.length === 0 ? null : (
+          todayUnmatchedArrivals.length === 0 ? null : (
             <View>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                Llegadas sin plan asociado
+                Llegadas de hoy sin plan asociado
               </Text>
-              {unmatchedArrivals.map((arrival) => (
+              {todayUnmatchedArrivals.map((arrival) => (
                 <Card key={arrival.id} style={styles.itemCard}>
                   <Card.Content>
                     <Text variant="bodyMedium">{siteName(arrival.siteId)}</Text>
                     <Text variant="bodySmall" style={styles.itemDescription}>
-                      Llegó {format(new Date(arrival.arrivedAt), 'dd-MM-yyyy HH:mm')}
+                      Llegó {format(new Date(arrival.arrivedAt), 'HH:mm')}
                     </Text>
                   </Card.Content>
                 </Card>
@@ -156,6 +217,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dateHeader: {
+    marginBottom: 4,
+  },
   sectionTitle: {
     marginTop: 8,
     marginBottom: 4,
@@ -165,6 +229,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 8,
+  },
+  complianceTile: {
+    minWidth: 150,
+    flexGrow: 1,
   },
   tile: {
     minWidth: 120,
@@ -191,8 +259,10 @@ const styles = StyleSheet.create({
   itemContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 12,
+  },
+  timeColumn: {
+    width: 64,
   },
   itemText: {
     flex: 1,
