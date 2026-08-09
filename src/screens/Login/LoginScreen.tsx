@@ -9,17 +9,17 @@ import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
 
 const ROLE_LABELS: Record<User['role'], string> = {
-  warehouse: 'Bodega',
+  operator: 'Operador',
   supervisor: 'Supervisor',
 };
 
 const ROLE_ICONS: Record<User['role'], keyof typeof MaterialCommunityIcons.glyphMap> = {
-  warehouse: 'warehouse',
+  operator: 'truck-delivery-outline',
   supervisor: 'shield-check-outline',
 };
 
 const ROLE_ACCENTS: Record<User['role'], string> = {
-  warehouse: '#38bdf8',
+  operator: '#38bdf8',
   supervisor: '#fb923c',
 };
 
@@ -101,14 +101,14 @@ export function LoginScreen() {
         >
           <View style={styles.badge}>
             <View style={styles.badgeDiamond}>
-              <MaterialCommunityIcons name="flask" size={30} color="#0b1120" />
+              <MaterialCommunityIcons name="truck-fast-outline" size={30} color="#0b1120" />
             </View>
           </View>
-          <Text style={styles.title}>SUSPEL</Text>
-          <Text style={styles.subtitle}>Registro de Sustancias Peligrosas</Text>
+          <Text style={styles.title}>Control de Transporte</Text>
+          <Text style={styles.subtitle}>Planificación y cumplimiento de cargas</Text>
           <View style={styles.tagRow}>
             <View style={styles.tagPill}>
-              <Text style={styles.tagText}>DS 43 · Chile</Text>
+              <Text style={styles.tagText}>Subida · Retiro · Home delivery</Text>
             </View>
           </View>
         </Animated.View>
@@ -132,7 +132,7 @@ export function LoginScreen() {
           )}
         </View>
 
-        <Text style={styles.footer}>Trazabilidad de stock · Verificaciones en terreno</Text>
+        <Text style={styles.footer}>Plan semanal · Registro de llegadas · Cumplimiento</Text>
       </View>
     </LinearGradient>
   );

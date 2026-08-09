@@ -15,7 +15,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
     // app, para mostrar un error claro si falta configurar las credenciales o el
     // esquema todavía no se corrió.
     supabase
-      .from('zones')
+      .from('users')
       .select('id', { count: 'exact', head: true })
       .then(({ error: queryError }) => {
         if (queryError) {

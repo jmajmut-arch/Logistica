@@ -1,9 +1,9 @@
 import { DarkTheme as NavigationDarkTheme, type Theme as NavigationTheme } from '@react-navigation/native';
 import { MD3DarkTheme, type MD3Theme } from 'react-native-paper';
 
-// Paleta de marca de SUSPEL: fondo azul-noche, acento naranja de riesgo (peligro/DS 43)
-// y acento celeste secundario. Usada en la pantalla de login y en el resto de la app
-// vía PaperProvider / NavigationContainer para mantener una identidad consistente.
+// Paleta de la app: fondo azul-noche, acento naranja y acento celeste secundario. Usada
+// en la pantalla de login y en el resto de la app vía PaperProvider / NavigationContainer
+// para mantener una identidad consistente.
 export const PALETTE = {
   background: '#0b1120',
   surface: '#132743',

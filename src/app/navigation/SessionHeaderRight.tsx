@@ -7,7 +7,7 @@ import { PALETTE } from '@/theme';
 import type { Role } from '@/types/enums';
 
 const ROLE_LABELS: Record<Role, string> = {
-  warehouse: 'Bodega',
+  operator: 'Operador',
   supervisor: 'Supervisor',
 };
 

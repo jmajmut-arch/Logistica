@@ -1,28 +1,20 @@
 import type { Role } from '@/types/enums';
 
 export interface Permissions {
-  manageSubstances: boolean;
-  resolveAlerts: boolean;
-  configureRules: boolean;
-  performVerifications: boolean;
-  registerTruckArrivals: boolean;
+  managePlan: boolean;
+  registerArrivals: boolean;
 }
 
 const PERMISSIONS_BY_ROLE: Record<Role, Permissions> = {
-  warehouse: {
-    manageSubstances: true,
-    resolveAlerts: false,
-    configureRules: false,
-    performVerifications: true,
-    registerTruckArrivals: true,
-  },
-  // El rol HSE se fusionó con Supervisor: supervisor concentra todos los permisos.
+  // El supervisor carga el plan de transporte semanal; el operador registra las llegadas
+  // reales. Separación estricta para dejar trazabilidad clara de quién hizo cada cosa.
   supervisor: {
-    manageSubstances: true,
-    resolveAlerts: true,
-    configureRules: true,
-    performVerifications: true,
-    registerTruckArrivals: true,
+    managePlan: true,
+    registerArrivals: false,
+  },
+  operator: {
+    managePlan: false,
+    registerArrivals: true,
   },
 };
 

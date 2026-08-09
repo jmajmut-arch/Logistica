@@ -3,17 +3,17 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
 import { PALETTE } from '@/theme';
 
-import { TruckArrivalFormScreen } from './TruckArrivalFormScreen';
-import { TruckArrivalListScreen } from './TruckArrivalListScreen';
+import { TransportPlanFormScreen } from './TransportPlanFormScreen';
+import { TransportPlanListScreen } from './TransportPlanListScreen';
 
-export type TruckArrivalsStackParamList = {
-  TruckArrivalList: undefined;
-  TruckArrivalForm: undefined;
+export type TransportPlanStackParamList = {
+  TransportPlanList: undefined;
+  TransportPlanForm: undefined;
 };
 
-const Stack = createNativeStackNavigator<TruckArrivalsStackParamList>();
+const Stack = createNativeStackNavigator<TransportPlanStackParamList>();
 
-export function TruckArrivalsStack() {
+export function TransportPlanStack() {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -25,14 +25,14 @@ export function TruckArrivalsStack() {
       }}
     >
       <Stack.Screen
-        name="TruckArrivalList"
-        component={TruckArrivalListScreen}
-        options={{ title: 'Llegada de camiones' }}
+        name="TransportPlanList"
+        component={TransportPlanListScreen}
+        options={{ title: 'Plan semanal' }}
       />
       <Stack.Screen
-        name="TruckArrivalForm"
-        component={TruckArrivalFormScreen}
-        options={{ title: 'Registrar llegada' }}
+        name="TransportPlanForm"
+        component={TransportPlanFormScreen}
+        options={{ title: 'Nuevo item del plan' }}
       />
     </Stack.Navigator>
   );

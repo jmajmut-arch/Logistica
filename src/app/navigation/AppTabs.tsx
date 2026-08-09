@@ -2,35 +2,23 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { AlertsScreen } from '@/screens/Alerts/AlertsScreen';
-import { CompatibilityMatrixScreen } from '@/screens/CompatibilityMatrix/CompatibilityMatrixScreen';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
-import { FieldVerificationsStack } from '@/screens/FieldVerifications/FieldVerificationsStack';
-import { StorageLimitsScreen } from '@/screens/StorageLimits/StorageLimitsScreen';
-import { SubstancesStack } from '@/screens/Substances/SubstancesStack';
-import { TruckArrivalsStack } from '@/screens/TruckArrivals/TruckArrivalsStack';
+import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
+import { TransportPlanStack } from '@/screens/TransportPlan/TransportPlanStack';
 import { PALETTE } from '@/theme';
 
 export type AppTabsParamList = {
   Dashboard: undefined;
-  Substances: undefined;
-  CompatibilityMatrix: undefined;
-  StorageLimits: undefined;
-  FieldVerifications: undefined;
-  TruckArrivals: undefined;
-  Alerts: undefined;
+  TransportPlan: undefined;
+  LoadArrivals: undefined;
 };
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
 
 const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Dashboard: 'view-dashboard-outline',
-  Substances: 'flask-outline',
-  CompatibilityMatrix: 'grid',
-  StorageLimits: 'gauge',
-  FieldVerifications: 'clipboard-check-outline',
-  TruckArrivals: 'truck-outline',
-  Alerts: 'alert-circle-outline',
+  TransportPlan: 'calendar-clock-outline',
+  LoadArrivals: 'package-variant-closed',
 };
 
 export function AppTabs() {
@@ -54,33 +42,17 @@ export function AppTabs() {
         tabBarInactiveTintColor: PALETTE.textMuted,
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen
-        name="Substances"
-        component={SubstancesStack}
-        options={{ title: 'Sustancias', headerShown: false }}
+        name="TransportPlan"
+        component={TransportPlanStack}
+        options={{ title: 'Plan semanal', headerShown: false }}
       />
       <Tab.Screen
-        name="CompatibilityMatrix"
-        component={CompatibilityMatrixScreen}
-        options={{ title: 'Compatibilidad' }}
+        name="LoadArrivals"
+        component={LoadArrivalsStack}
+        options={{ title: 'Llegadas', headerShown: false }}
       />
-      <Tab.Screen
-        name="StorageLimits"
-        component={StorageLimitsScreen}
-        options={{ title: 'Límites' }}
-      />
-      <Tab.Screen
-        name="FieldVerifications"
-        component={FieldVerificationsStack}
-        options={{ title: 'Verificaciones', headerShown: false }}
-      />
-      <Tab.Screen
-        name="TruckArrivals"
-        component={TruckArrivalsStack}
-        options={{ title: 'Camiones', headerShown: false }}
-      />
-      <Tab.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alertas' }} />
     </Tab.Navigator>
   );
 }

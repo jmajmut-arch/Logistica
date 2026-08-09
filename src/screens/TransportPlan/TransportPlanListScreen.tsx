@@ -6,57 +6,58 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, FAB, List, Text } from 'react-native-paper';
 
 import { RoleGate } from '@/components/RoleGate';
-import { TruckStatusBadge } from '@/components/TruckStatusBadge';
-import { truckArrivalRepository } from '@/data/repositories/truckArrivalRepository';
+import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
 import { userRepository } from '@/data/repositories/userRepository';
-import type { TruckArrival } from '@/domain/entities/TruckArrival';
-import { getTruckArrivalStatus } from '@/domain/rules/truckArrivalStatus';
+import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
-import { TRUCK_LOCATION_LABELS } from '@/utils/truckArrivalDisplay';
+import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
-import type { TruckArrivalsStackParamList } from './TruckArrivalsStack';
+import type { TransportPlanStackParamList } from './TransportPlanStack';
 
-type Navigation = NativeStackNavigationProp<TruckArrivalsStackParamList, 'TruckArrivalList'>;
+type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'TransportPlanList'>;
 
-export function TruckArrivalListScreen() {
+export function TransportPlanListScreen() {
   const navigation = useNavigation<Navigation>();
-  const [arrivals, setArrivals] = useState<TruckArrival[] | null>(null);
+  const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
 
   const loadData = useCallback(async () => {
-    const [loadedArrivals, users] = await Promise.all([
-      truckArrivalRepository.findAll(),
+    const [items, users] = await Promise.all([
+      transportPlanRepository.findAll(),
       userRepository.findAll(),
     ]);
-    setArrivals(loadedArrivals);
+    setPlanItems(items);
     setUsersById(new Map(users.map((user) => [user.id, user])));
   }, []);
 
   useFocusRefresh(loadData);
 
   const describe = useMemo(
-    () => (arrival: TruckArrival) => {
-      const parts = [
-        TRUCK_LOCATION_LABELS[arrival.location],
-        `Llegó ${format(new Date(arrival.arrivedAt), 'dd-MM-yyyy HH:mm')}`,
-      ];
-      if (arrival.scheduledAt !== null) {
-        parts.push(`Planificado ${format(new Date(arrival.scheduledAt), 'HH:mm')}`);
+    () => (item: TransportPlanItem) => {
+      const parts = [format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm')];
+      if (item.origin) {
+        parts.push(`Desde ${item.origin}`);
       }
-      if (arrival.carrier) {
-        parts.push(arrival.carrier);
+      if (item.destination) {
+        parts.push(`Hacia ${item.destination}`);
       }
-      const registeredBy = usersById.get(arrival.registeredBy);
-      if (registeredBy) {
-        parts.push(registeredBy.name);
+      if (item.carrier) {
+        parts.push(item.carrier);
       }
+      const creator = usersById.get(item.createdBy);
+      parts.push(
+        `Ingresado por ${creator ? creator.name : `#${item.createdBy}`} el ${format(
+          new Date(item.createdAt),
+          'dd-MM-yyyy HH:mm',
+        )}`,
+      );
       return parts.join(' · ');
     },
     [usersById],
   );
 
-  if (arrivals === null) {
+  if (planItems === null) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -67,26 +68,26 @@ export function TruckArrivalListScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={arrivals}
+        data={planItems}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={arrivals.length === 0 && styles.emptyContainer}
+        contentContainerStyle={planItems.length === 0 && styles.emptyContainer}
         ListEmptyComponent={
-          <Text style={styles.empty}>No hay llegadas de camiones registradas.</Text>
+          <Text style={styles.empty}>No hay items en el plan de transporte todavía.</Text>
         }
         renderItem={({ item }) => (
           <List.Item
-            title={item.plate}
+            title={OPERATION_TYPE_LABELS[item.operationType]}
             description={describe(item)}
-            left={(props) => <List.Icon {...props} icon="truck-outline" />}
-            right={() => <TruckStatusBadge status={getTruckArrivalStatus(item)} />}
+            descriptionNumberOfLines={2}
+            left={(props) => <List.Icon {...props} icon="calendar-clock-outline" />}
           />
         )}
       />
-      <RoleGate permission="registerTruckArrivals">
+      <RoleGate permission="managePlan">
         <FAB
           icon="plus"
           style={styles.fab}
-          onPress={() => navigation.navigate('TruckArrivalForm')}
+          onPress={() => navigation.navigate('TransportPlanForm')}
         />
       </RoleGate>
     </View>

@@ -1,24 +1,24 @@
 import { objectToSnakeCase, rowToCamelCase, rowsToCamelCase } from '@/data/supabase/caseMapping';
 import { supabase } from '@/data/supabase/client';
-import type { NewTruckArrival, TruckArrival } from '@/domain/entities/TruckArrival';
+import type { LoadArrival, NewLoadArrival } from '@/domain/entities/LoadArrival';
 
-export const truckArrivalRepository = {
-  async findAll(): Promise<TruckArrival[]> {
+export const loadArrivalRepository = {
+  async findAll(): Promise<LoadArrival[]> {
     const { data, error } = await supabase
-      .from('truck_arrivals')
+      .from('load_arrivals')
       .select('*')
       .order('arrived_at', { ascending: false });
     if (error) throw error;
-    return rowsToCamelCase<TruckArrival>(data);
+    return rowsToCamelCase<LoadArrival>(data);
   },
 
-  async create(input: NewTruckArrival): Promise<TruckArrival> {
+  async create(input: NewLoadArrival): Promise<LoadArrival> {
     const { data, error } = await supabase
-      .from('truck_arrivals')
+      .from('load_arrivals')
       .insert(objectToSnakeCase(input))
       .select()
       .single();
     if (error) throw error;
-    return rowToCamelCase<TruckArrival>(data);
+    return rowToCamelCase<LoadArrival>(data);
   },
 };
