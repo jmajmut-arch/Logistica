@@ -302,10 +302,13 @@ export function DashboardScreen() {
           if (arrivalsByPlanItem.has(item.id)) {
             return false;
           }
-          return item.hasNoSchedule || item.scheduledAt >= now;
+          // Un "sin horario" no tiene una hora exacta contra la cual comparar, pero sigue
+          // siendo de un día concreto — antes contaba como "futuro" aunque fuera de una
+          // semana ya pasada, con tal de no tener llegada registrada.
+          return item.hasNoSchedule ? item.scheduledAt >= dayStart : item.scheduledAt >= now;
         })
         .sort((a, b) => a.scheduledAt - b.scheduledAt),
-    [scopedPlanItems, arrivalsByPlanItem, now],
+    [scopedPlanItems, arrivalsByPlanItem, now, dayStart],
   );
 
   const futureCraneItems = useMemo(
@@ -580,6 +583,9 @@ export function DashboardScreen() {
                 ` · ${todayUnplannedArrivals.length} ${getUnplannedCountLabel(effectiveScope)}`}
             </Text>
 
+            <Text variant="titleMedium" style={styles.groupTitle}>
+              Hoy
+            </Text>
             <View style={styles.grid}>
               <Card
                 style={styles.complianceTile}
@@ -600,6 +606,101 @@ export function DashboardScreen() {
                   />
                 </Card.Content>
               </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
+                    'Viajes pendientes hoy',
+                    todayItems.filter((item) => {
+                      const status = getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now);
+                      return status === 'pending' || status === 'overdue';
+                    }),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
+                    {pendingTodayCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes pendientes hoy</Text>
+                </Card.Content>
+              </Card>
+            </View>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Distribución de hoy
+                </Text>
+                {todayItems.length === 0 && todayUnplannedArrivals.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados ni registrados para hoy todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={EXTENDED_STATUS_ORDER.map((status) => ({
+                        key: status,
+                        value:
+                          status === 'out_of_plan'
+                            ? todayUnplannedArrivals.length
+                            : (todayStatusCounts.get(status) ?? 0),
+                        color: EXTENDED_STATUS_COLORS[status],
+                      }))}
+                      centerValue={String(todayItems.length + todayUnplannedArrivals.length)}
+                      centerLabel={
+                        todayItems.length + todayUnplannedArrivals.length === 1 ? 'viaje' : 'viajes'
+                      }
+                    />
+                    <View style={styles.legend}>
+                      {EXTENDED_STATUS_ORDER.map((status) => (
+                        <Pressable
+                          key={status}
+                          style={styles.legendRow}
+                          onPress={() => {
+                            if (status === 'out_of_plan') {
+                              openUnplannedDetail(
+                                `${getUnplannedLabel(effectiveScope)} · hoy`,
+                                todayUnplannedArrivals,
+                              );
+                              return;
+                            }
+                            openDetail(
+                              `${EXTENDED_STATUS_LABELS[status]} · hoy`,
+                              todayItems.filter(
+                                (item) =>
+                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
+                                  status,
+                              ),
+                            );
+                          }}
+                        >
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: EXTENDED_STATUS_COLORS[status] },
+                            ]}
+                          />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {getExtendedStatusLabel(status, effectiveScope)}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {status === 'out_of_plan'
+                              ? todayUnplannedArrivals.length
+                              : (todayStatusCounts.get(status) ?? 0)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+
+            <Text variant="titleMedium" style={styles.groupTitle}>
+              Esta semana · Semana {weekNumber}
+            </Text>
+            <View style={styles.grid}>
               <Card
                 style={styles.complianceTile}
                 onPress={() =>
@@ -663,31 +764,199 @@ export function DashboardScreen() {
                   />
                 </Card.Content>
               </Card>
-              <Card
-                style={styles.complianceTile}
-                onPress={() =>
-                  openDetail(
-                    'Viajes pendientes hoy',
-                    todayItems.filter((item) => {
-                      const status = getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now);
-                      return status === 'pending' || status === 'overdue';
-                    }),
-                  )
-                }
-              >
-                <Card.Content>
-                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
-                    {pendingTodayCount}
-                  </Text>
-                  <Text variant="labelMedium">Viajes pendientes hoy</Text>
-                </Card.Content>
-              </Card>
             </View>
 
             <Card style={styles.wideCard}>
               <Card.Content>
                 <Text variant="titleMedium" style={styles.cardTitle}>
-                  Rango personalizado
+                  Cumplimiento de la semana · Semana {weekNumber}
+                </Text>
+                <WeekBarChart
+                  data={weeklyComplianceByDay.map((day) => ({
+                    ...day,
+                    onPress: () =>
+                      openDetail(
+                        `${capitalize(day.label)} — ${day.items.length} planificados${
+                          day.unplannedCount > 0
+                            ? ` (+${day.unplannedCount} ${getUnplannedCountLabel(effectiveScope)})`
+                            : ''
+                        }`,
+                        day.items,
+                      ),
+                  }))}
+                />
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Distribución de la semana
+                </Text>
+                {weekItems.length === 0 && weekUnplannedArrivals.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados ni registrados para esta semana todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={EXTENDED_STATUS_ORDER.map((status) => ({
+                        key: status,
+                        value:
+                          status === 'out_of_plan'
+                            ? weekUnplannedArrivals.length
+                            : (weekStatusCounts.get(status) ?? 0),
+                        color: EXTENDED_STATUS_COLORS[status],
+                      }))}
+                      centerValue={String(weekItems.length + weekUnplannedArrivals.length)}
+                      centerLabel={
+                        weekItems.length + weekUnplannedArrivals.length === 1 ? 'viaje' : 'viajes'
+                      }
+                    />
+                    <View style={styles.legend}>
+                      {EXTENDED_STATUS_ORDER.map((status) => (
+                        <Pressable
+                          key={status}
+                          style={styles.legendRow}
+                          onPress={() => {
+                            if (status === 'out_of_plan') {
+                              openUnplannedDetail(
+                                `${getUnplannedLabel(effectiveScope)} · semana`,
+                                weekUnplannedArrivals,
+                              );
+                              return;
+                            }
+                            openDetail(
+                              `${EXTENDED_STATUS_LABELS[status]} · semana`,
+                              weekItems.filter(
+                                (item) =>
+                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
+                                  status,
+                              ),
+                            );
+                          }}
+                        >
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: EXTENDED_STATUS_COLORS[status] },
+                            ]}
+                          />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {getExtendedStatusLabel(status, effectiveScope)}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {status === 'out_of_plan'
+                              ? weekUnplannedArrivals.length
+                              : (weekStatusCounts.get(status) ?? 0)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+
+            {scopedOperationTypes.length > 1 && (
+              <Card style={styles.wideCard}>
+                <Card.Content>
+                  <Text variant="titleMedium" style={styles.cardTitle}>
+                    Cumplimiento por tipo · Semana {weekNumber}
+                  </Text>
+                  {complianceByOperationType.map(({ type, count, percentage, items }) => (
+                    <Pressable
+                      key={type}
+                      style={styles.typeRow}
+                      onPress={() => openDetail(`${OPERATION_TYPE_LABELS[type]} · semana`, items)}
+                    >
+                      <View style={styles.typeHeaderRow}>
+                        <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[type]}</Text>
+                        <Text
+                          variant="bodyMedium"
+                          style={{ color: getComplianceColor(percentage) }}
+                        >
+                          {percentage === null ? '—' : `${percentage}%`}
+                        </Text>
+                      </View>
+                      <ProgressBar
+                        style={styles.progressBar}
+                        progress={(percentage ?? 0) / 100}
+                        color={getComplianceColor(percentage)}
+                      />
+                      <Text variant="bodySmall" style={styles.itemDescription}>
+                        {count} {count === 1 ? 'viaje planificado' : 'viajes planificados'} esta
+                        semana
+                      </Text>
+                    </Pressable>
+                  ))}
+                </Card.Content>
+              </Card>
+            )}
+
+            <Text variant="titleMedium" style={styles.groupTitle}>
+              Viajes futuros
+            </Text>
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Viajes futuros y grúa de 32 t
+                </Text>
+                <SegmentedButtons
+                  style={styles.craneFilterToggle}
+                  value={craneFilter}
+                  onValueChange={(value) => setCraneFilter(value as 'all' | 'crane' | 'no_crane')}
+                  buttons={[
+                    { value: 'all', label: `Todos (${futurePlanItems.length})` },
+                    {
+                      value: 'crane',
+                      label: `Con grúa (${futureCraneItems.length})`,
+                      icon: 'crane',
+                    },
+                    { value: 'no_crane', label: `Sin grúa (${futureNoCraneItems.length})` },
+                  ]}
+                />
+                {filteredFutureItems.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes futuros
+                    {craneFilter === 'crane'
+                      ? ' que requieran grúa.'
+                      : craneFilter === 'no_crane'
+                        ? ' sin grúa.'
+                        : ' planificados.'}
+                  </Text>
+                ) : (
+                  <Pressable
+                    style={styles.rangeComplianceRow}
+                    onPress={() =>
+                      openDetail(
+                        `Viajes futuros${
+                          craneFilter === 'crane'
+                            ? ' · con grúa'
+                            : craneFilter === 'no_crane'
+                              ? ' · sin grúa'
+                              : ''
+                        } (${filteredFutureItems.length})`,
+                        filteredFutureItems,
+                      )
+                    }
+                  >
+                    <Text variant="displaySmall" style={{ color: PALETTE.primary }}>
+                      {filteredFutureItems.length}
+                    </Text>
+                    <Text variant="labelMedium">Toca para ver el detalle</Text>
+                  </Pressable>
+                )}
+              </Card.Content>
+            </Card>
+
+            <Text variant="titleMedium" style={styles.groupTitle}>
+              Rango personalizado
+            </Text>
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Elegir rango
                 </Text>
                 <View style={styles.rangePickerRow}>
                   <Pressable
@@ -903,257 +1172,6 @@ export function DashboardScreen() {
                       </View>
                     </View>
                   )}
-                </Card.Content>
-              </Card>
-            )}
-
-            <Card style={styles.wideCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.cardTitle}>
-                  Viajes futuros y grúa de 32 t
-                </Text>
-                <SegmentedButtons
-                  style={styles.craneFilterToggle}
-                  value={craneFilter}
-                  onValueChange={(value) => setCraneFilter(value as 'all' | 'crane' | 'no_crane')}
-                  buttons={[
-                    { value: 'all', label: `Todos (${futurePlanItems.length})` },
-                    {
-                      value: 'crane',
-                      label: `Con grúa (${futureCraneItems.length})`,
-                      icon: 'crane',
-                    },
-                    { value: 'no_crane', label: `Sin grúa (${futureNoCraneItems.length})` },
-                  ]}
-                />
-                {filteredFutureItems.length === 0 ? (
-                  <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes futuros
-                    {craneFilter === 'crane'
-                      ? ' que requieran grúa.'
-                      : craneFilter === 'no_crane'
-                        ? ' sin grúa.'
-                        : ' planificados.'}
-                  </Text>
-                ) : (
-                  <Pressable
-                    style={styles.rangeComplianceRow}
-                    onPress={() =>
-                      openDetail(
-                        `Viajes futuros${
-                          craneFilter === 'crane'
-                            ? ' · con grúa'
-                            : craneFilter === 'no_crane'
-                              ? ' · sin grúa'
-                              : ''
-                        } (${filteredFutureItems.length})`,
-                        filteredFutureItems,
-                      )
-                    }
-                  >
-                    <Text variant="displaySmall" style={{ color: PALETTE.primary }}>
-                      {filteredFutureItems.length}
-                    </Text>
-                    <Text variant="labelMedium">Toca para ver el detalle</Text>
-                  </Pressable>
-                )}
-              </Card.Content>
-            </Card>
-
-            <Card style={styles.wideCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.cardTitle}>
-                  Distribución de hoy
-                </Text>
-                {todayItems.length === 0 && todayUnplannedArrivals.length === 0 ? (
-                  <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes planificados ni registrados para hoy todavía.
-                  </Text>
-                ) : (
-                  <View style={styles.donutRow}>
-                    <DonutChart
-                      segments={EXTENDED_STATUS_ORDER.map((status) => ({
-                        key: status,
-                        value:
-                          status === 'out_of_plan'
-                            ? todayUnplannedArrivals.length
-                            : (todayStatusCounts.get(status) ?? 0),
-                        color: EXTENDED_STATUS_COLORS[status],
-                      }))}
-                      centerValue={String(todayItems.length + todayUnplannedArrivals.length)}
-                      centerLabel={
-                        todayItems.length + todayUnplannedArrivals.length === 1 ? 'viaje' : 'viajes'
-                      }
-                    />
-                    <View style={styles.legend}>
-                      {EXTENDED_STATUS_ORDER.map((status) => (
-                        <Pressable
-                          key={status}
-                          style={styles.legendRow}
-                          onPress={() => {
-                            if (status === 'out_of_plan') {
-                              openUnplannedDetail(
-                                `${getUnplannedLabel(effectiveScope)} · hoy`,
-                                todayUnplannedArrivals,
-                              );
-                              return;
-                            }
-                            openDetail(
-                              `${EXTENDED_STATUS_LABELS[status]} · hoy`,
-                              todayItems.filter(
-                                (item) =>
-                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
-                                  status,
-                              ),
-                            );
-                          }}
-                        >
-                          <View
-                            style={[
-                              styles.legendDot,
-                              { backgroundColor: EXTENDED_STATUS_COLORS[status] },
-                            ]}
-                          />
-                          <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {getExtendedStatusLabel(status, effectiveScope)}
-                          </Text>
-                          <Text variant="bodyMedium" style={styles.legendCount}>
-                            {status === 'out_of_plan'
-                              ? todayUnplannedArrivals.length
-                              : (todayStatusCounts.get(status) ?? 0)}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </Card.Content>
-            </Card>
-
-            <Card style={styles.wideCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.cardTitle}>
-                  Cumplimiento de la semana · Semana {weekNumber}
-                </Text>
-                <WeekBarChart
-                  data={weeklyComplianceByDay.map((day) => ({
-                    ...day,
-                    onPress: () =>
-                      openDetail(
-                        `${capitalize(day.label)} — ${day.items.length} planificados${
-                          day.unplannedCount > 0
-                            ? ` (+${day.unplannedCount} ${getUnplannedCountLabel(effectiveScope)})`
-                            : ''
-                        }`,
-                        day.items,
-                      ),
-                  }))}
-                />
-              </Card.Content>
-            </Card>
-
-            <Card style={styles.wideCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.cardTitle}>
-                  Distribución de la semana
-                </Text>
-                {weekItems.length === 0 && weekUnplannedArrivals.length === 0 ? (
-                  <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes planificados ni registrados para esta semana todavía.
-                  </Text>
-                ) : (
-                  <View style={styles.donutRow}>
-                    <DonutChart
-                      segments={EXTENDED_STATUS_ORDER.map((status) => ({
-                        key: status,
-                        value:
-                          status === 'out_of_plan'
-                            ? weekUnplannedArrivals.length
-                            : (weekStatusCounts.get(status) ?? 0),
-                        color: EXTENDED_STATUS_COLORS[status],
-                      }))}
-                      centerValue={String(weekItems.length + weekUnplannedArrivals.length)}
-                      centerLabel={
-                        weekItems.length + weekUnplannedArrivals.length === 1 ? 'viaje' : 'viajes'
-                      }
-                    />
-                    <View style={styles.legend}>
-                      {EXTENDED_STATUS_ORDER.map((status) => (
-                        <Pressable
-                          key={status}
-                          style={styles.legendRow}
-                          onPress={() => {
-                            if (status === 'out_of_plan') {
-                              openUnplannedDetail(
-                                `${getUnplannedLabel(effectiveScope)} · semana`,
-                                weekUnplannedArrivals,
-                              );
-                              return;
-                            }
-                            openDetail(
-                              `${EXTENDED_STATUS_LABELS[status]} · semana`,
-                              weekItems.filter(
-                                (item) =>
-                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
-                                  status,
-                              ),
-                            );
-                          }}
-                        >
-                          <View
-                            style={[
-                              styles.legendDot,
-                              { backgroundColor: EXTENDED_STATUS_COLORS[status] },
-                            ]}
-                          />
-                          <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {getExtendedStatusLabel(status, effectiveScope)}
-                          </Text>
-                          <Text variant="bodyMedium" style={styles.legendCount}>
-                            {status === 'out_of_plan'
-                              ? weekUnplannedArrivals.length
-                              : (weekStatusCounts.get(status) ?? 0)}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </Card.Content>
-            </Card>
-
-            {scopedOperationTypes.length > 1 && (
-              <Card style={styles.wideCard}>
-                <Card.Content>
-                  <Text variant="titleMedium" style={styles.cardTitle}>
-                    Cumplimiento por tipo · Semana {weekNumber}
-                  </Text>
-                  {complianceByOperationType.map(({ type, count, percentage, items }) => (
-                    <Pressable
-                      key={type}
-                      style={styles.typeRow}
-                      onPress={() => openDetail(`${OPERATION_TYPE_LABELS[type]} · semana`, items)}
-                    >
-                      <View style={styles.typeHeaderRow}>
-                        <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[type]}</Text>
-                        <Text
-                          variant="bodyMedium"
-                          style={{ color: getComplianceColor(percentage) }}
-                        >
-                          {percentage === null ? '—' : `${percentage}%`}
-                        </Text>
-                      </View>
-                      <ProgressBar
-                        style={styles.progressBar}
-                        progress={(percentage ?? 0) / 100}
-                        color={getComplianceColor(percentage)}
-                      />
-                      <Text variant="bodySmall" style={styles.itemDescription}>
-                        {count} {count === 1 ? 'viaje planificado' : 'viajes planificados'} esta
-                        semana
-                      </Text>
-                    </Pressable>
-                  ))}
                 </Card.Content>
               </Card>
             )}
@@ -1382,6 +1400,12 @@ const styles = StyleSheet.create({
   weekLabel: {
     opacity: 0.7,
     marginBottom: 12,
+  },
+  groupTitle: {
+    fontWeight: '700',
+    color: PALETTE.primary,
+    marginTop: 20,
+    marginBottom: 8,
   },
   sectionTitle: {
     marginTop: 8,
