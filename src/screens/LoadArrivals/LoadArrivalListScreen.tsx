@@ -28,12 +28,17 @@ import type { Carrier } from '@/domain/entities/Carrier';
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
-import { getPlanItemStatus } from '@/domain/rules/complianceStatus';
+import { getDisplayStatus, getPlanItemStatus } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { startOfToday } from '@/utils/timeBlocks';
-import { getUnplannedLabel, OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
+import {
+  DISPLAY_STATUS_COLORS,
+  getComplianceColor,
+  getUnplannedLabel,
+  OPERATION_TYPE_LABELS,
+} from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
@@ -80,6 +85,59 @@ export function LoadArrivalListScreen() {
       ),
     [arrivals],
   );
+
+  const arrivalsByPlanItem = useMemo(() => {
+    const map = new Map<number, LoadArrival>();
+    for (const arrival of arrivals ?? []) {
+      if (arrival.planItemId !== null) {
+        map.set(arrival.planItemId, arrival);
+      }
+    }
+    return map;
+  }, [arrivals]);
+
+  // Todo lo planificado hoy para el sitio/frente de trabajo del operador, sin importar si
+  // ya se registró, sigue pendiente o se canceló — para el resumen de estadísticas del día.
+  const todayItemsForSite = useMemo(() => {
+    if (currentSiteId === null) {
+      return [];
+    }
+    return planItems.filter(
+      (item) =>
+        item.siteId === currentSiteId &&
+        item.scheduledAt >= dayStart &&
+        item.scheduledAt < dayEnd &&
+        matchesOperatorScope(item.operationType, currentOperatorScope),
+    );
+  }, [planItems, currentSiteId, dayStart, dayEnd, currentOperatorScope]);
+
+  const todayStats = useMemo(() => {
+    let executed = 0;
+    let pending = 0;
+    let cancelled = 0;
+    let onTime = 0;
+    for (const item of todayItemsForSite) {
+      const arrival = arrivalsByPlanItem.get(item.id);
+      if (arrival) {
+        executed += 1;
+        if (getDisplayStatus(item, arrival) === 'on_time') {
+          onTime += 1;
+        }
+      } else if (item.cancelledByOperator) {
+        cancelled += 1;
+      } else {
+        pending += 1;
+      }
+    }
+    const total = todayItemsForSite.length;
+    return {
+      total,
+      executed,
+      pending,
+      cancelled,
+      compliancePct: total === 0 ? null : Math.round((onTime / total) * 100),
+    };
+  }, [todayItemsForSite, arrivalsByPlanItem]);
 
   const pendingItemsForSite = useMemo(() => {
     if (currentSiteId === null) {
@@ -168,6 +226,55 @@ export function LoadArrivalListScreen() {
         ListHeaderComponent={
           <RoleGate permission="registerArrivals">
             <View>
+              {currentSiteId !== null && (
+                <Card style={styles.statsCard}>
+                  <Card.Content>
+                    <Text variant="titleMedium" style={styles.cardTitle}>
+                      Resumen de hoy
+                    </Text>
+                    <View style={styles.statsRow}>
+                      <View style={styles.statItem}>
+                        <Text variant="headlineSmall">{todayStats.total}</Text>
+                        <Text variant="labelSmall" style={styles.statLabel}>
+                          Planificados
+                        </Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text variant="headlineSmall" style={{ color: DISPLAY_STATUS_COLORS.on_time }}>
+                          {todayStats.executed}
+                        </Text>
+                        <Text variant="labelSmall" style={styles.statLabel}>
+                          Ejecutados
+                        </Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text variant="headlineSmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
+                          {todayStats.pending}
+                        </Text>
+                        <Text variant="labelSmall" style={styles.statLabel}>
+                          Pendientes
+                        </Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text variant="headlineSmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                          {todayStats.cancelled}
+                        </Text>
+                        <Text variant="labelSmall" style={styles.statLabel}>
+                          Cancelados
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      variant="bodyMedium"
+                      style={[styles.complianceLine, { color: getComplianceColor(todayStats.compliancePct) }]}
+                    >
+                      Cumplimiento hoy:{' '}
+                      {todayStats.compliancePct === null ? '—' : `${todayStats.compliancePct}%`}
+                    </Text>
+                  </Card.Content>
+                </Card>
+              )}
+
               <Text variant="titleMedium" style={styles.sectionTitle}>
                 Pendientes de hoy
               </Text>
@@ -298,6 +405,29 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 88,
+  },
+  statsCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  cardTitle: {
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  statLabel: {
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  complianceLine: {
+    marginTop: 12,
+    fontWeight: '700',
   },
   sectionTitle: {
     marginHorizontal: 16,
