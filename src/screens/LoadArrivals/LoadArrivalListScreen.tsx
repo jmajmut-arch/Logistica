@@ -97,6 +97,22 @@ export function LoadArrivalListScreen() {
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
   }, [planItems, currentSiteId, dayStart, dayEnd, registeredPlanItemIds, currentOperatorScope]);
 
+  // Igual que "Pendientes de hoy": el operador solo debe ver lo ya registrado de su propio
+  // patio/bodega y del día de hoy, no el historial completo de todos los sitios.
+  const registeredTodayForSite = useMemo(() => {
+    if (currentSiteId === null) {
+      return [];
+    }
+    return (arrivals ?? [])
+      .filter(
+        (arrival) =>
+          arrival.siteId === currentSiteId &&
+          arrival.arrivedAt >= dayStart &&
+          arrival.arrivedAt < dayEnd,
+      )
+      .sort((a, b) => b.arrivedAt - a.arrivedAt);
+  }, [arrivals, currentSiteId, dayStart, dayEnd]);
+
   const confirmDelete = async () => {
     if (!arrivalToDelete) {
       return;
@@ -145,7 +161,7 @@ export function LoadArrivalListScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={arrivals}
+        data={registeredTodayForSite}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
@@ -208,10 +224,13 @@ export function LoadArrivalListScreen() {
               )}
 
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                Registradas
+                Registradas hoy
               </Text>
-              {arrivals.length === 0 && (
-                <EmptyState icon="package-variant-closed" message="No hay llegadas de carga registradas." />
+              {registeredTodayForSite.length === 0 && (
+                <EmptyState
+                  icon="package-variant-closed"
+                  message="No hay llegadas de carga registradas hoy en este sitio."
+                />
               )}
             </View>
           </RoleGate>
