@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -186,7 +186,11 @@ export function LoginScreen() {
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
 
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View
           style={{
             opacity: heroAnim,
@@ -289,7 +293,7 @@ export function LoginScreen() {
           <Text style={styles.footer}>Plan semanal de transporte · Registro de llegadas · Cumplimiento</Text>
           <Text style={styles.credit}>Desarrollado por Joel Majmut</Text>
         </View>
-      </View>
+      </ScrollView>
     </LinearGradient>
   );
 }
@@ -316,8 +320,11 @@ const styles = StyleSheet.create({
     borderRadius: 360,
     backgroundColor: 'rgba(56,189,248,0.12)',
   },
-  container: {
+  scrollView: {
     flex: 1,
+  },
+  container: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
