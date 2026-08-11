@@ -169,8 +169,9 @@ export function LoadArrivalFormScreen() {
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
     setBlockMinutes(blockMinutesOf(item.scheduledAt));
-    // Sin horario no hay nada que "cumplir": se salta directo a pedir la hora de llegada.
-    setDialogStep(item.hasNoSchedule ? 'time' : 'choose');
+    // Siempre se abre en 'choose': aunque no tenga horario que "cumplir", ahí vive la
+    // opción de marcarlo como viaje cancelado (ver el paso 'choose' del diálogo).
+    setDialogStep('choose');
   };
 
   const openUnplanned = () => {
@@ -204,7 +205,7 @@ export function LoadArrivalFormScreen() {
         }
         setActive(item);
         setBlockMinutes(blockMinutesOf(item.scheduledAt));
-        setDialogStep(item.hasNoSchedule ? 'time' : 'choose');
+        setDialogStep('choose');
         setAutoOpened(true);
         return;
       }
@@ -436,10 +437,14 @@ export function LoadArrivalFormScreen() {
         <Dialog visible={active !== null} onDismiss={closeDialog}>
           {active !== null && active !== 'unplanned' && dialogStep === 'choose' && (
             <>
-              <Dialog.Title>¿Se cumplió el horario planificado?</Dialog.Title>
+              <Dialog.Title>
+                {active.hasNoSchedule ? '¿Llegó el camión?' : '¿Se cumplió el horario planificado?'}
+              </Dialog.Title>
               <Dialog.Content>
                 <Text>
-                  Planificado: {format(new Date(active.scheduledAt), 'EEE dd-MM HH:mm', { locale: es })}
+                  {active.hasNoSchedule
+                    ? 'Este viaje no tiene horario planificado.'
+                    : `Planificado: ${format(new Date(active.scheduledAt), 'EEE dd-MM HH:mm', { locale: es })}`}
                 </Text>
                 {active.requiresHeavyCrane && (
                   <View style={styles.craneWarning}>
@@ -462,18 +467,26 @@ export function LoadArrivalFormScreen() {
                     Viaje cancelado
                   </Button>
                 )}
-                <Button compact onPress={() => setDialogStep('time')}>
-                  Otro horario
-                </Button>
-                <Button
-                  compact
-                  mode="contained"
-                  onPress={confirmOnSchedule}
-                  loading={submitting}
-                  disabled={submitting}
-                >
-                  Sí, cumplió
-                </Button>
+                {active.hasNoSchedule ? (
+                  <Button compact mode="contained" onPress={() => setDialogStep('time')}>
+                    Registrar llegada
+                  </Button>
+                ) : (
+                  <>
+                    <Button compact onPress={() => setDialogStep('time')}>
+                      Otro horario
+                    </Button>
+                    <Button
+                      compact
+                      mode="contained"
+                      onPress={confirmOnSchedule}
+                      loading={submitting}
+                      disabled={submitting}
+                    >
+                      Sí, cumplió
+                    </Button>
+                  </>
+                )}
               </Dialog.Actions>
             </>
           )}
