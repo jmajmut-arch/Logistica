@@ -169,11 +169,14 @@ export function TransportPlanListScreen() {
       relevantDays
         .slice()
         .sort((a, b) => a - b)
-        .map((day) => ({
-          day,
-          title: `${capitalize(format(new Date(day), "EEEE dd 'de' MMMM", { locale: es }))} · Semana ${getWeekNumber(day)}`,
-          data: [...(itemsByDay.get(day) ?? [])].sort((a, b) => a.scheduledAt - b.scheduledAt),
-        })),
+        .map((day) => {
+          const data = [...(itemsByDay.get(day) ?? [])].sort((a, b) => a.scheduledAt - b.scheduledAt);
+          return {
+            day,
+            title: `${capitalize(format(new Date(day), "EEEE dd 'de' MMMM", { locale: es }))} · Semana ${getWeekNumber(day)} · ${data.length} ${data.length === 1 ? 'viaje' : 'viajes'}`,
+            data,
+          };
+        }),
     [relevantDays, itemsByDay],
   );
 
@@ -312,6 +315,8 @@ export function TransportPlanListScreen() {
               />
               <Text variant="titleMedium" style={styles.selectedDayTitle}>
                 {capitalize(format(new Date(selectedDay), "EEEE dd 'de' MMMM", { locale: es }))}
+                {selectedDayItems.length > 0 &&
+                  ` · ${selectedDayItems.length} ${selectedDayItems.length === 1 ? 'viaje' : 'viajes'}`}
               </Text>
             </View>
           }
