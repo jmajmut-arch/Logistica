@@ -56,6 +56,9 @@ const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 // Paleta rotativa para el donut de destinos (sitios): a diferencia de los estados del
 // plan, la cantidad de sitios es variable, así que no hay un color fijo por sitio.
 const SITE_CHART_COLORS = ['#38bdf8', '#fb923c', '#34d399', '#f472b6', '#a78bfa', '#facc15', '#22d3ee', '#fb7185'];
+// Tope de días para el desglose diario del rango personalizado: un rango de meses no
+// debería intentar dibujar cientos de barras.
+const MAX_RANGE_DAYS = 92;
 
 type DetailState =
   | { kind: 'items'; title: string; items: TransportPlanItem[] }
@@ -327,6 +330,51 @@ export function DashboardScreen() {
     [customRangeDisplayStatuses],
   );
 
+  // Desglose día por día del rango elegido, para graficarlo con el mismo estilo de barras
+  // que "Cumplimiento de la semana" — todo asociado al rango, nunca a la semana calendario.
+  const customRangeComplianceByDay = useMemo(() => {
+    if (!customRange) {
+      return [];
+    }
+    const totalDays = Math.round((customRange.end - customRange.start) / DAY_MS) + 1;
+    if (totalDays > MAX_RANGE_DAYS) {
+      return [];
+    }
+    const days: {
+      label: string;
+      percentage: number | null;
+      items: TransportPlanItem[];
+      unplannedCount: number;
+    }[] = [];
+    for (let start = customRange.start; start <= customRange.end; start += DAY_MS) {
+      const end = start + DAY_MS;
+      const items = customRangeItems.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
+      const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
+      const unplannedCount = customRangeUnplannedArrivals.filter(
+        (arrival) => arrival.arrivedAt >= start && arrival.arrivedAt < end,
+      ).length;
+      days.push({
+        label: format(new Date(start), 'dd/MM', { locale: es }),
+        percentage: combinedCompliance(statuses, unplannedCount),
+        items,
+        unplannedCount,
+      });
+    }
+    return days;
+  }, [customRange, customRangeItems, customRangeUnplannedArrivals, arrivalsByPlanItem, now]);
+
+  // Destinos (sitios) del rango elegido — misma idea que agendaItemsBySite, pero atada al
+  // rango personalizado en vez del toggle Hoy/Semana.
+  const customRangeItemsBySite = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of customRangeItems) {
+      counts.set(item.siteId, (counts.get(item.siteId) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([siteId, count]) => ({ siteId, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [customRangeItems]);
+
   const pendingTodayCount = (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
   const registeredTodayCount = todayItems.length - pendingTodayCount;
 
@@ -514,81 +562,177 @@ export function DashboardScreen() {
                       No hay viajes planificados ni registrados en este rango.
                     </Text>
                   ) : (
-                    <>
-                      <Pressable
-                        style={styles.rangeComplianceRow}
-                        onPress={() =>
-                          openDetail(
-                            `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')} (${customRangeItems.length})`,
-                            customRangeItems,
-                          )
-                        }
-                      >
-                        <Text
-                          variant="displaySmall"
-                          style={{ color: getComplianceColor(customRangeCompliance) }}
-                        >
-                          {customRangeCompliance === null ? '—' : `${customRangeCompliance}%`}
-                        </Text>
-                        <Text variant="labelMedium">Cumplimiento del rango</Text>
-                      </Pressable>
-                      <View style={styles.donutRow}>
-                        <DonutChart
-                          segments={EXTENDED_STATUS_ORDER.map((status) => ({
-                            key: status,
-                            value:
-                              status === 'out_of_plan'
-                                ? customRangeUnplannedArrivals.length
-                                : (customRangeStatusCounts.get(status) ?? 0),
-                            color: EXTENDED_STATUS_COLORS[status],
-                          }))}
-                          centerValue={String(
-                            customRangeItems.length + customRangeUnplannedArrivals.length,
-                          )}
-                          centerLabel={
-                            customRangeItems.length + customRangeUnplannedArrivals.length === 1
-                              ? 'viaje'
-                              : 'viajes'
-                          }
-                        />
-                        <View style={styles.legend}>
-                          {EXTENDED_STATUS_ORDER.map((status) => (
-                            <Pressable
-                              key={status}
-                              style={styles.legendRow}
-                              onPress={() => {
-                                if (status === 'out_of_plan') {
-                                  openUnplannedDetail('No planificado · rango', customRangeUnplannedArrivals);
-                                  return;
-                                }
-                                openDetail(
-                                  `${EXTENDED_STATUS_LABELS[status]} · rango`,
-                                  customRangeItems.filter(
-                                    (item) =>
-                                      getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
-                                  ),
-                                );
-                              }}
-                            >
-                              <View
-                                style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]}
-                              />
-                              <Text variant="bodyMedium" style={styles.legendLabel}>
-                                {EXTENDED_STATUS_LABELS[status]}
-                              </Text>
-                              <Text variant="bodyMedium" style={styles.legendCount}>
-                                {status === 'out_of_plan'
-                                  ? customRangeUnplannedArrivals.length
-                                  : (customRangeStatusCounts.get(status) ?? 0)}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      </View>
-                    </>
+                    <Pressable
+                      style={styles.rangeComplianceRow}
+                      onPress={() =>
+                        openDetail(
+                          `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')} (${customRangeItems.length})`,
+                          customRangeItems,
+                        )
+                      }
+                    >
+                      <Text variant="displaySmall" style={{ color: getComplianceColor(customRangeCompliance) }}>
+                        {customRangeCompliance === null ? '—' : `${customRangeCompliance}%`}
+                      </Text>
+                      <Text variant="labelMedium">Cumplimiento del rango</Text>
+                    </Pressable>
                   ))}
               </Card.Content>
             </Card>
+
+            {customRange && (
+              <Card style={styles.wideCard}>
+                <Card.Content>
+                  <Text variant="titleMedium" style={styles.cardTitle}>
+                    Cumplimiento del rango por día
+                  </Text>
+                  {customRangeComplianceByDay.length === 0 ? (
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      El rango elegido es muy amplio para mostrarlo día por día (máximo{' '}
+                      {MAX_RANGE_DAYS} días).
+                    </Text>
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={{ width: Math.max(300, customRangeComplianceByDay.length * 44) }}>
+                        <WeekBarChart
+                          data={customRangeComplianceByDay.map((day) => ({
+                            ...day,
+                            onPress: () =>
+                              openDetail(
+                                `${day.label} — ${day.items.length} planificados${
+                                  day.unplannedCount > 0 ? ` (+${day.unplannedCount} no planificados)` : ''
+                                }`,
+                                day.items,
+                              ),
+                          }))}
+                        />
+                      </View>
+                    </ScrollView>
+                  )}
+                </Card.Content>
+              </Card>
+            )}
+
+            {customRange && (
+              <Card style={styles.wideCard}>
+                <Card.Content>
+                  <Text variant="titleMedium" style={styles.cardTitle}>
+                    Distribución del rango
+                  </Text>
+                  {customRangeItems.length === 0 && customRangeUnplannedArrivals.length === 0 ? (
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      No hay viajes planificados ni registrados en este rango.
+                    </Text>
+                  ) : (
+                    <View style={styles.donutRow}>
+                      <DonutChart
+                        segments={EXTENDED_STATUS_ORDER.map((status) => ({
+                          key: status,
+                          value:
+                            status === 'out_of_plan'
+                              ? customRangeUnplannedArrivals.length
+                              : (customRangeStatusCounts.get(status) ?? 0),
+                          color: EXTENDED_STATUS_COLORS[status],
+                        }))}
+                        centerValue={String(customRangeItems.length + customRangeUnplannedArrivals.length)}
+                        centerLabel={
+                          customRangeItems.length + customRangeUnplannedArrivals.length === 1
+                            ? 'viaje'
+                            : 'viajes'
+                        }
+                      />
+                      <View style={styles.legend}>
+                        {EXTENDED_STATUS_ORDER.map((status) => (
+                          <Pressable
+                            key={status}
+                            style={styles.legendRow}
+                            onPress={() => {
+                              if (status === 'out_of_plan') {
+                                openUnplannedDetail('No planificado · rango', customRangeUnplannedArrivals);
+                                return;
+                              }
+                              openDetail(
+                                `${EXTENDED_STATUS_LABELS[status]} · rango`,
+                                customRangeItems.filter(
+                                  (item) =>
+                                    getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
+                                ),
+                              );
+                            }}
+                          >
+                            <View
+                              style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]}
+                            />
+                            <Text variant="bodyMedium" style={styles.legendLabel}>
+                              {EXTENDED_STATUS_LABELS[status]}
+                            </Text>
+                            <Text variant="bodyMedium" style={styles.legendCount}>
+                              {status === 'out_of_plan'
+                                ? customRangeUnplannedArrivals.length
+                                : (customRangeStatusCounts.get(status) ?? 0)}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </Card.Content>
+              </Card>
+            )}
+
+            {customRange && (
+              <Card style={styles.wideCard}>
+                <Card.Content>
+                  <Text variant="titleMedium" style={styles.cardTitle}>
+                    Destinos de las cargas · rango
+                  </Text>
+                  {customRangeItemsBySite.length === 0 ? (
+                    <Text variant="bodySmall" style={styles.itemDescription}>
+                      No hay viajes planificados en este rango.
+                    </Text>
+                  ) : (
+                    <View style={styles.donutRow}>
+                      <DonutChart
+                        segments={customRangeItemsBySite.map((entry, index) => ({
+                          key: String(entry.siteId),
+                          value: entry.count,
+                          color: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                        }))}
+                        centerValue={String(customRangeItems.length)}
+                        centerLabel={customRangeItems.length === 1 ? 'viaje' : 'viajes'}
+                      />
+                      <View style={styles.legend}>
+                        {customRangeItemsBySite.map((entry, index) => (
+                          <Pressable
+                            key={entry.siteId}
+                            style={styles.legendRow}
+                            onPress={() =>
+                              openDetail(
+                                `${siteName(entry.siteId)} · rango (${entry.count})`,
+                                customRangeItems.filter((item) => item.siteId === entry.siteId),
+                              )
+                            }
+                          >
+                            <View
+                              style={[
+                                styles.legendDot,
+                                { backgroundColor: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length] },
+                              ]}
+                            />
+                            <Text variant="bodyMedium" style={styles.legendLabel}>
+                              {siteName(entry.siteId)}
+                            </Text>
+                            <Text variant="bodyMedium" style={styles.legendCount}>
+                              {entry.count}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </Card.Content>
+              </Card>
+            )}
 
             <Card style={styles.wideCard}>
               <Card.Content>
