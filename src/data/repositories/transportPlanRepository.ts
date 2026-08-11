@@ -15,12 +15,42 @@ export const transportPlanRepository = {
     return rowsToCamelCase<TransportPlanItem>(data);
   },
 
-  /** Solo para la sincronización de reglas permanentes: necesita ver también los items
-   * cancelados para no regenerar una semana que el planificador eliminó a propósito. */
-  async findAllIncludingCancelled(): Promise<TransportPlanItem[]> {
+  /** Solo para la sincronización de reglas permanentes: items generados por alguna regla
+   * (incluye cancelados, para no regenerar una semana que el planificador eliminó a
+   * propósito), sin traer también los items sueltos — que son la mayoría de la tabla y no
+   * le importan a este chequeo. */
+  async findAllRecurringOccurrences(): Promise<TransportPlanItem[]> {
     const { data, error } = await supabase
       .from('transport_plan_items')
       .select('*')
+      .not('recurrence_rule_id', 'is', null)
+      .order('scheduled_at', { ascending: true });
+    if (error) throw error;
+    return rowsToCamelCase<TransportPlanItem>(data);
+  },
+
+  /** Inserta varios items de una sola vez (ej. materializar ocurrencias de reglas
+   * permanentes) en vez de una llamada de red por fila. */
+  async createMany(inputs: NewTransportPlanItem[]): Promise<void> {
+    if (inputs.length === 0) {
+      return;
+    }
+    const { error } = await supabase
+      .from('transport_plan_items')
+      .insert(inputs.map((input) => objectToSnakeCase(input)));
+    if (error) throw error;
+  },
+
+  /** Igual que findAll pero acotado a un rango de fechas — usado por pantallas que solo
+   * necesitan un período visible (ej. el día de hoy, un rango elegido, o un mes del
+   * calendario) en vez de traer toda la tabla, que con el tiempo puede ser enorme. */
+  async findByDateRange(start: number, end: number): Promise<TransportPlanItem[]> {
+    const { data, error } = await supabase
+      .from('transport_plan_items')
+      .select('*')
+      .eq('cancelled', false)
+      .gte('scheduled_at', start)
+      .lt('scheduled_at', end)
       .order('scheduled_at', { ascending: true });
     if (error) throw error;
     return rowsToCamelCase<TransportPlanItem>(data);
@@ -63,7 +93,7 @@ export const transportPlanRepository = {
   },
 
   /** "Borra" una ocurrencia generada por una regla permanente sin liberar su semana, para
-   * que la sincronización no la regenere. Ver findAllIncludingCancelled. */
+   * que la sincronización no la regenere. Ver findAllRecurringOccurrences. */
   async cancel(id: number): Promise<void> {
     const { error } = await supabase
       .from('transport_plan_items')

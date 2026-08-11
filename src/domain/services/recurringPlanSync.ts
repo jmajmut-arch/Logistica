@@ -1,5 +1,6 @@
 import { recurringPlanRuleRepository } from '@/data/repositories/recurringPlanRuleRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
+import type { NewTransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { computeUpcomingScheduledDates } from '@/domain/rules/recurringPlanOccurrences';
 import { startOfWeek } from '@/utils/timeBlocks';
 
@@ -21,9 +22,9 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
     return;
   }
 
-  const allItems = await transportPlanRepository.findAllIncludingCancelled();
+  const recurringOccurrences = await transportPlanRepository.findAllRecurringOccurrences();
   const coveredWeeksByRule = new Map<number, Set<number>>();
-  for (const item of allItems) {
+  for (const item of recurringOccurrences) {
     if (item.recurrenceRuleId === null) {
       continue;
     }
@@ -32,6 +33,10 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
     coveredWeeksByRule.set(item.recurrenceRuleId, weeks);
   }
 
+  // Se junta todo lo que falta y se inserta de una sola vez al final, en vez de una
+  // llamada de red por ocurrencia — con muchas reglas y semanas de horizonte, esperar cada
+  // insert por turno es lo que hacía lenta la sincronización.
+  const missingOccurrences: NewTransportPlanItem[] = [];
   for (const rule of activeRules) {
     const coveredWeeks = coveredWeeksByRule.get(rule.id) ?? new Set<number>();
     const wantedDates = computeUpcomingScheduledDates(rule.dayOfWeek, rule.blockMinutes);
@@ -40,7 +45,7 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
       if (coveredWeeks.has(weekStart)) {
         continue;
       }
-      await transportPlanRepository.create({
+      missingOccurrences.push({
         operationType: rule.operationType,
         siteId: rule.siteId,
         carrierId: rule.carrierId,
@@ -56,4 +61,5 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
       coveredWeeks.add(weekStart);
     }
   }
+  await transportPlanRepository.createMany(missingOccurrences);
 }

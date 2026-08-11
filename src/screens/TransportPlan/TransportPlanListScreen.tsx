@@ -31,7 +31,7 @@ import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { ensureRecurringPlanOccurrences } from '@/domain/services/recurringPlanSync';
 import { PALETTE } from '@/theme';
 import { matchesOperatorScope } from '@/utils/operatorScope';
-import { getWeekNumber, startOfDay, startOfToday } from '@/utils/timeBlocks';
+import { getWeekNumber, startOfDay, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
   OPERATION_TYPE_COLORS,
   OPERATION_TYPE_ICONS,
@@ -45,6 +45,8 @@ import type { TransportPlanStackParamList } from './TransportPlanStack';
 type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'TransportPlanList'>;
 
 type DaySection = { day: number; title: string; data: TransportPlanItem[] };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -67,19 +69,36 @@ export function TransportPlanListScreen() {
   const [customRange, setCustomRange] = useState<{ start: number; end: number } | null>(null);
   const [rangePickerVisible, setRangePickerVisible] = useState(false);
 
+  // Solo se trae de Supabase el rango que la vista actual realmente necesita — el mes
+  // visible del calendario, el rango elegido, o si no, el día de hoy — en vez de toda la
+  // tabla, que con el tiempo puede tener miles de filas.
+  const queryRange = useMemo(() => {
+    if (viewMode === 'calendar') {
+      const year = visibleMonth.getFullYear();
+      const month = visibleMonth.getMonth();
+      const firstOfMonth = new Date(year, month, 1).getTime();
+      const lastOfMonth = new Date(year, month + 1, 0).getTime();
+      return { start: startOfWeek(firstOfMonth), end: startOfWeek(lastOfMonth) + 7 * DAY_MS };
+    }
+    if (customRange) {
+      return { start: customRange.start, end: customRange.end + DAY_MS };
+    }
+    return { start: today, end: today + DAY_MS };
+  }, [viewMode, visibleMonth, customRange, today]);
+
   const loadData = useCallback(async () => {
     // Reglas permanentes existen tanto para plan semanal como para home delivery, así que
     // la sincronización corre siempre, sin importar qué scope esté viendo el planificador.
     await ensureRecurringPlanOccurrences();
     const [items, sites, carriers] = await Promise.all([
-      transportPlanRepository.findAll(),
+      transportPlanRepository.findByDateRange(queryRange.start, queryRange.end),
       siteRepository.findAll(),
       carrierRepository.findAll(),
     ]);
     setPlanItems(items);
     setSitesById(new Map(sites.map((site) => [site.id, site])));
     setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
-  }, []);
+  }, [queryRange]);
 
   useFocusRefresh(loadData);
 
