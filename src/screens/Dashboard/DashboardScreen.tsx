@@ -685,24 +685,22 @@ export function DashboardScreen() {
                   <Text variant="labelMedium">Viajes pendientes hoy</Text>
                 </Card.Content>
               </Card>
-              {effectiveScope === 'plan_transporte' && (
-                <Card
-                  style={styles.complianceTile}
-                  onPress={() =>
-                    openDetail(
-                      'Viajes cancelados hoy',
-                      todayItems.filter((item) => item.cancelledByOperator),
-                    )
-                  }
-                >
-                  <Card.Content>
-                    <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
-                      {cancelledTodayCount}
-                    </Text>
-                    <Text variant="labelMedium">Viajes cancelados hoy</Text>
-                  </Card.Content>
-                </Card>
-              )}
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
+                    'Viajes cancelados hoy',
+                    todayItems.filter((item) => item.cancelledByOperator),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                    {cancelledTodayCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes cancelados hoy</Text>
+                </Card.Content>
+              </Card>
             </View>
 
             <Card style={styles.wideCard}>
@@ -911,24 +909,22 @@ export function DashboardScreen() {
                   <Text variant="labelMedium">Viajes pendientes semana</Text>
                 </Card.Content>
               </Card>
-              {effectiveScope === 'plan_transporte' && (
-                <Card
-                  style={styles.complianceTile}
-                  onPress={() =>
-                    openDetail(
-                      'Viajes cancelados esta semana',
-                      weekItems.filter((item) => item.cancelledByOperator),
-                    )
-                  }
-                >
-                  <Card.Content>
-                    <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
-                      {cancelledWeekCount}
-                    </Text>
-                    <Text variant="labelMedium">Viajes cancelados semana</Text>
-                  </Card.Content>
-                </Card>
-              )}
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
+                    'Viajes cancelados esta semana',
+                    weekItems.filter((item) => item.cancelledByOperator),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                    {cancelledWeekCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes cancelados semana</Text>
+                </Card.Content>
+              </Card>
             </View>
 
             <Card style={styles.wideCard}>

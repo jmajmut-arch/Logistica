@@ -483,17 +483,15 @@ export function LoadArrivalFormScreen() {
                 <Button compact onPress={closeDialog}>
                   Cancelar
                 </Button>
-                {currentOperatorScope === 'plan_transporte' && (
-                  <Button
-                    compact
-                    textColor={DISPLAY_STATUS_COLORS.overdue}
-                    onPress={cancelTrip}
-                    loading={submitting}
-                    disabled={submitting}
-                  >
-                    Viaje cancelado
-                  </Button>
-                )}
+                <Button
+                  compact
+                  textColor={DISPLAY_STATUS_COLORS.overdue}
+                  onPress={cancelTrip}
+                  loading={submitting}
+                  disabled={submitting}
+                >
+                  Viaje cancelado
+                </Button>
                 {active.hasNoSchedule ? (
                   <Button compact mode="contained" onPress={() => setDialogStep('time')}>
                     Registrar llegada
