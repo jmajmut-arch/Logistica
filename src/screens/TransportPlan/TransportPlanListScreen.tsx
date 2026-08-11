@@ -45,6 +45,10 @@ type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'Transp
 
 type DaySection = { day: number; title: string; data: TransportPlanItem[] };
 
+// Cuántos días con plan se muestran de entrada en la vista Lista, antes de tocar "Cargar
+// más": con historiales largos, agrupar y renderizar todo de una es lo más lento.
+const DAY_PAGE_SIZE = 20;
+
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -61,6 +65,7 @@ export function TransportPlanListScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<number>(today);
+  const [visibleDayCount, setVisibleDayCount] = useState(DAY_PAGE_SIZE);
 
   const loadData = useCallback(async () => {
     // Reglas permanentes existen tanto para plan semanal como para home delivery, así que
@@ -74,6 +79,7 @@ export function TransportPlanListScreen() {
     setPlanItems(items);
     setSitesById(new Map(sites.map((site) => [site.id, site])));
     setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
+    setVisibleDayCount(DAY_PAGE_SIZE);
   }, []);
 
   useFocusRefresh(loadData);
@@ -99,6 +105,57 @@ export function TransportPlanListScreen() {
     }
   };
 
+  const scopedPlanItems = useMemo(
+    () => (planItems ?? []).filter((item) => matchesOperatorScope(item.operationType, planManagerScope)),
+    [planItems, planManagerScope],
+  );
+
+  // Una sola pasada para agrupar por día (en vez de un filter() del arreglo completo por
+  // cada día distinto): con historiales largos esto era O(días × items).
+  const { countsByDay, craneDays, itemsByDay } = useMemo(() => {
+    const counts = new Map<number, number>();
+    const crane = new Set<number>();
+    const byDay = new Map<number, TransportPlanItem[]>();
+    for (const item of scopedPlanItems) {
+      const day = startOfDay(item.scheduledAt);
+      counts.set(day, (counts.get(day) ?? 0) + 1);
+      if (item.requiresHeavyCrane) {
+        crane.add(day);
+      }
+      const dayItems = byDay.get(day);
+      if (dayItems) {
+        dayItems.push(item);
+      } else {
+        byDay.set(day, [item]);
+      }
+    }
+    return { countsByDay: counts, craneDays: crane, itemsByDay: byDay };
+  }, [scopedPlanItems]);
+
+  const allDaySections: DaySection[] = useMemo(
+    () =>
+      Array.from(itemsByDay.keys())
+        .sort((a, b) => a - b)
+        .map((day) => ({
+          day,
+          title: `${capitalize(format(new Date(day), "EEEE dd 'de' MMMM", { locale: es }))} · Semana ${getWeekNumber(day)}`,
+          data: [...(itemsByDay.get(day) ?? [])].sort((a, b) => a.scheduledAt - b.scheduledAt),
+        })),
+    [itemsByDay],
+  );
+
+  const daySections = useMemo(
+    () => allDaySections.slice(0, visibleDayCount),
+    [allDaySections, visibleDayCount],
+  );
+  const hasMoreDays = visibleDayCount < allDaySections.length;
+
+  const selectedDayItems = useMemo(
+    () =>
+      (itemsByDay.get(selectedDay) ?? []).slice().sort((a, b) => a.scheduledAt - b.scheduledAt),
+    [itemsByDay, selectedDay],
+  );
+
   if (planItems === null) {
     return (
       <View style={styles.center}>
@@ -106,34 +163,6 @@ export function TransportPlanListScreen() {
       </View>
     );
   }
-
-  const scopedPlanItems = planItems.filter((item) =>
-    matchesOperatorScope(item.operationType, planManagerScope),
-  );
-
-  const countsByDay = new Map<number, number>();
-  const craneDays = new Set<number>();
-  for (const item of scopedPlanItems) {
-    const day = startOfDay(item.scheduledAt);
-    countsByDay.set(day, (countsByDay.get(day) ?? 0) + 1);
-    if (item.requiresHeavyCrane) {
-      craneDays.add(day);
-    }
-  }
-
-  const daySections: DaySection[] = Array.from(countsByDay.keys())
-    .sort((a, b) => a - b)
-    .map((day) => ({
-      day,
-      title: `${capitalize(format(new Date(day), "EEEE dd 'de' MMMM", { locale: es }))} · Semana ${getWeekNumber(day)}`,
-      data: scopedPlanItems
-        .filter((item) => startOfDay(item.scheduledAt) === day)
-        .sort((a, b) => a.scheduledAt - b.scheduledAt),
-    }));
-
-  const selectedDayItems = scopedPlanItems
-    .filter((item) => startOfDay(item.scheduledAt) === selectedDay)
-    .sort((a, b) => a.scheduledAt - b.scheduledAt);
 
   const renderPlanItem = (item: TransportPlanItem) => {
     const site = sitesById.get(item.siteId);
@@ -264,6 +293,17 @@ export function TransportPlanListScreen() {
             </View>
           )}
           renderItem={({ item }) => renderPlanItem(item)}
+          ListFooterComponent={
+            hasMoreDays ? (
+              <Button
+                mode="outlined"
+                style={styles.loadMoreButton}
+                onPress={() => setVisibleDayCount((count) => count + DAY_PAGE_SIZE)}
+              >
+                Cargar más días ({allDaySections.length - visibleDayCount} restantes)
+              </Button>
+            ) : null
+          }
         />
       )}
       <RoleGate permission="managePlan">
@@ -325,6 +365,10 @@ const styles = StyleSheet.create({
   },
   sectionHeaderText: {
     color: PALETTE.textMuted,
+  },
+  loadMoreButton: {
+    marginHorizontal: 16,
+    marginTop: 8,
   },
   itemCard: {
     marginHorizontal: 16,
