@@ -384,7 +384,10 @@ export function DashboardScreen() {
         ).length;
         return {
           label,
-          percentage: combinedCompliance(statuses, unplannedCount),
+          // "Camión llegado según plan" (llegó, sin importar la hora), igual que la cajita
+          // del mismo nombre — no el % de cumplimiento a tiempo, para ver de un vistazo qué
+          // días tuvieron camiones que nunca llegaron (pendientes/cancelados).
+          percentage: arrivalCompliance(statuses),
           highlight: start === dayStart,
           items,
           unplannedCount,
@@ -917,7 +920,7 @@ export function DashboardScreen() {
             <Card style={styles.wideCard}>
               <Card.Content>
                 <Text variant="titleMedium" style={styles.cardTitle}>
-                  Cumplimiento de la semana · Semana {weekNumber}
+                  Camión llegado según plan · Semana {weekNumber}
                 </Text>
                 <WeekBarChart
                   data={weeklyComplianceByDay.map((day) => ({
