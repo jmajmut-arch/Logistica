@@ -29,6 +29,7 @@ import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
+import { splitCancelledByOperator } from '@/domain/rules/cancelledTrips';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 import { matchesOperatorScope } from '@/utils/operatorScope';
@@ -170,18 +171,15 @@ export function LoadArrivalFormScreen() {
   // "Pendientes de hoy" deja de calzar con el conteo real de pendientes (el cancelado ya no
   // es "pendiente", solo queda como registro).
   const pendingItemsForSite = useMemo(
-    () => todayItemsForSite.filter((item) => !item.cancelledByOperator),
+    () => splitCancelledByOperator(todayItemsForSite).pending,
     [todayItemsForSite],
   );
   const overduePendingItemsForSite = useMemo(
-    () => overdueItemsForSite.filter((item) => !item.cancelledByOperator),
+    () => splitCancelledByOperator(overdueItemsForSite).pending,
     [overdueItemsForSite],
   );
   const cancelledItemsForSite = useMemo(
-    () =>
-      [...overdueItemsForSite, ...todayItemsForSite]
-        .filter((item) => item.cancelledByOperator)
-        .sort((a, b) => (b.cancelledAt ?? 0) - (a.cancelledAt ?? 0)),
+    () => splitCancelledByOperator([...overdueItemsForSite, ...todayItemsForSite]).cancelled,
     [overdueItemsForSite, todayItemsForSite],
   );
 

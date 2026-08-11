@@ -30,6 +30,7 @@ import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
+import { splitCancelledByOperator } from '@/domain/rules/cancelledTrips';
 import { getDisplayStatus, getPlanItemStatus } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
@@ -163,15 +164,8 @@ export function LoadArrivalListScreen() {
   // Separados de los pendientes accionables: si se mezclan en la misma lista, el título
   // "Pendientes de hoy" deja de calzar con el conteo real de pendientes del resumen (un
   // cancelado ya no es "pendiente", solo queda como registro).
-  const pendingItemsForSite = useMemo(
-    () => unregisteredTodayForSite.filter((item) => !item.cancelledByOperator),
-    [unregisteredTodayForSite],
-  );
-  const cancelledTodayForSite = useMemo(
-    () =>
-      unregisteredTodayForSite
-        .filter((item) => item.cancelledByOperator)
-        .sort((a, b) => (b.cancelledAt ?? 0) - (a.cancelledAt ?? 0)),
+  const { pending: pendingItemsForSite, cancelled: cancelledTodayForSite } = useMemo(
+    () => splitCancelledByOperator(unregisteredTodayForSite),
     [unregisteredTodayForSite],
   );
 

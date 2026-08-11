@@ -33,6 +33,15 @@ import {
   getDisplayStatus,
   type DisplayStatus,
 } from '@/domain/rules/complianceStatus';
+import {
+  arrivalCompliance,
+  cancelledCount,
+  combinedCompliance,
+  countByStatus,
+  executedCount,
+  pendingCount,
+  scheduleAdherence,
+} from '@/domain/rules/dashboardMetrics';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 import { OPERATION_TYPES, type OperatorScope } from '@/types/enums';
@@ -86,43 +95,6 @@ function arrivalDelta(scheduledAt: number, arrivedAt: number): string {
     return 'en punto';
   }
   return diffMinutes > 0 ? `+${diffMinutes} min` : `${diffMinutes} min`;
-}
-
-/** Cuenta las cargas fuera de plan como incumplimiento adicional del período: no tienen
- * horario contra el cual medirse, pero sí bajan el % porque el plan no las anticipó. */
-function combinedCompliance(planStatuses: DisplayStatus[], unplannedCount: number): number | null {
-  const total = planStatuses.length + unplannedCount;
-  if (total === 0) {
-    return null;
-  }
-  const onTime = planStatuses.filter((status) => status === 'on_time').length;
-  return Math.round((onTime / total) * 100);
-}
-
-/** % de items planificados a los que efectivamente llegó un camión, sin importar si fue a
- * tiempo, atrasado o anticipado — mide si el camión llegó según lo planificado. */
-function arrivalCompliance(planStatuses: DisplayStatus[]): number | null {
-  if (planStatuses.length === 0) {
-    return null;
-  }
-  const arrived = planStatuses.filter(
-    (status) => status === 'on_time' || status === 'late' || status === 'early',
-  ).length;
-  return Math.round((arrived / planStatuses.length) * 100);
-}
-
-/** % de los camiones que sí llegaron y lo hicieron dentro del horario planificado — mide
- * adherencia horaria solo entre los que llegaron (si nunca llegó, ya lo penaliza
- * arrivalCompliance, no esta métrica). */
-function scheduleAdherence(planStatuses: DisplayStatus[]): number | null {
-  const arrived = planStatuses.filter(
-    (status) => status === 'on_time' || status === 'late' || status === 'early',
-  );
-  if (arrived.length === 0) {
-    return null;
-  }
-  const onTime = arrived.filter((status) => status === 'on_time').length;
-  return Math.round((onTime / arrived.length) * 100);
 }
 
 export function DashboardScreen() {
@@ -385,14 +357,6 @@ export function DashboardScreen() {
     [weekItems, weekUnplannedArrivals, weekStart, dayStart, arrivalsByPlanItem, now],
   );
 
-  function countByStatus(statuses: DisplayStatus[]): Map<DisplayStatus, number> {
-    const counts = new Map<DisplayStatus, number>();
-    for (const status of statuses) {
-      counts.set(status, (counts.get(status) ?? 0) + 1);
-    }
-    return counts;
-  }
-
   const todayStatusCounts = useMemo(
     () => countByStatus(todayDisplayStatuses),
     [todayDisplayStatuses],
@@ -452,23 +416,12 @@ export function DashboardScreen() {
       .sort((a, b) => b.count - a.count);
   }, [customRangeItems]);
 
-  const pendingTodayCount =
-    (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
-  // Ejecutados = con llegada real registrada. No es "total - pendientes": un viaje
-  // cancelado por el operador tampoco es pendiente, pero tampoco se ejecutó — si se
-  // restaba solo lo pendiente, un cancelado quedaba contado como ejecutado.
-  const registeredTodayCount =
-    (todayStatusCounts.get('on_time') ?? 0) +
-    (todayStatusCounts.get('late') ?? 0) +
-    (todayStatusCounts.get('early') ?? 0);
-  const cancelledTodayCount = todayStatusCounts.get('cancelled') ?? 0;
-  const pendingWeekCount =
-    (weekStatusCounts.get('pending') ?? 0) + (weekStatusCounts.get('overdue') ?? 0);
-  const registeredWeekCount =
-    (weekStatusCounts.get('on_time') ?? 0) +
-    (weekStatusCounts.get('late') ?? 0) +
-    (weekStatusCounts.get('early') ?? 0);
-  const cancelledWeekCount = weekStatusCounts.get('cancelled') ?? 0;
+  const pendingTodayCount = pendingCount(todayStatusCounts);
+  const registeredTodayCount = executedCount(todayStatusCounts);
+  const cancelledTodayCount = cancelledCount(todayStatusCounts);
+  const pendingWeekCount = pendingCount(weekStatusCounts);
+  const registeredWeekCount = executedCount(weekStatusCounts);
+  const cancelledWeekCount = cancelledCount(weekStatusCounts);
 
   const complianceByOperationType = useMemo(
     () =>
