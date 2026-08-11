@@ -446,7 +446,8 @@ export function TransportPlanFormScreen() {
           <View style={styles.recurringText}>
             <Text variant="bodyMedium">Planificación permanente</Text>
             <Text variant="bodySmall" style={styles.recurringHint}>
-              Se repite todas las semanas en el mismo día y hora
+              Se repite todas las semanas en el mismo día y hora, generando ocurrencias para las
+              próximas 12 semanas (~3 meses) desde hoy
             </Text>
           </View>
           <Switch
@@ -484,60 +485,48 @@ export function TransportPlanFormScreen() {
               Días de esta semana
             </Text>
             {weekDayOptions.map((option) => {
-              const quantity = selectedWeekDays.get(option.value);
-              const isSelected = quantity !== undefined;
+              const quantity = selectedWeekDays.get(option.value) ?? 0;
               return (
                 <View key={option.value} style={styles.weekDayRow}>
-                  <Chip
-                    selected={isSelected}
-                    showSelectedCheck
-                    onPress={() =>
-                      setSelectedWeekDays((prev) => {
-                        const next = new Map(prev);
-                        if (next.has(option.value)) {
-                          next.delete(option.value);
-                        } else {
-                          next.set(option.value, 1);
-                        }
-                        return next;
-                      })
-                    }
-                  >
+                  <Text variant="bodyMedium" style={styles.weekDayLabel}>
                     {option.label}
-                  </Chip>
-                  {isSelected && (
-                    <View style={styles.truckStepper}>
-                      <IconButton
-                        icon="minus"
-                        size={18}
-                        disabled={quantity <= 1}
-                        onPress={() =>
-                          setSelectedWeekDays((prev) => {
-                            const next = new Map(prev);
-                            next.set(option.value, Math.max(1, (next.get(option.value) ?? 1) - 1));
-                            return next;
-                          })
-                        }
-                      />
-                      <Text variant="bodyMedium" style={styles.truckCount}>
-                        {quantity}
-                      </Text>
-                      <IconButton
-                        icon="plus"
-                        size={18}
-                        onPress={() =>
-                          setSelectedWeekDays((prev) => {
-                            const next = new Map(prev);
-                            next.set(option.value, (next.get(option.value) ?? 1) + 1);
-                            return next;
-                          })
-                        }
-                      />
-                      <Text variant="bodySmall" style={styles.truckLabel}>
-                        {quantity === 1 ? 'camión' : 'camiones'}
-                      </Text>
-                    </View>
-                  )}
+                  </Text>
+                  <View style={styles.truckStepper}>
+                    <IconButton
+                      icon="minus"
+                      size={18}
+                      disabled={quantity === 0}
+                      onPress={() =>
+                        setSelectedWeekDays((prev) => {
+                          const next = new Map(prev);
+                          const current = next.get(option.value) ?? 0;
+                          if (current <= 1) {
+                            next.delete(option.value);
+                          } else {
+                            next.set(option.value, current - 1);
+                          }
+                          return next;
+                        })
+                      }
+                    />
+                    <Text variant="bodyMedium" style={styles.truckCount}>
+                      {quantity}
+                    </Text>
+                    <IconButton
+                      icon="plus"
+                      size={18}
+                      onPress={() =>
+                        setSelectedWeekDays((prev) => {
+                          const next = new Map(prev);
+                          next.set(option.value, (next.get(option.value) ?? 0) + 1);
+                          return next;
+                        })
+                      }
+                    />
+                    <Text variant="bodySmall" style={styles.truckLabel}>
+                      {quantity === 1 ? 'camión' : 'camiones'}
+                    </Text>
+                  </View>
                 </View>
               );
             })}
@@ -668,7 +657,9 @@ export function TransportPlanFormScreen() {
                 : 'Selecciona la fecha y revisa la hora ingresada'}
         </HelperText>
       ) : isRecurring && canBeRecurring ? (
-        <HelperText type="info">Se repite todas las semanas, a partir de hoy</HelperText>
+        <HelperText type="info">
+          Se repite todas las semanas, a partir de hoy y durante las próximas 12 semanas (~3 meses)
+        </HelperText>
       ) : (
         weekNumber !== null && <HelperText type="info">Semana {weekNumber}</HelperText>
       )}
@@ -777,8 +768,11 @@ const styles = StyleSheet.create({
   weekDayRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  weekDayLabel: {
+    flex: 1,
   },
   truckStepper: {
     flexDirection: 'row',
