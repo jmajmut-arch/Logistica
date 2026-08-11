@@ -4,7 +4,17 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Chip, HelperText, Menu, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
+import {
+  Button,
+  Chip,
+  HelperText,
+  IconButton,
+  Menu,
+  SegmentedButtons,
+  Switch,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -101,7 +111,8 @@ export function TransportPlanFormScreen() {
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
   // Plan semanal se re-ingresa cada 7 días: al crear, en vez de una fecha puntual se elige
   // uno o varios días concretos de esta semana (nunca una regla que se repita indefinido).
-  const [selectedWeekDays, setSelectedWeekDays] = useState<Set<number>>(new Set());
+  // El valor de cada día es la cantidad de camiones que llegan ese día (1 por defecto).
+  const [selectedWeekDays, setSelectedWeekDays] = useState<Map<number, number>>(new Map());
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   // En plan semanal (carga_subida/retiro_carga) por defecto viene marcado "sin horario";
@@ -175,21 +186,28 @@ export function TransportPlanFormScreen() {
   );
   const previewBlockMinutes = sortedSelectedBlocks[0] ?? null;
   const sortedSelectedDays = useMemo(() => Array.from(selectedDays).sort((a, b) => a - b), [selectedDays]);
-  const sortedSelectedWeekDays = useMemo(
-    () => Array.from(selectedWeekDays).sort((a, b) => a - b),
+  const sortedWeekDayEntries = useMemo(
+    () => Array.from(selectedWeekDays.entries()).sort((a, b) => a[0] - b[0]),
     [selectedWeekDays],
   );
 
-  // Días a los que se debe aplicar el guardado: varios si se está creando en plan semanal
-  // (un día concreto por cada uno elegido), o el único de la fecha puntual en cualquier
-  // otro caso (home delivery sin regla permanente, o al editar una ocurrencia existente).
+  // Días a los que se debe aplicar el guardado: en plan semanal, cada día elegido se repite
+  // tantas veces como camiones se hayan indicado para ese día (un item por camión); en
+  // cualquier otro caso es el único día de la fecha puntual (home delivery sin regla
+  // permanente, o al editar una ocurrencia existente).
   const activeDayStarts = useMemo(() => {
     if (showWeekDayPicker) {
-      return sortedSelectedWeekDays;
+      const result: number[] = [];
+      for (const [day, quantity] of sortedWeekDayEntries) {
+        for (let i = 0; i < quantity; i += 1) {
+          result.push(day);
+        }
+      }
+      return result;
     }
     const parsed = dateStringToDate(date);
     return parsed ? [startOfDay(parsed.getTime())] : [];
-  }, [showWeekDayPicker, sortedSelectedWeekDays, date]);
+  }, [showWeekDayPicker, sortedWeekDayEntries, date]);
 
   const scheduledAt = useMemo(() => {
     const dayStart = activeDayStarts[0] ?? null;
@@ -465,16 +483,67 @@ export function TransportPlanFormScreen() {
             <Text variant="bodyMedium" style={styles.label}>
               Días de esta semana
             </Text>
-            <SegmentedButtons
-              multiSelect
-              value={sortedSelectedWeekDays.map(String)}
-              onValueChange={(values) => setSelectedWeekDays(new Set(values.map(Number)))}
-              buttons={weekDayOptions.map((option) => ({
-                value: String(option.value),
-                label: option.label,
-              }))}
-            />
-            <HelperText type="info">Puedes elegir uno o varios días — solo de esta semana</HelperText>
+            {weekDayOptions.map((option) => {
+              const quantity = selectedWeekDays.get(option.value);
+              const isSelected = quantity !== undefined;
+              return (
+                <View key={option.value} style={styles.weekDayRow}>
+                  <Chip
+                    selected={isSelected}
+                    showSelectedCheck
+                    onPress={() =>
+                      setSelectedWeekDays((prev) => {
+                        const next = new Map(prev);
+                        if (next.has(option.value)) {
+                          next.delete(option.value);
+                        } else {
+                          next.set(option.value, 1);
+                        }
+                        return next;
+                      })
+                    }
+                  >
+                    {option.label}
+                  </Chip>
+                  {isSelected && (
+                    <View style={styles.truckStepper}>
+                      <IconButton
+                        icon="minus"
+                        size={18}
+                        disabled={quantity <= 1}
+                        onPress={() =>
+                          setSelectedWeekDays((prev) => {
+                            const next = new Map(prev);
+                            next.set(option.value, Math.max(1, (next.get(option.value) ?? 1) - 1));
+                            return next;
+                          })
+                        }
+                      />
+                      <Text variant="bodyMedium" style={styles.truckCount}>
+                        {quantity}
+                      </Text>
+                      <IconButton
+                        icon="plus"
+                        size={18}
+                        onPress={() =>
+                          setSelectedWeekDays((prev) => {
+                            const next = new Map(prev);
+                            next.set(option.value, (next.get(option.value) ?? 1) + 1);
+                            return next;
+                          })
+                        }
+                      />
+                      <Text variant="bodySmall" style={styles.truckLabel}>
+                        {quantity === 1 ? 'camión' : 'camiones'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+            <HelperText type="info">
+              Puedes elegir uno o varios días de esta semana e indicar cuántos camiones llegan cada día
+            </HelperText>
           </View>
           {noScheduleToggle}
         </>
@@ -704,6 +773,24 @@ const styles = StyleSheet.create({
   },
   blockChip: {
     marginBottom: 4,
+  },
+  weekDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  truckStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  truckCount: {
+    minWidth: 18,
+    textAlign: 'center',
+  },
+  truckLabel: {
+    opacity: 0.7,
+    marginLeft: 4,
   },
   recurringRow: {
     flexDirection: 'row',
