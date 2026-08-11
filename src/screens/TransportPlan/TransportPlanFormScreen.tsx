@@ -100,7 +100,9 @@ export function TransportPlanFormScreen() {
   const [dayOfWeek, setDayOfWeek] = useState<number | null>(null);
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [hasNoSchedule, setHasNoSchedule] = useState(false);
+  // En plan semanal (carga_subida/retiro_carga) por defecto viene marcado "sin horario";
+  // en home delivery no, porque ahí lo habitual es planificar horarios concretos.
+  const [hasNoSchedule, setHasNoSchedule] = useState(planItemId === undefined && planManagerScope !== 'home_delivery');
   const [selectedBlocks, setSelectedBlocks] = useState<Set<number>>(new Set());
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
