@@ -497,21 +497,9 @@ export function DashboardScreen() {
   const agendaUnplannedArrivals =
     agendaScope === 'day' ? todayUnplannedArrivals : weekUnplannedArrivals;
 
-  // Destinos (sitios) de las cargas del período elegido en el toggle Hoy/Semana de la
-  // agenda, para ver de un vistazo hacia dónde se concentra el tráfico planificado.
-  const agendaItemsBySite = useMemo(() => {
-    const counts = new Map<number, number>();
-    for (const item of agendaItems) {
-      counts.set(item.siteId, (counts.get(item.siteId) ?? 0) + 1);
-    }
-    return Array.from(counts.entries())
-      .map(([siteId, count]) => ({ siteId, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [agendaItems]);
-
-  // Igual que agendaItemsBySite, pero fijo a hoy: la sección "Hoy" del dashboard necesita
-  // su propio gráfico de destinos, sin depender de en qué posición esté el toggle
-  // Hoy/Semana de la agenda (que vive más abajo, en otra sección).
+  // Destinos (sitios) fijos a hoy/semana: las secciones "Hoy" y "Esta semana" tienen cada
+  // una su propio gráfico de destinos, sin depender del toggle Hoy/Semana de la agenda que
+  // vive más abajo (ese toggle solo controla la lista de la agenda, no estos gráficos).
   const todayItemsBySite = useMemo(() => {
     const counts = new Map<number, number>();
     for (const item of todayItems) {
@@ -521,6 +509,15 @@ export function DashboardScreen() {
       .map(([siteId, count]) => ({ siteId, count }))
       .sort((a, b) => b.count - a.count);
   }, [todayItems]);
+  const weekItemsBySite = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of weekItems) {
+      counts.set(item.siteId, (counts.get(item.siteId) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([siteId, count]) => ({ siteId, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [weekItems]);
 
   function renderPlanItemCard(item: TransportPlanItem, wideTime: boolean) {
     const arrival = arrivalsByPlanItem.get(item.id);
@@ -1026,6 +1023,61 @@ export function DashboardScreen() {
               </Card.Content>
             </Card>
 
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Destinos de las cargas · semana {weekNumber}
+                </Text>
+                {weekItemsBySite.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados para esta semana todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={weekItemsBySite.map((entry, index) => ({
+                        key: String(entry.siteId),
+                        value: entry.count,
+                        color: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                      }))}
+                      centerValue={String(weekItems.length)}
+                      centerLabel={weekItems.length === 1 ? 'viaje' : 'viajes'}
+                    />
+                    <View style={styles.legend}>
+                      {weekItemsBySite.map((entry, index) => (
+                        <Pressable
+                          key={entry.siteId}
+                          style={styles.legendRow}
+                          onPress={() =>
+                            openDetail(
+                              `${siteName(entry.siteId)} · semana ${weekNumber} (${entry.count})`,
+                              weekItems.filter((item) => item.siteId === entry.siteId),
+                            )
+                          }
+                        >
+                          <View
+                            style={[
+                              styles.legendDot,
+                              {
+                                backgroundColor:
+                                  SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                              },
+                            ]}
+                          />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {siteName(entry.siteId)}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {entry.count}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+
             {scopedOperationTypes.length > 1 && (
               <Card style={styles.wideCard}>
                 <Card.Content>
@@ -1343,64 +1395,6 @@ export function DashboardScreen() {
                 </Card.Content>
               </Card>
             )}
-
-            <Card style={styles.wideCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.cardTitle}>
-                  Destinos de las cargas · {agendaScope === 'day' ? 'hoy' : `semana ${weekNumber}`}
-                </Text>
-                {agendaItemsBySite.length === 0 ? (
-                  <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes planificados{' '}
-                    {agendaScope === 'day' ? 'para hoy' : 'para esta semana'} todavía.
-                  </Text>
-                ) : (
-                  <View style={styles.donutRow}>
-                    <DonutChart
-                      segments={agendaItemsBySite.map((entry, index) => ({
-                        key: String(entry.siteId),
-                        value: entry.count,
-                        color: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
-                      }))}
-                      centerValue={String(agendaItems.length)}
-                      centerLabel={agendaItems.length === 1 ? 'viaje' : 'viajes'}
-                    />
-                    <View style={styles.legend}>
-                      {agendaItemsBySite.map((entry, index) => (
-                        <Pressable
-                          key={entry.siteId}
-                          style={styles.legendRow}
-                          onPress={() =>
-                            openDetail(
-                              `${siteName(entry.siteId)} · ${
-                                agendaScope === 'day' ? 'hoy' : `semana ${weekNumber}`
-                              } (${entry.count})`,
-                              agendaItems.filter((item) => item.siteId === entry.siteId),
-                            )
-                          }
-                        >
-                          <View
-                            style={[
-                              styles.legendDot,
-                              {
-                                backgroundColor:
-                                  SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
-                              },
-                            ]}
-                          />
-                          <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {siteName(entry.siteId)}
-                          </Text>
-                          <Text variant="bodyMedium" style={styles.legendCount}>
-                            {entry.count}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </Card.Content>
-            </Card>
 
             <View style={styles.agendaHeaderRow}>
               <Text variant="titleMedium" style={styles.sectionTitle}>
