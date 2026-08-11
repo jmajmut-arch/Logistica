@@ -3,7 +3,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, SectionList, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, SectionList, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -15,6 +15,7 @@ import {
   SegmentedButtons,
   Text,
 } from 'react-native-paper';
+import { DatePickerModal } from 'react-native-paper-dates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -45,10 +46,6 @@ type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'Transp
 
 type DaySection = { day: number; title: string; data: TransportPlanItem[] };
 
-// Cuántos días con plan se muestran de entrada en la vista Lista, antes de tocar "Cargar
-// más": con historiales largos, agrupar y renderizar todo de una es lo más lento.
-const DAY_PAGE_SIZE = 7;
-
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -65,7 +62,10 @@ export function TransportPlanListScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<number>(today);
-  const [visibleDayCount, setVisibleDayCount] = useState(DAY_PAGE_SIZE);
+  // La vista Lista muestra solo hoy por defecto — con historiales largos, agrupar y
+  // renderizar todo de una es lento — y deja elegir un rango de fechas para ver otro período.
+  const [customRange, setCustomRange] = useState<{ start: number; end: number } | null>(null);
+  const [rangePickerVisible, setRangePickerVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     // Reglas permanentes existen tanto para plan semanal como para home delivery, así que
@@ -79,7 +79,6 @@ export function TransportPlanListScreen() {
     setPlanItems(items);
     setSitesById(new Map(sites.map((site) => [site.id, site])));
     setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
-    setVisibleDayCount(DAY_PAGE_SIZE);
   }, []);
 
   useFocusRefresh(loadData);
@@ -132,23 +131,30 @@ export function TransportPlanListScreen() {
     return { countsByDay: counts, craneDays: crane, itemsByDay: byDay };
   }, [scopedPlanItems]);
 
-  const allDaySections: DaySection[] = useMemo(
+  // Sin rango elegido, la Lista solo muestra hoy; con rango, todos los días con plan
+  // dentro de ese rango (acotado por lo que realmente hay datos, no por recorrer el rango
+  // día a día).
+  const relevantDays = useMemo(() => {
+    if (customRange) {
+      return Array.from(itemsByDay.keys()).filter(
+        (day) => day >= customRange.start && day <= customRange.end,
+      );
+    }
+    return itemsByDay.has(today) ? [today] : [];
+  }, [itemsByDay, customRange, today]);
+
+  const daySections: DaySection[] = useMemo(
     () =>
-      Array.from(itemsByDay.keys())
+      relevantDays
+        .slice()
         .sort((a, b) => a - b)
         .map((day) => ({
           day,
           title: `${capitalize(format(new Date(day), "EEEE dd 'de' MMMM", { locale: es }))} · Semana ${getWeekNumber(day)}`,
           data: [...(itemsByDay.get(day) ?? [])].sort((a, b) => a.scheduledAt - b.scheduledAt),
         })),
-    [itemsByDay],
+    [relevantDays, itemsByDay],
   );
-
-  const daySections = useMemo(
-    () => allDaySections.slice(0, visibleDayCount),
-    [allDaySections, visibleDayCount],
-  );
-  const hasMoreDays = visibleDayCount < allDaySections.length;
 
   const selectedDayItems = useMemo(
     () =>
@@ -238,11 +244,25 @@ export function TransportPlanListScreen() {
       message={
         viewMode === 'calendar'
           ? 'No hay nada planificado este día.'
-          : planManagerScope === 'home_delivery'
-            ? 'No hay items en el plan de home delivery todavía.'
-            : 'No hay items en el plan de transporte todavía.'
+          : customRange
+            ? 'No hay nada planificado en este rango.'
+            : 'No hay nada planificado para hoy.'
       }
     />
+  );
+
+  const rangePicker = (
+    <View style={styles.rangePickerRow}>
+      <Pressable onPress={() => setRangePickerVisible(true)} style={styles.rangePickerButton}>
+        <MaterialCommunityIcons name="calendar-range" size={20} color={PALETTE.primary} />
+        <Text variant="bodyMedium" style={styles.rangePickerText}>
+          {customRange
+            ? `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')}`
+            : 'Ver rango de fechas'}
+        </Text>
+      </Pressable>
+      {customRange && <IconButton icon="close" size={18} onPress={() => setCustomRange(null)} />}
+    </View>
   );
 
   return (
@@ -283,7 +303,12 @@ export function TransportPlanListScreen() {
           keyExtractor={(item) => String(item.id)}
           stickySectionHeadersEnabled
           contentContainerStyle={[styles.listContent, daySections.length === 0 && styles.emptyContainer]}
-          ListHeaderComponent={<View>{viewToggle}</View>}
+          ListHeaderComponent={
+            <View>
+              {viewToggle}
+              {rangePicker}
+            </View>
+          }
           ListEmptyComponent={emptyState}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
@@ -293,17 +318,6 @@ export function TransportPlanListScreen() {
             </View>
           )}
           renderItem={({ item }) => renderPlanItem(item)}
-          ListFooterComponent={
-            hasMoreDays ? (
-              <Button
-                mode="outlined"
-                style={styles.loadMoreButton}
-                onPress={() => setVisibleDayCount((count) => count + DAY_PAGE_SIZE)}
-              >
-                Cargar más días ({allDaySections.length - visibleDayCount} restantes)
-              </Button>
-            ) : null
-          }
         />
       )}
       <RoleGate permission="managePlan">
@@ -313,6 +327,21 @@ export function TransportPlanListScreen() {
           onPress={() => navigation.navigate('TransportPlanForm')}
         />
       </RoleGate>
+
+      <DatePickerModal
+        locale="es"
+        mode="range"
+        visible={rangePickerVisible}
+        startDate={customRange ? new Date(customRange.start) : undefined}
+        endDate={customRange ? new Date(customRange.end) : undefined}
+        onDismiss={() => setRangePickerVisible(false)}
+        onConfirm={({ startDate, endDate }) => {
+          setRangePickerVisible(false);
+          if (startDate && endDate) {
+            setCustomRange({ start: startOfDay(startDate.getTime()), end: startOfDay(endDate.getTime()) });
+          }
+        }}
+      />
 
       <Portal>
         <Dialog visible={itemToDelete !== null} onDismiss={() => setItemToDelete(null)}>
@@ -366,9 +395,22 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     color: PALETTE.textMuted,
   },
-  loadMoreButton: {
+  rangePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginHorizontal: 16,
-    marginTop: 8,
+    marginBottom: 8,
+  },
+  rangePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    paddingVertical: 8,
+  },
+  rangePickerText: {
+    color: PALETTE.primary,
   },
   itemCard: {
     marginHorizontal: 16,
