@@ -38,7 +38,7 @@ import {
   startOfToday,
   TIME_BLOCKS,
 } from '@/utils/timeBlocks';
-import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
+import { DISPLAY_STATUS_COLORS, OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 
 import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
 
@@ -134,6 +134,23 @@ export function LoadArrivalFormScreen() {
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
   }, [planItems, siteId, dayStart, dayEnd, registeredPlanItemIds, currentOperatorScope]);
+
+  // Viajes planificados para días anteriores que nunca se registraron: se muestran aparte
+  // para que el operador también pueda ponerse al día, aunque la hora o el día ya pasó.
+  const overduePendingItemsForSite = useMemo(() => {
+    if (!planItems || siteId === 0) {
+      return [];
+    }
+    return planItems
+      .filter(
+        (item) =>
+          item.siteId === siteId &&
+          item.scheduledAt < dayStart &&
+          !registeredPlanItemIds.has(item.id) &&
+          matchesOperatorScope(item.operationType, currentOperatorScope),
+      )
+      .sort((a, b) => a.scheduledAt - b.scheduledAt);
+  }, [planItems, siteId, dayStart, registeredPlanItemIds, currentOperatorScope]);
 
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
@@ -276,6 +293,50 @@ export function LoadArrivalFormScreen() {
 
       {siteId !== 0 && (
         <>
+          {overduePendingItemsForSite.length > 0 && (
+            <>
+              <Text variant="bodyMedium" style={[styles.label, styles.overdueLabel]}>
+                Pendientes atrasados
+              </Text>
+              {overduePendingItemsForSite.map((item) => {
+                const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
+                return (
+                  <Card
+                    key={item.id}
+                    style={[styles.planItemCard, styles.overdueCard]}
+                    onPress={() => openPlanItem(item)}
+                  >
+                    <Card.Content style={styles.planItemContent}>
+                      <View style={styles.planItemTimeWide}>
+                        <Text variant="bodySmall" style={styles.overdueLabel}>
+                          {item.hasNoSchedule
+                            ? format(new Date(item.scheduledAt), 'dd-MM')
+                            : format(new Date(item.scheduledAt), 'dd-MM HH:mm')}
+                        </Text>
+                      </View>
+                      <View style={styles.planItemText}>
+                        <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
+                        {carrier && (
+                          <Text variant="bodySmall" style={styles.planItemDetail}>
+                            {carrier.name}
+                          </Text>
+                        )}
+                        {item.reference && (
+                          <Text variant="bodySmall" style={styles.planItemDetail}>
+                            {item.reference}
+                          </Text>
+                        )}
+                        {item.requiresHeavyCrane && <HeavyCraneBadge />}
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={22} color={PALETTE.textMuted} />
+                    </Card.Content>
+                  </Card>
+                );
+              })}
+              <Divider style={styles.divider} />
+            </>
+          )}
+
           <Text variant="bodyMedium" style={styles.label}>
             Plan de hoy para {selectedSite?.name}
           </Text>
@@ -500,6 +561,16 @@ const styles = StyleSheet.create({
   },
   planItemTime: {
     width: 60,
+  },
+  planItemTimeWide: {
+    width: 76,
+  },
+  overdueLabel: {
+    color: DISPLAY_STATUS_COLORS.overdue,
+  },
+  overdueCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: DISPLAY_STATUS_COLORS.overdue,
   },
   planItemText: {
     flex: 1,
