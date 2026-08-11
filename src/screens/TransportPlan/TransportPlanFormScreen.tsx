@@ -97,7 +97,7 @@ export function TransportPlanFormScreen() {
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [dayOfWeek, setDayOfWeek] = useState<number | null>(null);
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   // En plan semanal (carga_subida/retiro_carga) por defecto viene marcado "sin horario";
@@ -158,6 +158,7 @@ export function TransportPlanFormScreen() {
     [selectedBlocks],
   );
   const previewBlockMinutes = sortedSelectedBlocks[0] ?? null;
+  const sortedSelectedDays = useMemo(() => Array.from(selectedDays).sort((a, b) => a - b), [selectedDays]);
 
   const scheduledAt = useMemo(
     () => parseScheduledAt(date.trim(), previewBlockMinutes, isOneOff && hasNoSchedule),
@@ -176,7 +177,7 @@ export function TransportPlanFormScreen() {
     setSiteError(false);
 
     if (isRecurring && canBeRecurring) {
-      if (dayOfWeek === null || sortedSelectedBlocks.length === 0) {
+      if (sortedSelectedDays.length === 0 || sortedSelectedBlocks.length === 0) {
         setDateError(true);
         return;
       }
@@ -184,21 +185,24 @@ export function TransportPlanFormScreen() {
 
       setSubmitting(true);
       try {
-        // Un horario de retiro por regla: varios horarios seleccionados crean varias
-        // reglas permanentes independientes para el mismo día (ej. 5+ horarios de retiro).
-        for (const block of sortedSelectedBlocks) {
-          await recurringPlanRuleRepository.create({
-            operationType,
-            siteId,
-            carrierId: carrierId || null,
-            dayOfWeek,
-            blockMinutes: block,
-            requiresHeavyCrane,
-            reference: reference.trim() || null,
-            notes: notes.trim() || null,
-            active: true,
-            createdBy: currentUser.id,
-          });
+        // Una regla por cada combinación día × horario: varios días y/o varios horarios
+        // seleccionados crean varias reglas permanentes independientes (ej. home delivery
+        // con retiros lunes y jueves, a las 09:00 y a las 15:00 — 4 reglas en total).
+        for (const day of sortedSelectedDays) {
+          for (const block of sortedSelectedBlocks) {
+            await recurringPlanRuleRepository.create({
+              operationType,
+              siteId,
+              carrierId: carrierId || null,
+              dayOfWeek: day,
+              blockMinutes: block,
+              requiresHeavyCrane,
+              reference: reference.trim() || null,
+              notes: notes.trim() || null,
+              active: true,
+              createdBy: currentUser.id,
+            });
+          }
         }
         await ensureRecurringPlanOccurrences();
         navigation.goBack();
@@ -386,16 +390,18 @@ export function TransportPlanFormScreen() {
       {isRecurring && canBeRecurring ? (
         <View style={styles.field}>
           <Text variant="bodyMedium" style={styles.label}>
-            Día de la semana
+            Días de la semana
           </Text>
           <SegmentedButtons
-            value={dayOfWeek === null ? '' : String(dayOfWeek)}
-            onValueChange={(value) => setDayOfWeek(Number(value))}
+            multiSelect
+            value={sortedSelectedDays.map(String)}
+            onValueChange={(values) => setSelectedDays(new Set(values.map(Number)))}
             buttons={WEEKDAY_OPTIONS.map((option) => ({
               value: String(option.value),
               label: option.label,
             }))}
           />
+          <HelperText type="info">Puedes elegir más de un día</HelperText>
         </View>
       ) : (
         <>
