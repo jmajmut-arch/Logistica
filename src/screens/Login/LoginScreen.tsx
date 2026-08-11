@@ -285,7 +285,10 @@ export function LoginScreen() {
           )}
         </View>
 
-        <Text style={styles.footer}>Plan semanal · Registro de llegadas · Cumplimiento</Text>
+        <View style={styles.footerGroup}>
+          <Text style={styles.footer}>Plan semanal · Registro de llegadas · Cumplimiento</Text>
+          <Text style={styles.credit}>Desarrollado por Joel Majmut</Text>
+        </View>
       </View>
     </LinearGradient>
   );
@@ -471,9 +474,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.5,
   },
+  footerGroup: {
+    gap: 4,
+  },
   footer: {
     color: 'rgba(226,232,240,0.35)',
     fontSize: 11,
+    textAlign: 'center',
+  },
+  credit: {
+    color: 'rgba(226,232,240,0.2)',
+    fontSize: 10,
     textAlign: 'center',
   },
 });
