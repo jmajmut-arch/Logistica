@@ -108,8 +108,9 @@ export function DispatchIssueFormScreen() {
         try {
           guideFileUrl = await uploadDispatchGuideFile(pickedFile.blob, pickedFile.name, pickedFile.mimeType);
           guideFileName = pickedFile.name;
-        } catch {
-          setUploadError('No se pudo subir el documento. Intenta nuevamente.');
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          setUploadError(`No se pudo subir el documento: ${reason}`);
           return;
         }
       }
