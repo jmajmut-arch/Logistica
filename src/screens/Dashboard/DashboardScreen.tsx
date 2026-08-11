@@ -511,6 +511,9 @@ export function DashboardScreen() {
         ]}
         ListHeaderComponent={
           <View>
+            <Text variant="headlineSmall" style={styles.dashboardTitle}>
+              Dashboard · {effectiveScope === 'home_delivery' ? 'Home delivery' : 'Plan semanal'}
+            </Text>
             {!isOperatorScoped && (
               <SegmentedButtons
                 style={styles.scopeToggle}
@@ -1275,6 +1278,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dashboardTitle: {
+    fontWeight: '700',
+    marginBottom: 12,
   },
   scopeToggle: {
     marginBottom: 12,
