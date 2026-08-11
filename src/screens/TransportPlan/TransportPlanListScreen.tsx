@@ -112,9 +112,13 @@ export function TransportPlanListScreen() {
   );
 
   const countsByDay = new Map<number, number>();
+  const craneDays = new Set<number>();
   for (const item of scopedPlanItems) {
     const day = startOfDay(item.scheduledAt);
     countsByDay.set(day, (countsByDay.get(day) ?? 0) + 1);
+    if (item.requiresHeavyCrane) {
+      craneDays.add(day);
+    }
   }
 
   const daySections: DaySection[] = Array.from(countsByDay.keys())
@@ -231,6 +235,7 @@ export function TransportPlanListScreen() {
                   setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
                 }
                 countsByDay={countsByDay}
+                craneDays={craneDays}
                 selectedDay={selectedDay}
                 onSelectDay={setSelectedDay}
                 today={today}
