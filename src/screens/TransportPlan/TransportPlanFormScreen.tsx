@@ -16,11 +16,12 @@ import type { Site } from '@/domain/entities/Site';
 import { ensureRecurringPlanOccurrences } from '@/domain/services/recurringPlanSync';
 import { useSessionStore } from '@/store/sessionStore';
 import type { OperationType } from '@/types/enums';
-import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
+import { matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import { blockMinutesOf, combineDayAndBlock, getWeekNumber, startOfDay, TIME_BLOCKS } from '@/utils/timeBlocks';
 import { HEAVY_CRANE_COLOR, HEAVY_CRANE_LABEL } from '@/utils/transportPlanDisplay';
 
+import { usePlanScope } from './PlanScopeContext';
 import type { TransportPlanStackParamList } from './TransportPlanStack';
 
 type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'TransportPlanForm'>;
@@ -79,11 +80,11 @@ export function TransportPlanFormScreen() {
   const route = useRoute<RouteProp<TransportPlanStackParamList, 'TransportPlanForm'>>();
   const planItemId = route.params?.planItemId;
   const currentUser = useSessionStore((state) => state.currentUser);
-  const planManagerScope = getPlanManagerScope(currentUser?.role);
+  const planManagerScope = usePlanScope();
   const allowedOperationTypes = OPERATION_TYPE_OPTIONS.filter((option) =>
     matchesOperatorScope(option.value, planManagerScope),
   );
-  // Solo el Administrador puede dejar una planificación de home delivery permanente, y
+  // Solo el planificador puede dejar una planificación de home delivery permanente, y
   // solo al crearla (una ocurrencia ya generada se edita/elimina puntualmente, no la regla).
   const canBeRecurring = planManagerScope === 'home_delivery' && planItemId === undefined;
 
@@ -211,6 +212,7 @@ export function TransportPlanFormScreen() {
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           recurrenceRuleId: originalRecurrenceRuleId,
+          cancelled: false,
           createdBy: originalCreatedBy ?? currentUser.id,
         });
       } else {
@@ -224,6 +226,7 @@ export function TransportPlanFormScreen() {
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           recurrenceRuleId: null,
+          cancelled: false,
           createdBy: currentUser.id,
         });
       }

@@ -57,11 +57,14 @@ create table recurring_plan_rules (
 );
 
 -- El plan de transporte semanal: cada fila es un viaje concreto (fecha + hora), no una
--- plantilla recurrente. "Semanal" describe la cadencia con la que el supervisor lo carga,
+-- plantilla recurrente. "Semanal" describe la cadencia con la que el planificador lo carga,
 -- no la forma de guardarlo — así se puede filtrar/agrupar por semana en la UI sin modelar
 -- semanas como entidad aparte. Un item puede venir de una regla permanente
 -- (recurrence_rule_id no nulo); editarlo o eliminarlo solo afecta esa fecha puntual, nunca
--- a la regla ni a las demás ocurrencias futuras.
+-- a la regla ni a las demás ocurrencias futuras. Eliminar una ocurrencia de una regla la
+-- cancela (cancelled = true) en vez de borrarla, para que la sincronización no la regenere
+-- al ver esa semana "libre"; un item cancelado se excluye de toda la app salvo del propio
+-- chequeo de sincronización.
 create table transport_plan_items (
   id bigint generated always as identity primary key,
   operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
@@ -73,6 +76,7 @@ create table transport_plan_items (
   notes text,
   requires_heavy_crane boolean not null default false,
   recurrence_rule_id bigint references recurring_plan_rules (id) on delete set null,
+  cancelled boolean not null default false,
   created_by bigint not null references users (id) on delete restrict,
   created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );

@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe('RoleGate', () => {
   it('renders children when the active role has the permission', async () => {
-    setRole('supervisor');
+    setRole('admin');
     await render(
       <RoleGate permission="managePlan">
         <Text>Editar plan</Text>

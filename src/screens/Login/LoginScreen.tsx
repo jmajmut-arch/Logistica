@@ -249,7 +249,7 @@ export function LoginScreen() {
                 <ActivityIndicator style={styles.loader} color="#fb923c" />
               ) : sites.length === 0 ? (
                 <Text style={styles.emptySites}>
-                  Todavía no hay patios ni bodegas registrados. Pide a un supervisor que los cree.
+                  Todavía no hay patios ni bodegas registrados. Pide a un planificador que los cree.
                 </Text>
               ) : (
                 <View style={styles.cardList}>

@@ -140,7 +140,7 @@ export function DashboardScreen() {
   );
 
   // Al operador se le acota todo el dashboard a su propio patio/bodega y al frente de
-  // trabajo elegidos al iniciar sesión; supervisor y administrador siguen viendo todo.
+  // trabajo elegidos al iniciar sesión; supervisor y planificador siguen viendo todo.
   const isOperatorScoped = currentUser?.role === 'operator' && currentSiteId !== null;
 
   const scopedPlanItems = useMemo(() => {

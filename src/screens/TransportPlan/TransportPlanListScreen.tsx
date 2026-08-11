@@ -29,12 +29,12 @@ import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
 import { ensureRecurringPlanOccurrences } from '@/domain/services/recurringPlanSync';
-import { useSessionStore } from '@/store/sessionStore';
-import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
+import { matchesOperatorScope } from '@/utils/operatorScope';
 import { getWeekNumber, startOfDay, startOfToday } from '@/utils/timeBlocks';
 import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
+import { usePlanScope } from './PlanScopeContext';
 import type { TransportPlanStackParamList } from './TransportPlanStack';
 
 type Navigation = NativeStackNavigationProp<TransportPlanStackParamList, 'TransportPlanList'>;
@@ -45,8 +45,7 @@ function capitalize(text: string): string {
 
 export function TransportPlanListScreen() {
   const navigation = useNavigation<Navigation>();
-  const currentUser = useSessionStore((state) => state.currentUser);
-  const planManagerScope = getPlanManagerScope(currentUser?.role);
+  const planManagerScope = usePlanScope();
   const today = useMemo(() => startOfToday(), []);
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
@@ -82,7 +81,14 @@ export function TransportPlanListScreen() {
     }
     setDeleting(true);
     try {
-      await transportPlanRepository.delete(itemToDelete.id);
+      // Una ocurrencia generada por una regla permanente no se borra de verdad: se cancela,
+      // para que la sincronización (que corre justo después, en loadData) no la regenere al
+      // ver esa semana "libre" otra vez. Un item suelto (sin regla) sí se borra directamente.
+      if (itemToDelete.recurrenceRuleId !== null) {
+        await transportPlanRepository.cancel(itemToDelete.id);
+      } else {
+        await transportPlanRepository.delete(itemToDelete.id);
+      }
       setItemToDelete(null);
       await loadData();
     } finally {

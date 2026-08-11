@@ -57,12 +57,10 @@ export function AppTabs() {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
-      {role === 'supervisor' && (
-        <Tab.Screen
-          name="TransportPlan"
-          component={TransportPlanStack}
-          options={{ title: 'Plan semanal', headerShown: false }}
-        />
+      {role === 'admin' && (
+        <Tab.Screen name="TransportPlan" options={{ title: 'Plan semanal', headerShown: false }}>
+          {() => <TransportPlanStack scope="plan_transporte" />}
+        </Tab.Screen>
       )}
       {role === 'operator' && (
         <Tab.Screen
@@ -72,11 +70,9 @@ export function AppTabs() {
         />
       )}
       {role === 'admin' && (
-        <Tab.Screen
-          name="HomeDeliveryPlan"
-          component={TransportPlanStack}
-          options={{ title: 'Home delivery', headerShown: false }}
-        />
+        <Tab.Screen name="HomeDeliveryPlan" options={{ title: 'Home delivery', headerShown: false }}>
+          {() => <TransportPlanStack scope="home_delivery" />}
+        </Tab.Screen>
       )}
       {role === 'admin' && (
         <Tab.Screen

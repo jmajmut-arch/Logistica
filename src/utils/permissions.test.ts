@@ -1,9 +1,9 @@
 import { getPermissions } from '@/utils/permissions';
 
 describe('getPermissions', () => {
-  it('allows supervisor and admin to manage the transport plan, not operator', () => {
-    expect(getPermissions('supervisor').managePlan).toBe(true);
+  it('only allows admin (planificador) to manage the transport plan', () => {
     expect(getPermissions('admin').managePlan).toBe(true);
+    expect(getPermissions('supervisor').managePlan).toBe(false);
     expect(getPermissions('operator').managePlan).toBe(false);
   });
 

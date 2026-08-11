@@ -3,7 +3,21 @@ import { supabase } from '@/data/supabase/client';
 import type { NewTransportPlanItem, TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 
 export const transportPlanRepository = {
+  /** Excluye los items cancelados: para el resto de la app (dashboard, llegadas, listas)
+   * un item cancelado se ve exactamente como si se hubiera borrado. */
   async findAll(): Promise<TransportPlanItem[]> {
+    const { data, error } = await supabase
+      .from('transport_plan_items')
+      .select('*')
+      .eq('cancelled', false)
+      .order('scheduled_at', { ascending: true });
+    if (error) throw error;
+    return rowsToCamelCase<TransportPlanItem>(data);
+  },
+
+  /** Solo para la sincronización de reglas permanentes: necesita ver también los items
+   * cancelados para no regenerar una semana que el planificador eliminó a propósito. */
+  async findAllIncludingCancelled(): Promise<TransportPlanItem[]> {
     const { data, error } = await supabase
       .from('transport_plan_items')
       .select('*')
@@ -45,6 +59,16 @@ export const transportPlanRepository = {
 
   async delete(id: number): Promise<void> {
     const { error } = await supabase.from('transport_plan_items').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  /** "Borra" una ocurrencia generada por una regla permanente sin liberar su semana, para
+   * que la sincronización no la regenere. Ver findAllIncludingCancelled. */
+  async cancel(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('transport_plan_items')
+      .update({ cancelled: true })
+      .eq('id', id);
     if (error) throw error;
   },
 };

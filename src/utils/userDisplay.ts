@@ -3,7 +3,7 @@ import type { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { Role } from '@/types/enums';
 
 export const ROLE_LABELS: Record<Role, string> = {
-  admin: 'Administrador',
+  admin: 'Planificador',
   operator: 'Operador',
   supervisor: 'Supervisor',
 };

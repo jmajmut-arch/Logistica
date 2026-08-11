@@ -15,6 +15,10 @@ export interface TransportPlanItem {
   /** No nulo si esta fecha puntual fue generada por una regla de planificación
    * permanente. Editarla o eliminarla solo afecta esta ocurrencia, nunca la regla. */
   recurrenceRuleId: number | null;
+  /** Solo se usa en ocurrencias con recurrenceRuleId: cancelar (en vez de borrar) evita que
+   * la sincronización regenere la misma semana al ver que quedó "libre". Un item cancelado
+   * queda excluido de findAll() — para el resto de la app se ve exactamente como borrado. */
+  cancelled: boolean;
   requiresHeavyCrane: boolean;
   createdBy: number;
   createdAt: number;

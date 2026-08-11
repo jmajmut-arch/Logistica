@@ -8,11 +8,11 @@ import { startOfWeek } from '@/utils/timeBlocks';
  * activas y crea los items concretos que falten hasta el horizonte de generación, para
  * que la ventana de ocurrencias siempre esté completa sin necesidad de un job aparte.
  *
- * El "ya existe" se decide por semana (no por hora exacta): si el operador o el
- * administrador edita el horario de una ocurrencia puntual, esa semana sigue contando
- * como cubierta y no se genera un duplicado a la hora original de la regla. Si en cambio
- * la elimina, la semana vuelve a quedar libre y se regenerará en la próxima sincronización
- * — es la única forma simple de "saltarse" una fecha sin una tabla de excepciones aparte.
+ * El "ya existe" se decide por semana (no por hora exacta): si el planificador edita el
+ * horario de una ocurrencia puntual, esa semana sigue contando como cubierta y no se
+ * genera un duplicado a la hora original de la regla. Si en cambio la elimina, se cancela
+ * en vez de borrarse (ver transportPlanRepository.cancel) — la semana sigue contando como
+ * cubierta aquí porque leemos también los items cancelados, así que no se regenera.
  */
 export async function ensureRecurringPlanOccurrences(): Promise<void> {
   const rules = await recurringPlanRuleRepository.findAll();
@@ -21,7 +21,7 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
     return;
   }
 
-  const allItems = await transportPlanRepository.findAll();
+  const allItems = await transportPlanRepository.findAllIncludingCancelled();
   const coveredWeeksByRule = new Map<number, Set<number>>();
   for (const item of allItems) {
     if (item.recurrenceRuleId === null) {
@@ -50,6 +50,7 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
         notes: rule.notes,
         requiresHeavyCrane: rule.requiresHeavyCrane,
         recurrenceRuleId: rule.id,
+        cancelled: false,
         createdBy: rule.createdBy,
       });
       coveredWeeks.add(weekStart);
