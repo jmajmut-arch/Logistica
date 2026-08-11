@@ -1,6 +1,7 @@
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, HelperText, Menu, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
@@ -18,7 +19,14 @@ import { useSessionStore } from '@/store/sessionStore';
 import type { OperationType } from '@/types/enums';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
-import { blockMinutesOf, combineDayAndBlock, getWeekNumber, startOfDay, TIME_BLOCKS } from '@/utils/timeBlocks';
+import {
+  blockMinutesOf,
+  combineDayAndBlock,
+  getWeekNumber,
+  startOfDay,
+  startOfWeek,
+  TIME_BLOCKS,
+} from '@/utils/timeBlocks';
 import { HEAVY_CRANE_COLOR, HEAVY_CRANE_LABEL } from '@/utils/transportPlanDisplay';
 
 import { usePlanScope } from './PlanScopeContext';
@@ -42,21 +50,11 @@ const WEEKDAY_OPTIONS: { value: number; label: string }[] = [
   { value: 6, label: 'Dom' },
 ];
 
+const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function parseScheduledAt(date: string, blockMinutes: number | null, hasNoSchedule: boolean): number | null {
-  if (!DATE_PATTERN.test(date)) {
-    return null;
-  }
-  const [year, month, day] = date.split('-').map(Number);
-  const dayStart = startOfDay(new Date(year, month - 1, day).getTime());
-  if (hasNoSchedule) {
-    return dayStart;
-  }
-  if (blockMinutes === null) {
-    return null;
-  }
-  return combineDayAndBlock(dayStart, blockMinutes);
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function pad(value: number): string {
@@ -81,8 +79,10 @@ export function TransportPlanFormScreen() {
   const planItemId = route.params?.planItemId;
   const currentUser = useSessionStore((state) => state.currentUser);
   const planManagerScope = usePlanScope();
-  const allowedOperationTypes = OPERATION_TYPE_OPTIONS.filter((option) =>
-    matchesOperatorScope(option.value, planManagerScope),
+  // Plan semanal ya no ofrece "Retiro" como opción al ingresar — sigue existiendo como
+  // tipo válido para datos históricos, solo se deja de ofrecer para items nuevos.
+  const allowedOperationTypes = OPERATION_TYPE_OPTIONS.filter(
+    (option) => matchesOperatorScope(option.value, planManagerScope) && option.value !== 'retiro_carga',
   );
   // Plan semanal se re-ingresa cada 7 días — no encaja con una regla permanente que se
   // repite indefinidamente. Solo home delivery admite planificación permanente, y solo al
@@ -99,6 +99,9 @@ export function TransportPlanFormScreen() {
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
+  // Plan semanal se re-ingresa cada 7 días: al crear, en vez de una fecha puntual se elige
+  // uno o varios días concretos de esta semana (nunca una regla que se repita indefinido).
+  const [selectedWeekDays, setSelectedWeekDays] = useState<Set<number>>(new Set());
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   // En plan semanal (carga_subida/retiro_carga) por defecto viene marcado "sin horario";
@@ -153,6 +156,18 @@ export function TransportPlanFormScreen() {
   // Solo al crear (no al editar una ocurrencia puntual) se permite elegir varios horarios
   // a la vez — por ejemplo, home delivery con 5+ horarios de retiro el mismo día.
   const isCreatingNew = planItemId === undefined;
+  // Al crear en plan semanal se eligen días concretos de esta semana (hasta 7), no una
+  // fecha puntual con el datepicker — al editar una ocurrencia existente sigue siendo una
+  // sola fecha, igual que home delivery.
+  const showWeekDayPicker = isCreatingNew && planManagerScope === 'plan_transporte';
+
+  const weekDayOptions = useMemo(() => {
+    const start = startOfWeek();
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = start + index * DAY_MS;
+      return { value: day, label: capitalize(format(new Date(day), 'EEE dd', { locale: es })) };
+    });
+  }, []);
 
   const sortedSelectedBlocks = useMemo(
     () => Array.from(selectedBlocks).sort((a, b) => a - b),
@@ -160,11 +175,35 @@ export function TransportPlanFormScreen() {
   );
   const previewBlockMinutes = sortedSelectedBlocks[0] ?? null;
   const sortedSelectedDays = useMemo(() => Array.from(selectedDays).sort((a, b) => a - b), [selectedDays]);
-
-  const scheduledAt = useMemo(
-    () => parseScheduledAt(date.trim(), previewBlockMinutes, isOneOff && hasNoSchedule),
-    [date, previewBlockMinutes, isOneOff, hasNoSchedule],
+  const sortedSelectedWeekDays = useMemo(
+    () => Array.from(selectedWeekDays).sort((a, b) => a - b),
+    [selectedWeekDays],
   );
+
+  // Días a los que se debe aplicar el guardado: varios si se está creando en plan semanal
+  // (un día concreto por cada uno elegido), o el único de la fecha puntual en cualquier
+  // otro caso (home delivery sin regla permanente, o al editar una ocurrencia existente).
+  const activeDayStarts = useMemo(() => {
+    if (showWeekDayPicker) {
+      return sortedSelectedWeekDays;
+    }
+    const parsed = dateStringToDate(date);
+    return parsed ? [startOfDay(parsed.getTime())] : [];
+  }, [showWeekDayPicker, sortedSelectedWeekDays, date]);
+
+  const scheduledAt = useMemo(() => {
+    const dayStart = activeDayStarts[0] ?? null;
+    if (dayStart === null) {
+      return null;
+    }
+    if (isOneOff && hasNoSchedule) {
+      return dayStart;
+    }
+    if (previewBlockMinutes === null) {
+      return null;
+    }
+    return combineDayAndBlock(dayStart, previewBlockMinutes);
+  }, [activeDayStarts, previewBlockMinutes, isOneOff, hasNoSchedule]);
   const weekNumber = scheduledAt !== null ? getWeekNumber(scheduledAt) : null;
 
   const onSubmit = async () => {
@@ -213,43 +252,47 @@ export function TransportPlanFormScreen() {
       return;
     }
 
+    if (activeDayStarts.length === 0) {
+      setDateError(true);
+      return;
+    }
+    const daysToSubmit = isCreatingNew ? activeDayStarts : activeDayStarts.slice(0, 1);
+
     if (isOneOff && hasNoSchedule) {
-      if (scheduledAt === null) {
-        setDateError(true);
-        return;
-      }
       setDateError(false);
 
       setSubmitting(true);
       try {
-        if (planItemId !== undefined) {
-          await transportPlanRepository.update(planItemId, {
-            operationType,
-            siteId,
-            scheduledAt,
-            hasNoSchedule: true,
-            carrierId: carrierId || null,
-            requiresHeavyCrane,
-            reference: reference.trim() || null,
-            notes: notes.trim() || null,
-            recurrenceRuleId: originalRecurrenceRuleId,
-            cancelled: false,
-            createdBy: originalCreatedBy ?? currentUser.id,
-          });
-        } else {
-          await transportPlanRepository.create({
-            operationType,
-            siteId,
-            scheduledAt,
-            hasNoSchedule: true,
-            carrierId: carrierId || null,
-            requiresHeavyCrane,
-            reference: reference.trim() || null,
-            notes: notes.trim() || null,
-            recurrenceRuleId: null,
-            cancelled: false,
-            createdBy: currentUser.id,
-          });
+        for (const dayStart of daysToSubmit) {
+          if (planItemId !== undefined) {
+            await transportPlanRepository.update(planItemId, {
+              operationType,
+              siteId,
+              scheduledAt: dayStart,
+              hasNoSchedule: true,
+              carrierId: carrierId || null,
+              requiresHeavyCrane,
+              reference: reference.trim() || null,
+              notes: notes.trim() || null,
+              recurrenceRuleId: originalRecurrenceRuleId,
+              cancelled: false,
+              createdBy: originalCreatedBy ?? currentUser.id,
+            });
+          } else {
+            await transportPlanRepository.create({
+              operationType,
+              siteId,
+              scheduledAt: dayStart,
+              hasNoSchedule: true,
+              carrierId: carrierId || null,
+              requiresHeavyCrane,
+              reference: reference.trim() || null,
+              notes: notes.trim() || null,
+              recurrenceRuleId: null,
+              cancelled: false,
+              createdBy: currentUser.id,
+            });
+          }
         }
         navigation.goBack();
       } finally {
@@ -258,10 +301,11 @@ export function TransportPlanFormScreen() {
       return;
     }
 
-    // Editar una ocurrencia puntual sigue siendo un solo horario; al crear, se puede elegir
-    // más de uno para dejar varios items del plan del mismo día en un solo envío.
+    // Editar una ocurrencia puntual sigue siendo un solo día y un solo horario; al crear,
+    // se puede elegir más de un día y/o más de un horario para dejar varios items del plan
+    // en un solo envío (uno por cada combinación día × horario).
     const blocksToSubmit = isCreatingNew ? sortedSelectedBlocks : sortedSelectedBlocks.slice(0, 1);
-    if (!DATE_PATTERN.test(date.trim()) || blocksToSubmit.length === 0) {
+    if (blocksToSubmit.length === 0) {
       setDateError(true);
       return;
     }
@@ -269,39 +313,38 @@ export function TransportPlanFormScreen() {
 
     setSubmitting(true);
     try {
-      for (const block of blocksToSubmit) {
-        const scheduledAtForBlock = parseScheduledAt(date.trim(), block, false);
-        if (scheduledAtForBlock === null) {
-          continue;
-        }
-        if (planItemId !== undefined) {
-          await transportPlanRepository.update(planItemId, {
-            operationType,
-            siteId,
-            scheduledAt: scheduledAtForBlock,
-            hasNoSchedule: false,
-            carrierId: carrierId || null,
-            requiresHeavyCrane,
-            reference: reference.trim() || null,
-            notes: notes.trim() || null,
-            recurrenceRuleId: originalRecurrenceRuleId,
-            cancelled: false,
-            createdBy: originalCreatedBy ?? currentUser.id,
-          });
-        } else {
-          await transportPlanRepository.create({
-            operationType,
-            siteId,
-            scheduledAt: scheduledAtForBlock,
-            hasNoSchedule: false,
-            carrierId: carrierId || null,
-            requiresHeavyCrane,
-            reference: reference.trim() || null,
-            notes: notes.trim() || null,
-            recurrenceRuleId: null,
-            cancelled: false,
-            createdBy: currentUser.id,
-          });
+      for (const dayStart of daysToSubmit) {
+        for (const block of blocksToSubmit) {
+          const scheduledAtForBlock = combineDayAndBlock(dayStart, block);
+          if (planItemId !== undefined) {
+            await transportPlanRepository.update(planItemId, {
+              operationType,
+              siteId,
+              scheduledAt: scheduledAtForBlock,
+              hasNoSchedule: false,
+              carrierId: carrierId || null,
+              requiresHeavyCrane,
+              reference: reference.trim() || null,
+              notes: notes.trim() || null,
+              recurrenceRuleId: originalRecurrenceRuleId,
+              cancelled: false,
+              createdBy: originalCreatedBy ?? currentUser.id,
+            });
+          } else {
+            await transportPlanRepository.create({
+              operationType,
+              siteId,
+              scheduledAt: scheduledAtForBlock,
+              hasNoSchedule: false,
+              carrierId: carrierId || null,
+              requiresHeavyCrane,
+              reference: reference.trim() || null,
+              notes: notes.trim() || null,
+              recurrenceRuleId: null,
+              cancelled: false,
+              createdBy: currentUser.id,
+            });
+          }
         }
       }
       navigation.goBack();
@@ -322,6 +365,18 @@ export function TransportPlanFormScreen() {
   const selectedCarrier = carriers.find((carrier) => carrier.id === carrierId);
   const selectedDate = dateStringToDate(date);
   const selectedBlock = TIME_BLOCKS.find((block) => block.minutes === sortedSelectedBlocks[0]);
+
+  const noScheduleToggle = (
+    <View style={[styles.field, styles.noScheduleRow]}>
+      <View style={styles.noScheduleText}>
+        <Text variant="bodyMedium">Sin horario</Text>
+        <Text variant="bodySmall" style={styles.noScheduleHint}>
+          Se planifica solo el día, sin una hora comprometida
+        </Text>
+      </View>
+      <Switch value={hasNoSchedule} onValueChange={setHasNoSchedule} />
+    </View>
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -404,6 +459,25 @@ export function TransportPlanFormScreen() {
           />
           <HelperText type="info">Puedes elegir más de un día</HelperText>
         </View>
+      ) : showWeekDayPicker ? (
+        <>
+          <View style={styles.field}>
+            <Text variant="bodyMedium" style={styles.label}>
+              Días de esta semana
+            </Text>
+            <SegmentedButtons
+              multiSelect
+              value={sortedSelectedWeekDays.map(String)}
+              onValueChange={(values) => setSelectedWeekDays(new Set(values.map(Number)))}
+              buttons={weekDayOptions.map((option) => ({
+                value: String(option.value),
+                label: option.label,
+              }))}
+            />
+            <HelperText type="info">Puedes elegir uno o varios días — solo de esta semana</HelperText>
+          </View>
+          {noScheduleToggle}
+        </>
       ) : (
         <>
           <View style={styles.field}>
@@ -432,15 +506,7 @@ export function TransportPlanFormScreen() {
             }}
           />
 
-          <View style={[styles.field, styles.noScheduleRow]}>
-            <View style={styles.noScheduleText}>
-              <Text variant="bodyMedium">Sin horario</Text>
-              <Text variant="bodySmall" style={styles.noScheduleHint}>
-                Se planifica solo el día, sin una hora comprometida
-              </Text>
-            </View>
-            <Switch value={hasNoSchedule} onValueChange={setHasNoSchedule} />
-          </View>
+          {noScheduleToggle}
         </>
       )}
 
@@ -524,9 +590,13 @@ export function TransportPlanFormScreen() {
         <HelperText type="error">
           {isRecurring && canBeRecurring
             ? 'Selecciona el día de la semana y la hora'
-            : isOneOff && hasNoSchedule
-              ? 'Selecciona la fecha'
-              : 'Selecciona la fecha y revisa la hora ingresada'}
+            : showWeekDayPicker
+              ? hasNoSchedule
+                ? 'Selecciona al menos un día'
+                : 'Selecciona al menos un día y un horario'
+              : isOneOff && hasNoSchedule
+                ? 'Selecciona la fecha'
+                : 'Selecciona la fecha y revisa la hora ingresada'}
         </HelperText>
       ) : isRecurring && canBeRecurring ? (
         <HelperText type="info">Se repite todas las semanas, a partir de hoy</HelperText>
