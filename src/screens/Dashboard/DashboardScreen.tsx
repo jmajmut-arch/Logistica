@@ -509,6 +509,19 @@ export function DashboardScreen() {
       .sort((a, b) => b.count - a.count);
   }, [agendaItems]);
 
+  // Igual que agendaItemsBySite, pero fijo a hoy: la sección "Hoy" del dashboard necesita
+  // su propio gráfico de destinos, sin depender de en qué posición esté el toggle
+  // Hoy/Semana de la agenda (que vive más abajo, en otra sección).
+  const todayItemsBySite = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of todayItems) {
+      counts.set(item.siteId, (counts.get(item.siteId) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([siteId, count]) => ({ siteId, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [todayItems]);
+
   function renderPlanItemCard(item: TransportPlanItem, wideTime: boolean) {
     const arrival = arrivalsByPlanItem.get(item.id);
     const status = getDisplayStatus(item, arrival, now);
@@ -756,6 +769,61 @@ export function DashboardScreen() {
                             {status === 'out_of_plan'
                               ? todayUnplannedArrivals.length
                               : (todayStatusCounts.get(status) ?? 0)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Destinos de las cargas · hoy
+                </Text>
+                {todayItemsBySite.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados para hoy todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={todayItemsBySite.map((entry, index) => ({
+                        key: String(entry.siteId),
+                        value: entry.count,
+                        color: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                      }))}
+                      centerValue={String(todayItems.length)}
+                      centerLabel={todayItems.length === 1 ? 'viaje' : 'viajes'}
+                    />
+                    <View style={styles.legend}>
+                      {todayItemsBySite.map((entry, index) => (
+                        <Pressable
+                          key={entry.siteId}
+                          style={styles.legendRow}
+                          onPress={() =>
+                            openDetail(
+                              `${siteName(entry.siteId)} · hoy (${entry.count})`,
+                              todayItems.filter((item) => item.siteId === entry.siteId),
+                            )
+                          }
+                        >
+                          <View
+                            style={[
+                              styles.legendDot,
+                              {
+                                backgroundColor:
+                                  SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                              },
+                            ]}
+                          />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {siteName(entry.siteId)}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {entry.count}
                           </Text>
                         </Pressable>
                       ))}
