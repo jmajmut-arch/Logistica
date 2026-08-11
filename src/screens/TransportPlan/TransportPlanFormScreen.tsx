@@ -43,12 +43,18 @@ const WEEKDAY_OPTIONS: { value: number; label: string }[] = [
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function parseScheduledAt(date: string, blockMinutes: number | null): number | null {
-  if (!DATE_PATTERN.test(date) || blockMinutes === null) {
+function parseScheduledAt(date: string, blockMinutes: number | null, hasNoSchedule: boolean): number | null {
+  if (!DATE_PATTERN.test(date)) {
     return null;
   }
   const [year, month, day] = date.split('-').map(Number);
   const dayStart = startOfDay(new Date(year, month - 1, day).getTime());
+  if (hasNoSchedule) {
+    return dayStart;
+  }
+  if (blockMinutes === null) {
+    return null;
+  }
   return combineDayAndBlock(dayStart, blockMinutes);
 }
 
@@ -93,6 +99,7 @@ export function TransportPlanFormScreen() {
   const [dayOfWeek, setDayOfWeek] = useState<number | null>(null);
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [hasNoSchedule, setHasNoSchedule] = useState(false);
   const [blockMinutes, setBlockMinutes] = useState<number | null>(null);
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
@@ -123,6 +130,7 @@ export function TransportPlanFormScreen() {
         setDate(
           `${scheduled.getFullYear()}-${pad(scheduled.getMonth() + 1)}-${pad(scheduled.getDate())}`,
         );
+        setHasNoSchedule(item.hasNoSchedule);
         setBlockMinutes(blockMinutesOf(item.scheduledAt));
         setCarrierId(item.carrierId ?? 0);
         setRequiresHeavyCrane(item.requiresHeavyCrane);
@@ -135,9 +143,13 @@ export function TransportPlanFormScreen() {
     });
   }, [planItemId]);
 
+  // Solo tiene sentido "sin horario" para una fecha puntual: una regla permanente
+  // necesita una hora fija para poder repetirse cada semana a esa misma hora.
+  const isOneOff = !(isRecurring && canBeRecurring);
+
   const scheduledAt = useMemo(
-    () => parseScheduledAt(date.trim(), blockMinutes),
-    [date, blockMinutes],
+    () => parseScheduledAt(date.trim(), blockMinutes, isOneOff && hasNoSchedule),
+    [date, blockMinutes, isOneOff, hasNoSchedule],
   );
   const weekNumber = scheduledAt !== null ? getWeekNumber(scheduledAt) : null;
 
@@ -193,6 +205,7 @@ export function TransportPlanFormScreen() {
           operationType,
           siteId,
           scheduledAt,
+          hasNoSchedule,
           carrierId: carrierId || null,
           requiresHeavyCrane,
           reference: reference.trim() || null,
@@ -205,6 +218,7 @@ export function TransportPlanFormScreen() {
           operationType,
           siteId,
           scheduledAt,
+          hasNoSchedule,
           carrierId: carrierId || null,
           requiresHeavyCrane,
           reference: reference.trim() || null,
@@ -285,7 +299,15 @@ export function TransportPlanFormScreen() {
               Se repite todas las semanas en el mismo día y hora
             </Text>
           </View>
-          <Switch value={isRecurring} onValueChange={setIsRecurring} />
+          <Switch
+            value={isRecurring}
+            onValueChange={(value) => {
+              setIsRecurring(value);
+              if (value) {
+                setHasNoSchedule(false);
+              }
+            }}
+          />
         </View>
       )}
 
@@ -330,45 +352,59 @@ export function TransportPlanFormScreen() {
               }
             }}
           />
+
+          <View style={[styles.field, styles.noScheduleRow]}>
+            <View style={styles.noScheduleText}>
+              <Text variant="bodyMedium">Sin horario</Text>
+              <Text variant="bodySmall" style={styles.noScheduleHint}>
+                Se planifica solo el día, sin una hora comprometida
+              </Text>
+            </View>
+            <Switch value={hasNoSchedule} onValueChange={setHasNoSchedule} />
+          </View>
         </>
       )}
 
-      <View style={styles.field}>
-        <Menu
-          visible={blockMenuVisible}
-          onDismiss={() => setBlockMenuVisible(false)}
-          anchor={
-            <Pressable onPress={() => setBlockMenuVisible(true)}>
-              <TextInput
-                label="Hora"
-                value={selectedBlock?.label ?? ''}
-                editable={false}
-                mode="outlined"
-                right={<TextInput.Icon icon="menu-down" />}
-                pointerEvents="none"
-              />
-            </Pressable>
-          }
-        >
-          <ScrollView style={styles.timeMenuScroll}>
-            {TIME_BLOCKS.map((block) => (
-              <Menu.Item
-                key={block.minutes}
-                title={block.label}
-                onPress={() => {
-                  setBlockMinutes(block.minutes);
-                  setBlockMenuVisible(false);
-                }}
-              />
-            ))}
-          </ScrollView>
-        </Menu>
-      </View>
+      {!(isOneOff && hasNoSchedule) && (
+        <View style={styles.field}>
+          <Menu
+            visible={blockMenuVisible}
+            onDismiss={() => setBlockMenuVisible(false)}
+            anchor={
+              <Pressable onPress={() => setBlockMenuVisible(true)}>
+                <TextInput
+                  label="Hora"
+                  value={selectedBlock?.label ?? ''}
+                  editable={false}
+                  mode="outlined"
+                  right={<TextInput.Icon icon="menu-down" />}
+                  pointerEvents="none"
+                />
+              </Pressable>
+            }
+          >
+            <ScrollView style={styles.timeMenuScroll}>
+              {TIME_BLOCKS.map((block) => (
+                <Menu.Item
+                  key={block.minutes}
+                  title={block.label}
+                  onPress={() => {
+                    setBlockMinutes(block.minutes);
+                    setBlockMenuVisible(false);
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </Menu>
+        </View>
+      )}
       {dateError ? (
         <HelperText type="error">
           {isRecurring && canBeRecurring
             ? 'Selecciona el día de la semana y la hora'
-            : 'Selecciona la fecha y revisa la hora ingresada'}
+            : isOneOff && hasNoSchedule
+              ? 'Selecciona la fecha'
+              : 'Selecciona la fecha y revisa la hora ingresada'}
         </HelperText>
       ) : isRecurring && canBeRecurring ? (
         <HelperText type="info">Se repite todas las semanas, a partir de hoy</HelperText>
@@ -478,6 +514,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   recurringHint: {
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  noScheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  noScheduleText: {
+    flex: 1,
+  },
+  noScheduleHint: {
     opacity: 0.7,
     marginTop: 2,
   },

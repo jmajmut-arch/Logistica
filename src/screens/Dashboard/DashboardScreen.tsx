@@ -326,16 +326,19 @@ export function DashboardScreen() {
       <Card key={item.id} style={[styles.itemCard, { borderLeftColor: DISPLAY_STATUS_COLORS[status] }]}>
         <Card.Content style={styles.itemContent}>
           <View style={wideTime ? styles.timeColumnWide : styles.timeColumn}>
-            <Text variant="titleMedium">
-              {format(new Date(item.scheduledAt), timeFormat, { locale: es })}
+            <Text variant={item.hasNoSchedule ? 'bodyMedium' : 'titleMedium'}>
+              {item.hasNoSchedule
+                ? 'Sin horario'
+                : format(new Date(item.scheduledAt), timeFormat, { locale: es })}
             </Text>
             {arrival && (
               <Text
                 variant="bodySmall"
                 style={[styles.itemDescription, { color: DISPLAY_STATUS_COLORS[status] }]}
               >
-                {format(new Date(arrival.arrivedAt), 'HH:mm')} ·{' '}
-                {arrivalDelta(item.scheduledAt, arrival.arrivedAt)}
+                {item.hasNoSchedule
+                  ? format(new Date(arrival.arrivedAt), 'HH:mm')
+                  : `${format(new Date(arrival.arrivedAt), 'HH:mm')} · ${arrivalDelta(item.scheduledAt, arrival.arrivedAt)}`}
               </Text>
             )}
           </View>

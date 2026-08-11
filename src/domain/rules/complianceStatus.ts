@@ -7,11 +7,16 @@ export type PlanItemStatus = 'pending' | 'on_time' | 'late' | 'early';
 const TOLERANCE_MINUTES = 15;
 
 export function getPlanItemStatus(
-  planItem: Pick<TransportPlanItem, 'scheduledAt'>,
+  planItem: Pick<TransportPlanItem, 'scheduledAt' | 'hasNoSchedule'>,
   arrival: Pick<LoadArrival, 'arrivedAt'> | undefined,
 ): PlanItemStatus {
   if (!arrival) {
     return 'pending';
+  }
+  // Sin horario comprometido no hay nada contra qué medir atraso/anticipo: cualquier
+  // llegada registrada cumple el plan.
+  if (planItem.hasNoSchedule) {
+    return 'on_time';
   }
   const diffMinutes = (arrival.arrivedAt - planItem.scheduledAt) / 60_000;
   if (diffMinutes > TOLERANCE_MINUTES) {
@@ -45,12 +50,12 @@ export function getCompliancePercentage(statuses: DisplayStatus[]): number | nul
  * visual para la agenda; para el % de cumplimiento ambos cuentan igual (no a tiempo).
  */
 export function getDisplayStatus(
-  planItem: Pick<TransportPlanItem, 'scheduledAt'>,
+  planItem: Pick<TransportPlanItem, 'scheduledAt' | 'hasNoSchedule'>,
   arrival: Pick<LoadArrival, 'arrivedAt'> | undefined,
   now: number = Date.now(),
 ): DisplayStatus {
   const status = getPlanItemStatus(planItem, arrival);
-  if (status === 'pending' && planItem.scheduledAt < now) {
+  if (status === 'pending' && !planItem.hasNoSchedule && planItem.scheduledAt < now) {
     return 'overdue';
   }
   return status;

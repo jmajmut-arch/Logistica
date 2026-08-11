@@ -2,31 +2,46 @@ import { getCompliancePercentage, getDisplayStatus, getPlanItemStatus } from '@/
 
 describe('getPlanItemStatus', () => {
   it('is pending when there is no arrival yet', () => {
-    expect(getPlanItemStatus({ scheduledAt: 1_000_000 }, undefined)).toBe('pending');
+    expect(getPlanItemStatus({ scheduledAt: 1_000_000, hasNoSchedule: false }, undefined)).toBe(
+      'pending',
+    );
   });
 
   it('is on time within the tolerance window', () => {
     const scheduledAt = 1_000_000;
     expect(
-      getPlanItemStatus({ scheduledAt }, { arrivedAt: scheduledAt + 10 * 60_000 }),
+      getPlanItemStatus({ scheduledAt, hasNoSchedule: false }, { arrivedAt: scheduledAt + 10 * 60_000 }),
     ).toBe('on_time');
     expect(
-      getPlanItemStatus({ scheduledAt }, { arrivedAt: scheduledAt - 10 * 60_000 }),
+      getPlanItemStatus({ scheduledAt, hasNoSchedule: false }, { arrivedAt: scheduledAt - 10 * 60_000 }),
     ).toBe('on_time');
   });
 
   it('is late past the tolerance window', () => {
     const scheduledAt = 1_000_000;
     expect(
-      getPlanItemStatus({ scheduledAt }, { arrivedAt: scheduledAt + 16 * 60_000 }),
+      getPlanItemStatus({ scheduledAt, hasNoSchedule: false }, { arrivedAt: scheduledAt + 16 * 60_000 }),
     ).toBe('late');
   });
 
   it('is early well before the tolerance window', () => {
     const scheduledAt = 1_000_000;
     expect(
-      getPlanItemStatus({ scheduledAt }, { arrivedAt: scheduledAt - 16 * 60_000 }),
+      getPlanItemStatus({ scheduledAt, hasNoSchedule: false }, { arrivedAt: scheduledAt - 16 * 60_000 }),
     ).toBe('early');
+  });
+
+  it('is on time regardless of the hour when the item has no schedule', () => {
+    const scheduledAt = 1_000_000;
+    expect(
+      getPlanItemStatus({ scheduledAt, hasNoSchedule: true }, { arrivedAt: scheduledAt + 5 * 60 * 60_000 }),
+    ).toBe('on_time');
+  });
+
+  it('is pending (not on time) when there is no arrival, even with no schedule', () => {
+    expect(getPlanItemStatus({ scheduledAt: 1_000_000, hasNoSchedule: true }, undefined)).toBe(
+      'pending',
+    );
   });
 });
 
@@ -58,16 +73,26 @@ describe('getDisplayStatus', () => {
   const scheduledAt = 1_000_000;
 
   it('is overdue when pending and the scheduled time already passed', () => {
-    expect(getDisplayStatus({ scheduledAt }, undefined, scheduledAt + 60_000)).toBe('overdue');
+    expect(
+      getDisplayStatus({ scheduledAt, hasNoSchedule: false }, undefined, scheduledAt + 60_000),
+    ).toBe('overdue');
   });
 
   it('is pending when not yet due', () => {
-    expect(getDisplayStatus({ scheduledAt }, undefined, scheduledAt - 60_000)).toBe('pending');
+    expect(
+      getDisplayStatus({ scheduledAt, hasNoSchedule: false }, undefined, scheduledAt - 60_000),
+    ).toBe('pending');
   });
 
   it('passes through resolved statuses unchanged regardless of now', () => {
     expect(
-      getDisplayStatus({ scheduledAt }, { arrivedAt: scheduledAt }, scheduledAt + 60_000),
+      getDisplayStatus({ scheduledAt, hasNoSchedule: false }, { arrivedAt: scheduledAt }, scheduledAt + 60_000),
     ).toBe('on_time');
+  });
+
+  it('never becomes overdue when the item has no schedule, no matter how much time passed', () => {
+    expect(
+      getDisplayStatus({ scheduledAt, hasNoSchedule: true }, undefined, scheduledAt + 10 * 24 * 60 * 60_000),
+    ).toBe('pending');
   });
 });

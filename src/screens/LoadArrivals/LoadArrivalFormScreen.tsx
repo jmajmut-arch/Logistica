@@ -137,8 +137,9 @@ export function LoadArrivalFormScreen() {
 
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
-    setDialogStep('choose');
     setBlockMinutes(blockMinutesOf(item.scheduledAt));
+    // Sin horario no hay nada que "cumplir": se salta directo a pedir la hora de llegada.
+    setDialogStep(item.hasNoSchedule ? 'time' : 'choose');
   };
 
   const openUnplanned = () => {
@@ -171,8 +172,8 @@ export function LoadArrivalFormScreen() {
           return;
         }
         setActive(item);
-        setDialogStep('choose');
         setBlockMinutes(blockMinutesOf(item.scheduledAt));
+        setDialogStep(item.hasNoSchedule ? 'time' : 'choose');
         setAutoOpened(true);
         return;
       }
@@ -289,7 +290,9 @@ export function LoadArrivalFormScreen() {
               <Card key={item.id} style={styles.planItemCard} onPress={() => openPlanItem(item)}>
                 <Card.Content style={styles.planItemContent}>
                   <View style={styles.planItemTime}>
-                    <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
+                    <Text variant={item.hasNoSchedule ? 'bodySmall' : 'titleMedium'}>
+                      {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
+                    </Text>
                   </View>
                   <View style={styles.planItemText}>
                     <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
@@ -368,6 +371,11 @@ export function LoadArrivalFormScreen() {
                     'dd-MM-yyyy',
                   )}
                 </Text>
+                {active !== 'unplanned' && active.hasNoSchedule && (
+                  <Text style={styles.dialogDayLabel}>
+                    Este viaje no tiene horario planificado — solo registra la hora de llegada.
+                  </Text>
+                )}
                 <Menu
                   visible={blockMenuVisible}
                   onDismiss={() => setBlockMenuVisible(false)}

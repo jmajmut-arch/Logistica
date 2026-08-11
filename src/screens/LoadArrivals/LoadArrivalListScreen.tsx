@@ -123,7 +123,11 @@ export function LoadArrivalListScreen() {
         }
       }
       if (planItem) {
-        parts.push(`Planificado ${format(new Date(planItem.scheduledAt), 'HH:mm')}`);
+        parts.push(
+          planItem.hasNoSchedule
+            ? 'Sin horario planificado'
+            : `Planificado ${format(new Date(planItem.scheduledAt), 'HH:mm')}`,
+        );
       }
       return parts.join(' · ');
     },
@@ -167,7 +171,9 @@ export function LoadArrivalListScreen() {
                     >
                       <Card.Content style={styles.pendingContent}>
                         <View style={styles.pendingTime}>
-                          <Text variant="titleMedium">{format(new Date(item.scheduledAt), 'HH:mm')}</Text>
+                          <Text variant={item.hasNoSchedule ? 'bodySmall' : 'titleMedium'}>
+                            {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
+                          </Text>
                         </View>
                         <View style={styles.pendingText}>
                           <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>

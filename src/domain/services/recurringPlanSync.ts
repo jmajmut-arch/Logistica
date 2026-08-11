@@ -45,6 +45,7 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
         siteId: rule.siteId,
         carrierId: rule.carrierId,
         scheduledAt,
+        hasNoSchedule: false,
         reference: rule.reference,
         notes: rule.notes,
         requiresHeavyCrane: rule.requiresHeavyCrane,

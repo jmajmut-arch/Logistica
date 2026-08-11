@@ -95,7 +95,9 @@ export function TransportPlanListScreen() {
       const site = sitesById.get(item.siteId);
       const parts = [
         `Semana ${getWeekNumber(item.scheduledAt)}`,
-        format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm'),
+        item.hasNoSchedule
+          ? `${format(new Date(item.scheduledAt), 'dd-MM-yyyy')} · Sin horario`
+          : format(new Date(item.scheduledAt), 'dd-MM-yyyy HH:mm'),
       ];
       parts.push(site ? site.name : `Sitio #${item.siteId}`);
       if (item.carrierId !== null) {

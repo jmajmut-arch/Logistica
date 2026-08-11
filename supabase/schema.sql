@@ -68,6 +68,7 @@ create table transport_plan_items (
   site_id bigint not null references sites (id) on delete restrict,
   carrier_id bigint references carriers (id) on delete set null,
   scheduled_at bigint not null,
+  has_no_schedule boolean not null default false,
   reference text,
   notes text,
   requires_heavy_crane boolean not null default false,
