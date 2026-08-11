@@ -28,7 +28,7 @@ export function getPlanItemStatus(
   return 'on_time';
 }
 
-export type DisplayStatus = PlanItemStatus | 'overdue';
+export type DisplayStatus = PlanItemStatus | 'overdue' | 'cancelled';
 
 /**
  * % de items "a tiempo" sobre el total planificado del período. Cualquier item sin
@@ -46,15 +46,23 @@ export function getCompliancePercentage(statuses: DisplayStatus[]): number | nul
 
 /**
  * Igual que getPlanItemStatus, pero distingue un "pendiente" cuya hora planificada ya
- * pasó ("overdue" — necesita atención ahora) de uno que todavía no toca. Es una capa
- * visual para la agenda; para el % de cumplimiento ambos cuentan igual (no a tiempo).
+ * pasó ("overdue" — necesita atención ahora) de uno que todavía no toca, y un pendiente
+ * que el operador marcó como "viaje cancelado" ("cancelled"). Es una capa visual para la
+ * agenda; para el % de cumplimiento los tres cuentan igual (no a tiempo) — un cancelado
+ * sigue en el total del período, a diferencia de un item con `cancelled` (tombstone de
+ * regla permanente), que se excluye por completo antes de llegar acá.
  */
 export function getDisplayStatus(
-  planItem: Pick<TransportPlanItem, 'scheduledAt' | 'hasNoSchedule'>,
+  planItem: Pick<TransportPlanItem, 'scheduledAt' | 'hasNoSchedule'> & {
+    cancelledByOperator?: boolean;
+  },
   arrival: Pick<LoadArrival, 'arrivedAt'> | undefined,
   now: number = Date.now(),
 ): DisplayStatus {
   const status = getPlanItemStatus(planItem, arrival);
+  if (status === 'pending' && planItem.cancelledByOperator) {
+    return 'cancelled';
+  }
   if (status === 'pending' && !planItem.hasNoSchedule && planItem.scheduledAt < now) {
     return 'overdue';
   }

@@ -95,4 +95,24 @@ describe('getDisplayStatus', () => {
       getDisplayStatus({ scheduledAt, hasNoSchedule: true }, undefined, scheduledAt + 10 * 24 * 60 * 60_000),
     ).toBe('pending');
   });
+
+  it('is cancelled when the operator marked it as such, even if overdue', () => {
+    expect(
+      getDisplayStatus(
+        { scheduledAt, hasNoSchedule: false, cancelledByOperator: true },
+        undefined,
+        scheduledAt + 60_000,
+      ),
+    ).toBe('cancelled');
+  });
+
+  it('passes through resolved statuses even when cancelledByOperator is set', () => {
+    expect(
+      getDisplayStatus(
+        { scheduledAt, hasNoSchedule: false, cancelledByOperator: true },
+        { arrivedAt: scheduledAt },
+        scheduledAt + 60_000,
+      ),
+    ).toBe('on_time');
+  });
 });

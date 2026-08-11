@@ -39,6 +39,7 @@ export const PLAN_ITEM_STATUS_COLORS: Record<PlanItemStatus, string> = {
 export const DISPLAY_STATUS_LABELS: Record<DisplayStatus, string> = {
   ...PLAN_ITEM_STATUS_LABELS,
   overdue: 'Fuera de planificación',
+  cancelled: 'Cancelado',
 };
 
 export const DISPLAY_STATUS_COLORS: Record<DisplayStatus, string> = {
@@ -46,6 +47,10 @@ export const DISPLAY_STATUS_COLORS: Record<DisplayStatus, string> = {
   // Antes era un rojo casi idéntico al de "late" (#B3261E), lo que los confundía en el
   // dashboard — se usa un naranjo para distinguirlos de un vistazo.
   overdue: '#EA580C',
+  // Morado, distinto del resto de estados (verde/rojo/naranjo/azul/gris): un viaje
+  // cancelado por el operador no es "malo" del mismo modo que uno atrasado, pero sí sigue
+  // contando como incumplimiento en el % — el color solo lo distingue visualmente.
+  cancelled: '#7C3AED',
 };
 
 // Estado extendido solo para gráficos/estadísticas del dashboard: además de los estados

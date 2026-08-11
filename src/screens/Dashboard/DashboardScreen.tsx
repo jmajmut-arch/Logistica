@@ -53,7 +53,7 @@ import {
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const STATUS_ORDER: DisplayStatus[] = ['overdue', 'late', 'pending', 'early', 'on_time'];
+const STATUS_ORDER: DisplayStatus[] = ['overdue', 'cancelled', 'late', 'pending', 'early', 'on_time'];
 const EXTENDED_STATUS_ORDER: ExtendedDisplayStatus[] = [...STATUS_ORDER, 'out_of_plan'];
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 // Paleta rotativa para el donut de destinos (sitios): a diferencia de los estados del
@@ -299,7 +299,7 @@ export function DashboardScreen() {
     () =>
       scopedPlanItems
         .filter((item) => {
-          if (arrivalsByPlanItem.has(item.id)) {
+          if (arrivalsByPlanItem.has(item.id) || item.cancelledByOperator) {
             return false;
           }
           // Un "sin horario" no tiene una hora exacta contra la cual comparar, pero sigue

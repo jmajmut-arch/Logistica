@@ -134,6 +134,7 @@ export function LoadArrivalFormScreen() {
           item.scheduledAt >= dayStart &&
           item.scheduledAt < dayEnd &&
           !registeredPlanItemIds.has(item.id) &&
+          !item.cancelledByOperator &&
           matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -151,6 +152,7 @@ export function LoadArrivalFormScreen() {
           item.siteId === siteId &&
           item.scheduledAt < dayStart &&
           !registeredPlanItemIds.has(item.id) &&
+          !item.cancelledByOperator &&
           matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -244,14 +246,15 @@ export function LoadArrivalFormScreen() {
   };
 
   // El viaje nunca llegó: a diferencia de "Sí, cumplió" u "Otro horario", esto no crea una
-  // llegada — cancela el item del plan para que deje de aparecer como pendiente.
+  // llegada. El item sigue contando en el total planificado del período como
+  // incumplimiento (ver markCancelledByOperator) — solo deja de pedirse como pendiente.
   const cancelTrip = async () => {
     if (active === null || active === 'unplanned') {
       return;
     }
     setSubmitting(true);
     try {
-      await transportPlanRepository.cancel(active.id);
+      await transportPlanRepository.markCancelledByOperator(active.id);
       navigation.goBack();
     } finally {
       setSubmitting(false);

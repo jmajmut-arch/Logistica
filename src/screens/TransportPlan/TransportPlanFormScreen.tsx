@@ -130,6 +130,7 @@ export function TransportPlanFormScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [originalCreatedBy, setOriginalCreatedBy] = useState<number | null>(null);
   const [originalRecurrenceRuleId, setOriginalRecurrenceRuleId] = useState<number | null>(null);
+  const [originalCancelledByOperator, setOriginalCancelledByOperator] = useState(false);
 
   useEffect(() => {
     siteRepository.findAll().then(setSites);
@@ -156,6 +157,7 @@ export function TransportPlanFormScreen() {
         setNotes(item.notes ?? '');
         setOriginalCreatedBy(item.createdBy);
         setOriginalRecurrenceRuleId(item.recurrenceRuleId);
+        setOriginalCancelledByOperator(item.cancelledByOperator);
       }
       setLoading(false);
     });
@@ -294,6 +296,7 @@ export function TransportPlanFormScreen() {
               notes: notes.trim() || null,
               recurrenceRuleId: originalRecurrenceRuleId,
               cancelled: false,
+              cancelledByOperator: originalCancelledByOperator,
               createdBy: originalCreatedBy ?? currentUser.id,
             });
           } else {
@@ -308,6 +311,7 @@ export function TransportPlanFormScreen() {
               notes: notes.trim() || null,
               recurrenceRuleId: null,
               cancelled: false,
+              cancelledByOperator: false,
               createdBy: currentUser.id,
             });
           }
@@ -346,6 +350,7 @@ export function TransportPlanFormScreen() {
               notes: notes.trim() || null,
               recurrenceRuleId: originalRecurrenceRuleId,
               cancelled: false,
+              cancelledByOperator: originalCancelledByOperator,
               createdBy: originalCreatedBy ?? currentUser.id,
             });
           } else {
@@ -360,6 +365,7 @@ export function TransportPlanFormScreen() {
               notes: notes.trim() || null,
               recurrenceRuleId: null,
               cancelled: false,
+              cancelledByOperator: false,
               createdBy: currentUser.id,
             });
           }

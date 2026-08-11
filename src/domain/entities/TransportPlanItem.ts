@@ -19,6 +19,10 @@ export interface TransportPlanItem {
    * la sincronización regenere la misma semana al ver que quedó "libre". Un item cancelado
    * queda excluido de findAll() — para el resto de la app se ve exactamente como borrado. */
   cancelled: boolean;
+  /** El operador marcó este viaje como "no llegó" desde Llegadas — a diferencia de
+   * `cancelled`, sigue contando en el total planificado del período como incumplimiento
+   * (falla estadística), solo deja de mostrarse como pendiente por registrar. */
+  cancelledByOperator: boolean;
   requiresHeavyCrane: boolean;
   createdBy: number;
   createdAt: number;

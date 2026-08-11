@@ -92,6 +92,7 @@ export function LoadArrivalListScreen() {
           item.scheduledAt >= dayStart &&
           item.scheduledAt < dayEnd &&
           !registeredPlanItemIds.has(item.id) &&
+          !item.cancelledByOperator &&
           matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);

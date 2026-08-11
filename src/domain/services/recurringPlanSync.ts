@@ -56,6 +56,7 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
         requiresHeavyCrane: rule.requiresHeavyCrane,
         recurrenceRuleId: rule.id,
         cancelled: false,
+        cancelledByOperator: false,
         createdBy: rule.createdBy,
       });
       coveredWeeks.add(weekStart);
