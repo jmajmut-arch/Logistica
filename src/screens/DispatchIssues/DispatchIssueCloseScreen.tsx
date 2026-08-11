@@ -3,8 +3,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Text, TextInput } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { RoleGate } from '@/components/RoleGate';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
@@ -16,6 +17,7 @@ import type { DispatchIssue } from '@/domain/entities/DispatchIssue';
 import type { Site } from '@/domain/entities/Site';
 import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
+import { PALETTE } from '@/theme';
 import {
   DISPATCH_ISSUE_STATUS_COLORS,
   DISPATCH_ISSUE_STATUS_LABELS,
@@ -114,6 +116,17 @@ export function DispatchIssueCloseScreen() {
             Levantada por {raisedByUser ? raisedByUser.name : `#${issue.raisedBy}`} el{' '}
             {format(new Date(issue.raisedAt), "dd-MM-yyyy HH:mm", { locale: es })}
           </Text>
+          {issue.guideFileUrl !== null && (
+            <Pressable
+              style={styles.fileRow}
+              onPress={() => Linking.openURL(issue.guideFileUrl!)}
+            >
+              <MaterialCommunityIcons name="file-document-outline" size={20} color={PALETTE.secondary} />
+              <Text variant="bodyMedium" style={styles.fileName} numberOfLines={1}>
+                {issue.guideFileName ?? 'Ver documento adjunto'}
+              </Text>
+            </Pressable>
+          )}
         </Card.Content>
       </Card>
 
@@ -202,5 +215,20 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: 12,
+  },
+  fileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    borderRadius: 4,
+  },
+  fileName: {
+    flex: 1,
+    color: PALETTE.secondary,
   },
 });

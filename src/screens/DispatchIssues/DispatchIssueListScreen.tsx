@@ -199,6 +199,9 @@ export function DispatchIssueListScreen() {
                 color={DISPATCH_ISSUE_STATUS_COLORS[item.status]}
               />
             )}
+            right={(props) =>
+              item.guideFileUrl !== null ? <List.Icon {...props} icon="paperclip" /> : null
+            }
             onPress={() => navigation.navigate('DispatchIssueClose', { issueId: item.id })}
           />
         )}

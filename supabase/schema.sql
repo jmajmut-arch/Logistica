@@ -103,7 +103,8 @@ create unique index load_arrivals_plan_item_unique on load_arrivals (plan_item_i
 
 -- Incidencias de guías de despacho con problemas (no ingresadas por el operador logístico,
 -- u otro motivo): el supervisor de logística las levanta al detectar el problema y las
--- cierra una vez regularizadas, dejando notas de cómo se resolvió.
+-- cierra una vez regularizadas, dejando notas de cómo se resolvió. guide_file_url apunta al
+-- documento adjunto (PDF o foto de la guía) en el bucket público "dispatch-guides".
 create table dispatch_issues (
   id bigint generated always as identity primary key,
   guide_number text not null,
@@ -111,6 +112,8 @@ create table dispatch_issues (
   carrier_id bigint references carriers (id) on delete set null,
   issue_type text not null check (issue_type in ('no_ingresada', 'otro')),
   description text not null,
+  guide_file_url text,
+  guide_file_name text,
   status text not null default 'open' check (status in ('open', 'closed')),
   raised_by bigint not null references users (id) on delete restrict,
   raised_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
@@ -131,6 +134,25 @@ alter table dispatch_issues disable row level security;
 
 grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;
+
+-- Bucket público para las guías de despacho adjuntas a una incidencia (dispatch_issues).
+insert into storage.buckets (id, name, public)
+values ('dispatch-guides', 'dispatch-guides', true)
+on conflict (id) do nothing;
+
+drop policy if exists "dispatch_guides_public_read" on storage.objects;
+drop policy if exists "dispatch_guides_public_insert" on storage.objects;
+drop policy if exists "dispatch_guides_public_update" on storage.objects;
+drop policy if exists "dispatch_guides_public_delete" on storage.objects;
+
+create policy "dispatch_guides_public_read" on storage.objects
+  for select using (bucket_id = 'dispatch-guides');
+create policy "dispatch_guides_public_insert" on storage.objects
+  for insert with check (bucket_id = 'dispatch-guides');
+create policy "dispatch_guides_public_update" on storage.objects
+  for update using (bucket_id = 'dispatch-guides');
+create policy "dispatch_guides_public_delete" on storage.objects
+  for delete using (bucket_id = 'dispatch-guides');
 
 insert into users (name, role) values
   ('Operador', 'operator'),

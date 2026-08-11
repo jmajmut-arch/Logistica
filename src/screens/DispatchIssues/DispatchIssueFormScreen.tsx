@@ -2,19 +2,25 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, HelperText, Menu, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import { Button, HelperText, IconButton, Menu, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import * as DocumentPicker from 'expo-document-picker';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { dispatchIssueRepository } from '@/data/repositories/dispatchIssueRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
+import { uploadDispatchGuideFile } from '@/data/supabase/storage';
 import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import { useSessionStore } from '@/store/sessionStore';
+import { PALETTE } from '@/theme';
 import { DISPATCH_ISSUE_TYPES, type DispatchIssueType } from '@/types/enums';
 import { DISPATCH_ISSUE_TYPE_LABELS_SHORT } from '@/utils/dispatchIssueDisplay';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 
 import type { DispatchIssuesStackParamList } from './DispatchIssuesStack';
+
+type PickedFile = { blob: Blob; name: string; mimeType: string | null };
 
 type Navigation = NativeStackNavigationProp<DispatchIssuesStackParamList, 'DispatchIssueForm'>;
 
@@ -38,12 +44,30 @@ export function DispatchIssueFormScreen() {
   const [guideNumberError, setGuideNumberError] = useState(false);
   const [siteError, setSiteError] = useState(false);
   const [descriptionError, setDescriptionError] = useState(false);
+  const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     siteRepository.findAll().then(setSites);
     carrierRepository.findAll().then(setCarriers);
   }, []);
+
+  const pickFile = async () => {
+    setUploadError(null);
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      multiple: false,
+      copyToCacheDirectory: true,
+      base64: false,
+    });
+    if (result.canceled) {
+      return;
+    }
+    const asset = result.assets[0];
+    const blob = asset.file ?? (await (await fetch(asset.uri)).blob());
+    setPickedFile({ blob, name: asset.name, mimeType: asset.mimeType ?? null });
+  };
 
   const onSubmit = async () => {
     if (!currentUser) {
@@ -76,13 +100,27 @@ export function DispatchIssueFormScreen() {
     }
 
     setSubmitting(true);
+    setUploadError(null);
     try {
+      let guideFileUrl: string | null = null;
+      let guideFileName: string | null = null;
+      if (pickedFile) {
+        try {
+          guideFileUrl = await uploadDispatchGuideFile(pickedFile.blob, pickedFile.name, pickedFile.mimeType);
+          guideFileName = pickedFile.name;
+        } catch {
+          setUploadError('No se pudo subir el documento. Intenta nuevamente.');
+          return;
+        }
+      }
       await dispatchIssueRepository.create({
         guideNumber: trimmedGuideNumber,
         siteId,
         carrierId: carrierId || null,
         issueType,
         description: trimmedDescription,
+        guideFileUrl,
+        guideFileName,
         status: 'open',
         raisedBy: currentUser.id,
         closedBy: null,
@@ -210,6 +248,24 @@ export function DispatchIssueFormScreen() {
       />
       {descriptionError && <HelperText type="error">Describe el problema</HelperText>}
 
+      <Text variant="bodyMedium" style={styles.label}>
+        Documento de la guía (opcional)
+      </Text>
+      {pickedFile ? (
+        <View style={styles.fileRow}>
+          <MaterialCommunityIcons name="file-document-outline" size={20} color={PALETTE.primary} />
+          <Text style={styles.fileName} numberOfLines={1}>
+            {pickedFile.name}
+          </Text>
+          <IconButton icon="close" size={18} onPress={() => setPickedFile(null)} />
+        </View>
+      ) : (
+        <Button mode="outlined" icon="paperclip" onPress={pickFile} style={styles.field}>
+          Adjuntar guía
+        </Button>
+      )}
+      {uploadError && <HelperText type="error">{uploadError}</HelperText>}
+
       <Button mode="contained" onPress={onSubmit} loading={submitting} disabled={submitting}>
         Levantar incidencia
       </Button>
@@ -232,5 +288,19 @@ const styles = StyleSheet.create({
   },
   label: {
     marginBottom: 8,
+  },
+  fileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    borderRadius: 4,
+  },
+  fileName: {
+    flex: 1,
   },
 });
