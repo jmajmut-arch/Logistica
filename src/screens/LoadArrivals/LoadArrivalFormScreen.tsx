@@ -243,6 +243,21 @@ export function LoadArrivalFormScreen() {
     submit(active.scheduledAt, active.id, active.carrierId);
   };
 
+  // El viaje nunca llegó: a diferencia de "Sí, cumplió" u "Otro horario", esto no crea una
+  // llegada — cancela el item del plan para que deje de aparecer como pendiente.
+  const cancelTrip = async () => {
+    if (active === null || active === 'unplanned') {
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await transportPlanRepository.cancel(active.id);
+      navigation.goBack();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const confirmOtherTime = () => {
     if (active === null) {
       return;
@@ -409,6 +424,17 @@ export function LoadArrivalFormScreen() {
                 <Button compact onPress={closeDialog}>
                   Cancelar
                 </Button>
+                {currentOperatorScope === 'plan_transporte' && (
+                  <Button
+                    compact
+                    textColor={DISPLAY_STATUS_COLORS.overdue}
+                    onPress={cancelTrip}
+                    loading={submitting}
+                    disabled={submitting}
+                  >
+                    Viaje cancelado
+                  </Button>
+                )}
                 <Button compact onPress={() => setDialogStep('time')}>
                   Otro horario
                 </Button>
