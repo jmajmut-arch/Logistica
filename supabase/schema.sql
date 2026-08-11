@@ -144,6 +144,7 @@ drop policy if exists "dispatch_guides_public_read" on storage.objects;
 drop policy if exists "dispatch_guides_public_insert" on storage.objects;
 drop policy if exists "dispatch_guides_public_update" on storage.objects;
 drop policy if exists "dispatch_guides_public_delete" on storage.objects;
+drop policy if exists "dispatch_guides_bucket_select" on storage.buckets;
 
 create policy "dispatch_guides_public_read" on storage.objects
   for select using (bucket_id = 'dispatch-guides');
@@ -153,6 +154,10 @@ create policy "dispatch_guides_public_update" on storage.objects
   for update using (bucket_id = 'dispatch-guides');
 create policy "dispatch_guides_public_delete" on storage.objects
   for delete using (bucket_id = 'dispatch-guides');
+-- storage.buckets también tiene RLS habilitado por defecto: sin esta policy, el rol anon
+-- no puede ver que el bucket existe y la subida falla con 400 antes de llegar a objects.
+create policy "dispatch_guides_bucket_select" on storage.buckets
+  for select using (id = 'dispatch-guides');
 
 insert into users (name, role) values
   ('Operador', 'operator'),
