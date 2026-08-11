@@ -84,9 +84,10 @@ export function TransportPlanFormScreen() {
   const allowedOperationTypes = OPERATION_TYPE_OPTIONS.filter((option) =>
     matchesOperatorScope(option.value, planManagerScope),
   );
-  // Solo el planificador puede dejar una planificación de home delivery permanente, y
-  // solo al crearla (una ocurrencia ya generada se edita/elimina puntualmente, no la regla).
-  const canBeRecurring = planManagerScope === 'home_delivery' && planItemId === undefined;
+  // El planificador puede dejar una planificación permanente tanto en plan semanal como
+  // en home delivery, y solo al crearla (una ocurrencia ya generada se edita/elimina
+  // puntualmente, no la regla).
+  const canBeRecurring = planItemId === undefined;
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
