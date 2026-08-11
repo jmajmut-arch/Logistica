@@ -686,7 +686,7 @@ export function DashboardScreen() {
               >
                 <Card.Content>
                   <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
-                    {pendingTodayCount}
+                    {pendingTodayCount}/{todayItems.length}
                   </Text>
                   <Text variant="labelMedium">Viajes pendientes hoy</Text>
                 </Card.Content>
@@ -860,7 +860,7 @@ export function DashboardScreen() {
               >
                 <Card.Content>
                   <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
-                    {pendingWeekCount}
+                    {pendingWeekCount}/{weekItems.length}
                   </Text>
                   <Text variant="labelMedium">Viajes pendientes semana</Text>
                 </Card.Content>
