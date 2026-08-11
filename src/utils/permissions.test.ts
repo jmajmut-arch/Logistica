@@ -17,4 +17,10 @@ describe('getPermissions', () => {
     expect(getPermissions('supervisor').manageCatalog).toBe(false);
     expect(getPermissions('operator').manageCatalog).toBe(false);
   });
+
+  it('only allows supervisor to manage dispatch issues (guías con problemas)', () => {
+    expect(getPermissions('supervisor').manageDispatchIssues).toBe(true);
+    expect(getPermissions('admin').manageDispatchIssues).toBe(false);
+    expect(getPermissions('operator').manageDispatchIssues).toBe(false);
+  });
 });

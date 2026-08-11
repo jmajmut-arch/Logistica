@@ -1,5 +1,6 @@
 -- Limpia por completo el esquema anterior de SUSPEL (registro de sustancias peligrosas):
 -- este proyecto pasó a ser exclusivamente control de planificación de transporte de carga.
+drop table if exists dispatch_issues cascade;
 drop table if exists load_arrivals cascade;
 drop table if exists transport_plan_items cascade;
 drop table if exists carriers cascade;
@@ -100,12 +101,33 @@ create index load_arrivals_arrived_idx on load_arrivals (arrived_at);
 create index load_arrivals_site_idx on load_arrivals (site_id);
 create unique index load_arrivals_plan_item_unique on load_arrivals (plan_item_id) where plan_item_id is not null;
 
+-- Incidencias de guías de despacho con problemas (no ingresadas por el operador logístico,
+-- u otro motivo): el supervisor de logística las levanta al detectar el problema y las
+-- cierra una vez regularizadas, dejando notas de cómo se resolvió.
+create table dispatch_issues (
+  id bigint generated always as identity primary key,
+  guide_number text not null,
+  site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
+  issue_type text not null check (issue_type in ('no_ingresada', 'otro')),
+  description text not null,
+  status text not null default 'open' check (status in ('open', 'closed')),
+  raised_by bigint not null references users (id) on delete restrict,
+  raised_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
+  closed_by bigint references users (id) on delete set null,
+  closed_at bigint,
+  resolution_notes text
+);
+create index dispatch_issues_status_idx on dispatch_issues (status);
+create index dispatch_issues_site_idx on dispatch_issues (site_id);
+
 alter table users disable row level security;
 alter table sites disable row level security;
 alter table carriers disable row level security;
 alter table recurring_plan_rules disable row level security;
 alter table transport_plan_items disable row level security;
 alter table load_arrivals disable row level security;
+alter table dispatch_issues disable row level security;
 
 grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;

@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
 import { CarriersStack } from '@/screens/Carriers/CarriersStack';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
+import { DispatchIssuesStack } from '@/screens/DispatchIssues/DispatchIssuesStack';
 import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
 import { SitesStack } from '@/screens/Sites/SitesStack';
 import { TransportPlanStack } from '@/screens/TransportPlan/TransportPlanStack';
@@ -19,6 +20,7 @@ export type AppTabsParamList = {
   Carriers: undefined;
   Users: undefined;
   LoadArrivals: undefined;
+  DispatchIssues: undefined;
 };
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
@@ -31,6 +33,7 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   Carriers: 'domain',
   Users: 'account-group-outline',
   LoadArrivals: 'package-variant-closed',
+  DispatchIssues: 'file-alert-outline',
 };
 
 export function AppTabs() {
@@ -67,6 +70,13 @@ export function AppTabs() {
           name="LoadArrivals"
           component={LoadArrivalsStack}
           options={{ title: 'Llegadas', headerShown: false }}
+        />
+      )}
+      {role === 'supervisor' && (
+        <Tab.Screen
+          name="DispatchIssues"
+          component={DispatchIssuesStack}
+          options={{ title: 'Guías con problemas', headerShown: false }}
         />
       )}
       {role === 'admin' && (

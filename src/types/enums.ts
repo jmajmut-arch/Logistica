@@ -14,3 +14,13 @@ export type SiteType = (typeof SITE_TYPES)[number];
 export const OPERATOR_SCOPES = ['plan_transporte', 'home_delivery'] as const;
 
 export type OperatorScope = (typeof OPERATOR_SCOPES)[number];
+
+// Motivo de una incidencia de guía de despacho: no fue ingresada por el operador
+// logístico, o algún otro problema (descrito en el campo de texto libre).
+export const DISPATCH_ISSUE_TYPES = ['no_ingresada', 'otro'] as const;
+
+export type DispatchIssueType = (typeof DISPATCH_ISSUE_TYPES)[number];
+
+export const DISPATCH_ISSUE_STATUSES = ['open', 'closed'] as const;
+
+export type DispatchIssueStatus = (typeof DISPATCH_ISSUE_STATUSES)[number];
