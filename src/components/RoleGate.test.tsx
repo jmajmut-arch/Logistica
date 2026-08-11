@@ -7,7 +7,7 @@ import type { Role } from '@/types/enums';
 
 function setRole(role: Role | null) {
   useSessionStore.setState({
-    currentUser: role ? { id: 1, name: 'Test User', role } : null,
+    currentUser: role ? { id: 1, name: 'Test User', role, email: null } : null,
   });
 }
 

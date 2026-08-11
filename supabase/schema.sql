@@ -18,7 +18,9 @@ drop table if exists users cascade;
 create table users (
   id bigint generated always as identity primary key,
   name text not null,
-  role text not null check (role in ('operator', 'supervisor', 'admin'))
+  role text not null check (role in ('operator', 'supervisor', 'admin')),
+  -- Solo se usa para notificar por correo (ej. incidencias de guías de despacho); opcional.
+  email text
 );
 
 -- Catálogo de patios y bodegas propias: es el "área" que el operador elige al registrar
@@ -114,6 +116,9 @@ create table dispatch_issues (
   description text not null,
   guide_file_url text,
   guide_file_name text,
+  -- Persona a notificar por correo al levantar la incidencia (opcional, ver Edge Function
+  -- send-dispatch-issue-notification).
+  notify_user_id bigint references users (id) on delete set null,
   status text not null default 'open' check (status in ('open', 'closed')),
   raised_by bigint not null references users (id) on delete restrict,
   raised_at bigint not null default (extract(epoch from now()) * 1000)::bigint,

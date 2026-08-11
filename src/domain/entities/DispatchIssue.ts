@@ -10,6 +10,8 @@ export interface DispatchIssue {
   /** Documento adjunto (PDF o foto de la guía), si se subió alguno al levantar la incidencia. */
   guideFileUrl: string | null;
   guideFileName: string | null;
+  /** Persona a notificar por correo al levantar la incidencia, si se eligió alguna. */
+  notifyUserId: number | null;
   status: DispatchIssueStatus;
   raisedBy: number;
   raisedAt: number;

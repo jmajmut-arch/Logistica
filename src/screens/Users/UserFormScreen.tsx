@@ -25,7 +25,9 @@ export function UserFormScreen() {
 
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('operator');
+  const [email, setEmail] = useState('');
   const [nameError, setNameError] = useState(false);
+  const [emailError, setEmailError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(userId !== undefined);
 
@@ -37,6 +39,7 @@ export function UserFormScreen() {
       if (user) {
         setName(user.name);
         setRole(user.role);
+        setEmail(user.email ?? '');
       }
       setLoading(false);
     });
@@ -44,18 +47,31 @@ export function UserFormScreen() {
 
   const onSubmit = async () => {
     const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    let hasError = false;
     if (!trimmedName) {
       setNameError(true);
+      hasError = true;
+    } else {
+      setNameError(false);
+    }
+    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      setEmailError(true);
+      hasError = true;
+    } else {
+      setEmailError(false);
+    }
+    if (hasError) {
       return;
     }
-    setNameError(false);
 
     setSubmitting(true);
     try {
+      const payload = { name: trimmedName, role, email: trimmedEmail || null };
       if (userId !== undefined) {
-        await userRepository.update(userId, { name: trimmedName, role });
+        await userRepository.update(userId, payload);
       } else {
-        await userRepository.create({ name: trimmedName, role });
+        await userRepository.create(payload);
       }
       navigation.goBack();
     } finally {
@@ -82,6 +98,22 @@ export function UserFormScreen() {
         style={styles.field}
       />
       {nameError && <HelperText type="error">Ingresa un nombre</HelperText>}
+
+      <TextInput
+        label="Email (opcional)"
+        value={email}
+        onChangeText={setEmail}
+        mode="outlined"
+        placeholder="maria.perez@empresa.cl"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        style={styles.field}
+      />
+      {emailError ? (
+        <HelperText type="error">El email no tiene un formato válido</HelperText>
+      ) : (
+        <HelperText type="info">Se usa para poder notificarle por correo (ej. incidencias)</HelperText>
+      )}
 
       <Text variant="bodyMedium" style={styles.label}>
         Rol

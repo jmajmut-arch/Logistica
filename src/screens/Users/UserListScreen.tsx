@@ -82,7 +82,7 @@ export function UserListScreen() {
         renderItem={({ item }) => (
           <List.Item
             title={item.name}
-            description={ROLE_LABELS[item.role]}
+            description={item.email ? `${ROLE_LABELS[item.role]} · ${item.email}` : ROLE_LABELS[item.role]}
             left={(props) => <List.Icon {...props} icon={ROLE_ICONS[item.role]} />}
             right={() => (
               <RoleGate permission="manageCatalog">

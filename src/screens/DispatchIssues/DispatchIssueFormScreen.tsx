@@ -9,13 +9,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { dispatchIssueRepository } from '@/data/repositories/dispatchIssueRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
+import { userRepository } from '@/data/repositories/userRepository';
+import { notifyDispatchIssueRaised } from '@/data/supabase/functions';
 import { uploadDispatchGuideFile } from '@/data/supabase/storage';
 import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
+import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 import { DISPATCH_ISSUE_TYPES, type DispatchIssueType } from '@/types/enums';
-import { DISPATCH_ISSUE_TYPE_LABELS_SHORT } from '@/utils/dispatchIssueDisplay';
+import { DISPATCH_ISSUE_TYPE_LABELS, DISPATCH_ISSUE_TYPE_LABELS_SHORT } from '@/utils/dispatchIssueDisplay';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 
 import type { DispatchIssuesStackParamList } from './DispatchIssuesStack';
@@ -34,11 +37,14 @@ export function DispatchIssueFormScreen() {
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
+  const [notifiableUsers, setNotifiableUsers] = useState<User[] | null>(null);
   const [guideNumber, setGuideNumber] = useState('');
   const [siteId, setSiteId] = useState(0);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
   const [carrierMenuVisible, setCarrierMenuVisible] = useState(false);
+  const [notifyUserId, setNotifyUserId] = useState(0);
+  const [notifyMenuVisible, setNotifyMenuVisible] = useState(false);
   const [issueType, setIssueType] = useState<DispatchIssueType>('no_ingresada');
   const [description, setDescription] = useState('');
   const [guideNumberError, setGuideNumberError] = useState(false);
@@ -51,6 +57,7 @@ export function DispatchIssueFormScreen() {
   useEffect(() => {
     siteRepository.findAll().then(setSites);
     carrierRepository.findAll().then(setCarriers);
+    userRepository.findAll().then((users) => setNotifiableUsers(users.filter((user) => user.email !== null)));
   }, []);
 
   const pickFile = async () => {
@@ -122,12 +129,27 @@ export function DispatchIssueFormScreen() {
         description: trimmedDescription,
         guideFileUrl,
         guideFileName,
+        notifyUserId: notifyUserId || null,
         status: 'open',
         raisedBy: currentUser.id,
         closedBy: null,
         closedAt: null,
         resolutionNotes: null,
       });
+      const notifyTarget = notifiableUsers?.find((user) => user.id === notifyUserId);
+      if (notifyTarget?.email) {
+        // No se espera el resultado: el envío de correo no debe demorar ni bloquear el
+        // flujo de "levantar incidencia" (ver notifyDispatchIssueRaised).
+        void notifyDispatchIssueRaised({
+          toEmail: notifyTarget.email,
+          toName: notifyTarget.name,
+          guideNumber: trimmedGuideNumber,
+          siteName: selectedSite?.name ?? `Sitio #${siteId}`,
+          issueTypeLabel: DISPATCH_ISSUE_TYPE_LABELS[issueType],
+          description: trimmedDescription,
+          raisedByName: currentUser.name,
+        });
+      }
       navigation.goBack();
     } finally {
       setSubmitting(false);
@@ -144,6 +166,7 @@ export function DispatchIssueFormScreen() {
 
   const selectedSite = sites.find((site) => site.id === siteId);
   const selectedCarrier = carriers.find((carrier) => carrier.id === carrierId);
+  const selectedNotifyUser = notifiableUsers?.find((user) => user.id === notifyUserId);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -248,6 +271,49 @@ export function DispatchIssueFormScreen() {
         style={styles.field}
       />
       {descriptionError && <HelperText type="error">Describe el problema</HelperText>}
+
+      <View style={styles.field}>
+        <Menu
+          visible={notifyMenuVisible}
+          onDismiss={() => setNotifyMenuVisible(false)}
+          anchor={
+            <Pressable onPress={() => setNotifyMenuVisible(true)}>
+              <TextInput
+                label="Notificar por correo a (opcional)"
+                value={selectedNotifyUser?.name ?? ''}
+                editable={false}
+                mode="outlined"
+                right={<TextInput.Icon icon="menu-down" />}
+                pointerEvents="none"
+              />
+            </Pressable>
+          }
+        >
+          <Menu.Item
+            title="No notificar"
+            onPress={() => {
+              setNotifyUserId(0);
+              setNotifyMenuVisible(false);
+            }}
+          />
+          {notifiableUsers !== null && notifiableUsers.length === 0 && (
+            <Menu.Item title="No hay personas con email registrado" disabled />
+          )}
+          {(notifiableUsers ?? []).map((user) => (
+            <Menu.Item
+              key={user.id}
+              title={user.name}
+              onPress={() => {
+                setNotifyUserId(user.id);
+                setNotifyMenuVisible(false);
+              }}
+            />
+          ))}
+        </Menu>
+        <HelperText type="info">
+          Solo aparecen personas con email registrado (en Personas, dentro de planificador)
+        </HelperText>
+      </View>
 
       <Text variant="bodyMedium" style={styles.label}>
         Documento de la guía (opcional)
