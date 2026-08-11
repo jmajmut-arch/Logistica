@@ -43,7 +43,9 @@ export const DISPLAY_STATUS_LABELS: Record<DisplayStatus, string> = {
 
 export const DISPLAY_STATUS_COLORS: Record<DisplayStatus, string> = {
   ...PLAN_ITEM_STATUS_COLORS,
-  overdue: '#DC2626',
+  // Antes era un rojo casi idéntico al de "late" (#B3261E), lo que los confundía en el
+  // dashboard — se usa un naranjo para distinguirlos de un vistazo.
+  overdue: '#EA580C',
 };
 
 // Estado extendido solo para gráficos/estadísticas del dashboard: además de los estados
