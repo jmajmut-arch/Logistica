@@ -7,6 +7,21 @@ export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
   home_delivery: 'Home delivery',
 };
 
+// Color de identidad por tipo de operación: distingue de un vistazo el listado del plan
+// semanal (barra de acento por fila), sin superponerse con los colores de estado de
+// cumplimiento (verde/rojo/azul) usados en el dashboard.
+export const OPERATION_TYPE_COLORS: Record<OperationType, string> = {
+  carga_subida: '#38bdf8',
+  retiro_carga: '#fb923c',
+  home_delivery: '#a78bfa',
+};
+
+export const OPERATION_TYPE_ICONS: Record<OperationType, string> = {
+  carga_subida: 'arrow-up-bold-box-outline',
+  retiro_carga: 'arrow-down-bold-box-outline',
+  home_delivery: 'home-city-outline',
+};
+
 export const PLAN_ITEM_STATUS_LABELS: Record<PlanItemStatus, string> = {
   pending: 'Pendiente',
   on_time: 'A tiempo',
