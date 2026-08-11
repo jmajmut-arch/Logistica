@@ -623,6 +623,22 @@ export function DashboardScreen() {
                 style={styles.complianceTile}
                 onPress={() =>
                   openDetail(
+                    'Viajes cancelados hoy',
+                    todayItems.filter((item) => item.cancelledByOperator),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                    {cancelledTodayCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes cancelados hoy</Text>
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
                     'Viajes pendientes hoy',
                     todayItems.filter((item) => {
                       const status = getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now);
@@ -636,22 +652,6 @@ export function DashboardScreen() {
                     {pendingTodayCount}/{todayItems.length}
                   </Text>
                   <Text variant="labelMedium">Viajes pendientes hoy</Text>
-                </Card.Content>
-              </Card>
-              <Card
-                style={styles.complianceTile}
-                onPress={() =>
-                  openDetail(
-                    'Viajes cancelados hoy',
-                    todayItems.filter((item) => item.cancelledByOperator),
-                  )
-                }
-              >
-                <Card.Content>
-                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
-                    {cancelledTodayCount}
-                  </Text>
-                  <Text variant="labelMedium">Viajes cancelados hoy</Text>
                 </Card.Content>
               </Card>
             </View>
@@ -847,6 +847,22 @@ export function DashboardScreen() {
                 style={styles.complianceTile}
                 onPress={() =>
                   openDetail(
+                    'Viajes cancelados esta semana',
+                    weekItems.filter((item) => item.cancelledByOperator),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                    {cancelledWeekCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes cancelados semana</Text>
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
                     'Viajes pendientes esta semana',
                     weekItems.filter((item) => {
                       const status = getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now);
@@ -860,22 +876,6 @@ export function DashboardScreen() {
                     {pendingWeekCount}/{weekItems.length}
                   </Text>
                   <Text variant="labelMedium">Viajes pendientes semana</Text>
-                </Card.Content>
-              </Card>
-              <Card
-                style={styles.complianceTile}
-                onPress={() =>
-                  openDetail(
-                    'Viajes cancelados esta semana',
-                    weekItems.filter((item) => item.cancelledByOperator),
-                  )
-                }
-              >
-                <Card.Content>
-                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
-                    {cancelledWeekCount}
-                  </Text>
-                  <Text variant="labelMedium">Viajes cancelados semana</Text>
                 </Card.Content>
               </Card>
             </View>
