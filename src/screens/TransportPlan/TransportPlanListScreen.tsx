@@ -87,9 +87,11 @@ export function TransportPlanListScreen() {
   }, [viewMode, visibleMonth, customRange, today]);
 
   const loadData = useCallback(async () => {
-    // Reglas permanentes existen tanto para plan semanal como para home delivery, así que
-    // la sincronización corre siempre, sin importar qué scope esté viendo el planificador.
-    await ensureRecurringPlanOccurrences();
+    // Solo home delivery admite planificación permanente — plan semanal se re-ingresa cada
+    // 7 días, así que no tiene reglas que sincronizar.
+    if (planManagerScope === 'home_delivery') {
+      await ensureRecurringPlanOccurrences();
+    }
     const [items, sites, carriers] = await Promise.all([
       transportPlanRepository.findByDateRange(queryRange.start, queryRange.end),
       siteRepository.findAll(),
@@ -98,7 +100,7 @@ export function TransportPlanListScreen() {
     setPlanItems(items);
     setSitesById(new Map(sites.map((site) => [site.id, site])));
     setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
-  }, [queryRange]);
+  }, [planManagerScope, queryRange]);
 
   useFocusRefresh(loadData);
 
