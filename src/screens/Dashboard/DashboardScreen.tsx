@@ -19,6 +19,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { DonutChart } from '@/components/DonutChart';
 import { EmptyState } from '@/components/EmptyState';
+import { HeavyCraneBadge } from '@/components/HeavyCraneBadge';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { WeekBarChart } from '@/components/WeekBarChart';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
@@ -343,6 +344,7 @@ export function DashboardScreen() {
             <Text variant="bodySmall" style={styles.itemDescription}>
               {siteName(item.siteId)}
             </Text>
+            {item.requiresHeavyCrane && <HeavyCraneBadge compact />}
           </View>
           <PlanItemStatusBadge status={status} />
         </Card.Content>

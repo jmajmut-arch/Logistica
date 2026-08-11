@@ -48,6 +48,7 @@ create table recurring_plan_rules (
   carrier_id bigint references carriers (id) on delete set null,
   day_of_week smallint not null check (day_of_week between 0 and 6), -- 0 = lunes ... 6 = domingo
   block_minutes integer not null check (block_minutes between 0 and 1439),
+  requires_heavy_crane boolean not null default false,
   reference text,
   notes text,
   active boolean not null default true,
@@ -69,6 +70,7 @@ create table transport_plan_items (
   scheduled_at bigint not null,
   reference text,
   notes text,
+  requires_heavy_crane boolean not null default false,
   recurrence_rule_id bigint references recurring_plan_rules (id) on delete set null,
   created_by bigint not null references users (id) on delete restrict,
   created_at bigint not null default (extract(epoch from now()) * 1000)::bigint

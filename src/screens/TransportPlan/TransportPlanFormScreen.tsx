@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Menu, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { recurringPlanRuleRepository } from '@/data/repositories/recurringPlanRuleRepository';
@@ -18,6 +19,7 @@ import type { OperationType } from '@/types/enums';
 import { getPlanManagerScope, matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import { blockMinutesOf, combineDayAndBlock, getWeekNumber, startOfDay, TIME_BLOCKS } from '@/utils/timeBlocks';
+import { HEAVY_CRANE_COLOR, HEAVY_CRANE_LABEL } from '@/utils/transportPlanDisplay';
 
 import type { TransportPlanStackParamList } from './TransportPlanStack';
 
@@ -95,6 +97,7 @@ export function TransportPlanFormScreen() {
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
   const [carrierMenuVisible, setCarrierMenuVisible] = useState(false);
+  const [requiresHeavyCrane, setRequiresHeavyCrane] = useState(false);
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [siteError, setSiteError] = useState(false);
@@ -122,6 +125,7 @@ export function TransportPlanFormScreen() {
         );
         setBlockMinutes(blockMinutesOf(item.scheduledAt));
         setCarrierId(item.carrierId ?? 0);
+        setRequiresHeavyCrane(item.requiresHeavyCrane);
         setReference(item.reference ?? '');
         setNotes(item.notes ?? '');
         setOriginalCreatedBy(item.createdBy);
@@ -162,6 +166,7 @@ export function TransportPlanFormScreen() {
           carrierId: carrierId || null,
           dayOfWeek,
           blockMinutes,
+          requiresHeavyCrane,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           active: true,
@@ -189,6 +194,7 @@ export function TransportPlanFormScreen() {
           siteId,
           scheduledAt,
           carrierId: carrierId || null,
+          requiresHeavyCrane,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           recurrenceRuleId: originalRecurrenceRuleId,
@@ -200,6 +206,7 @@ export function TransportPlanFormScreen() {
           siteId,
           scheduledAt,
           carrierId: carrierId || null,
+          requiresHeavyCrane,
           reference: reference.trim() || null,
           notes: notes.trim() || null,
           recurrenceRuleId: null,
@@ -406,6 +413,18 @@ export function TransportPlanFormScreen() {
           ))}
         </Menu>
       </View>
+
+      <View style={[styles.field, styles.craneRow]}>
+        <MaterialCommunityIcons name="crane" size={22} color={HEAVY_CRANE_COLOR} />
+        <View style={styles.craneText}>
+          <Text variant="bodyMedium">{HEAVY_CRANE_LABEL}</Text>
+          <Text variant="bodySmall" style={styles.craneHint}>
+            Márcalo si este viaje necesita coordinar una grúa especial
+          </Text>
+        </View>
+        <Switch value={requiresHeavyCrane} onValueChange={setRequiresHeavyCrane} />
+      </View>
+
       <TextInput
         label="Referencia — guía, pedido, etc. (opcional)"
         value={reference}
@@ -459,6 +478,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   recurringHint: {
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  craneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  craneText: {
+    flex: 1,
+  },
+  craneHint: {
     opacity: 0.7,
     marginTop: 2,
   },

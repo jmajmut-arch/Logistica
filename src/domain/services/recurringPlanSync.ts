@@ -47,6 +47,7 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
         scheduledAt,
         reference: rule.reference,
         notes: rule.notes,
+        requiresHeavyCrane: rule.requiresHeavyCrane,
         recurrenceRuleId: rule.id,
         createdBy: rule.createdBy,
       });

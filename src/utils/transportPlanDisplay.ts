@@ -46,6 +46,13 @@ export const EXTENDED_STATUS_COLORS: Record<ExtendedDisplayStatus, string> = {
   out_of_plan: '#a78bfa',
 };
 
+// Aviso de que el viaje requiere una grúa especial de alto tonelaje: se muestra en el
+// plan, en el registro de llegadas del operador y en el dashboard, para que quien reciba
+// el camión sepa de antemano que necesita coordinar ese equipo.
+export const HEAVY_CRANE_COLOR = '#f59e0b';
+export const HEAVY_CRANE_LABEL = 'Requiere grúa de alto tonelaje (32 t)';
+export const HEAVY_CRANE_LABEL_SHORT = 'Grúa 32 t';
+
 /** Color según umbral de % de cumplimiento, para las tarjetas del dashboard. */
 export function getComplianceColor(percentage: number | null): string {
   if (percentage === null) {

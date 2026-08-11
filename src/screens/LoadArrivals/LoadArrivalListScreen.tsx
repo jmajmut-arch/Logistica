@@ -17,6 +17,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { EmptyState } from '@/components/EmptyState';
+import { HeavyCraneBadge } from '@/components/HeavyCraneBadge';
 import { PlanItemStatusBadge } from '@/components/PlanItemStatusBadge';
 import { RoleGate } from '@/components/RoleGate';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
@@ -175,6 +176,7 @@ export function LoadArrivalListScreen() {
                               {carrier.name}
                             </Text>
                           )}
+                          {item.requiresHeavyCrane && <HeavyCraneBadge />}
                         </View>
                         <MaterialCommunityIcons name="chevron-right" size={22} color={PALETTE.textMuted} />
                       </Card.Content>
@@ -218,6 +220,7 @@ export function LoadArrivalListScreen() {
               onPress={() => navigation.navigate('LoadArrivalForm', { arrivalId: item.id })}
               right={() => (
                 <View style={styles.rightActions}>
+                  {planItem?.requiresHeavyCrane && <HeavyCraneBadge compact />}
                   {planItem && <PlanItemStatusBadge status={getPlanItemStatus(planItem, item)} />}
                   <RoleGate permission="registerArrivals">
                     <IconButton icon="delete-outline" onPress={() => setArrivalToDelete(item)} />

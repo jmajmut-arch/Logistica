@@ -18,6 +18,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { HeavyCraneBadge } from '@/components/HeavyCraneBadge';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
@@ -302,6 +303,7 @@ export function LoadArrivalFormScreen() {
                         {item.reference}
                       </Text>
                     )}
+                    {item.requiresHeavyCrane && <HeavyCraneBadge />}
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={PALETTE.textMuted} />
                 </Card.Content>
@@ -329,6 +331,11 @@ export function LoadArrivalFormScreen() {
                 <Text>
                   Planificado: {format(new Date(active.scheduledAt), 'EEE dd-MM HH:mm', { locale: es })}
                 </Text>
+                {active.requiresHeavyCrane && (
+                  <View style={styles.craneWarning}>
+                    <HeavyCraneBadge />
+                  </View>
+                )}
               </Dialog.Content>
               <Dialog.Actions style={styles.dialogActions}>
                 <Button compact onPress={closeDialog}>
@@ -502,6 +509,9 @@ const styles = StyleSheet.create({
   },
   dialogDayLabel: {
     marginBottom: 12,
+  },
+  craneWarning: {
+    marginTop: 8,
   },
   blockMenuScroll: {
     maxHeight: 320,

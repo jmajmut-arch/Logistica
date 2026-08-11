@@ -9,6 +9,7 @@ export interface RecurringPlanRule {
   dayOfWeek: number;
   /** Minutos desde medianoche, en bloques de 30 (igual que TIME_BLOCKS). */
   blockMinutes: number;
+  requiresHeavyCrane: boolean;
   reference: string | null;
   notes: string | null;
   active: boolean;

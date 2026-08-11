@@ -11,6 +11,7 @@ export interface TransportPlanItem {
   /** No nulo si esta fecha puntual fue generada por una regla de planificación
    * permanente. Editarla o eliminarla solo afecta esta ocurrencia, nunca la regla. */
   recurrenceRuleId: number | null;
+  requiresHeavyCrane: boolean;
   createdBy: number;
   createdAt: number;
 }

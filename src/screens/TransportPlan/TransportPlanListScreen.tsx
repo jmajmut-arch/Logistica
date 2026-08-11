@@ -17,6 +17,7 @@ import {
 } from 'react-native-paper';
 
 import { EmptyState } from '@/components/EmptyState';
+import { HeavyCraneBadge } from '@/components/HeavyCraneBadge';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { RoleGate } from '@/components/RoleGate';
 import { carrierRepository } from '@/data/repositories/carrierRepository';
@@ -147,9 +148,12 @@ export function TransportPlanListScreen() {
       left={(props) => <List.Icon {...props} icon="calendar-clock-outline" />}
       onPress={() => navigation.navigate('TransportPlanForm', { planItemId: item.id })}
       right={() => (
-        <RoleGate permission="managePlan">
-          <IconButton icon="delete-outline" onPress={() => setItemToDelete(item)} />
-        </RoleGate>
+        <View style={styles.rightRow}>
+          {item.requiresHeavyCrane && <HeavyCraneBadge compact />}
+          <RoleGate permission="managePlan">
+            <IconButton icon="delete-outline" onPress={() => setItemToDelete(item)} />
+          </RoleGate>
+        </View>
       )}
     />
   );
@@ -253,6 +257,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 4,
+  },
+  rightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   fab: {
     position: 'absolute',
