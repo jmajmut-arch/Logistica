@@ -348,8 +348,17 @@ export function DashboardScreen() {
     () => combinedCompliance(weekDisplayStatuses, weekUnplannedArrivals.length),
     [weekDisplayStatuses, weekUnplannedArrivals],
   );
-  // Desglose del cumplimiento semanal en sus dos causas: si el camión llegó (sin importar
-  // la hora) y, entre los que llegaron, si respetaron el horario planificado.
+  // Desglose del cumplimiento en sus dos causas: si el camión llegó (sin importar la hora)
+  // y, entre los que llegaron, si respetaron el horario planificado. Se calcula igual para
+  // hoy y para la semana, para que ambas secciones del Dashboard tengan la misma estructura.
+  const dailyArrivalCompliance = useMemo(
+    () => arrivalCompliance(todayDisplayStatuses),
+    [todayDisplayStatuses],
+  );
+  const dailyScheduleAdherence = useMemo(
+    () => scheduleAdherence(todayDisplayStatuses),
+    [todayDisplayStatuses],
+  );
   const weeklyArrivalCompliance = useMemo(
     () => arrivalCompliance(weekDisplayStatuses),
     [weekDisplayStatuses],
@@ -454,6 +463,9 @@ export function DashboardScreen() {
   const pendingTodayCount =
     (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
   const registeredTodayCount = todayItems.length - pendingTodayCount;
+  const pendingWeekCount =
+    (weekStatusCounts.get('pending') ?? 0) + (weekStatusCounts.get('overdue') ?? 0);
+  const registeredWeekCount = weekItems.length - pendingWeekCount;
 
   const complianceByOperationType = useMemo(
     () =>
@@ -604,6 +616,60 @@ export function DashboardScreen() {
                     progress={(dailyCompliance ?? 0) / 100}
                     color={getComplianceColor(dailyCompliance)}
                   />
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() => openDetail(`Agenda de hoy (${todayItems.length})`, todayItems)}
+              >
+                <Card.Content>
+                  <Text
+                    variant="displaySmall"
+                    style={{ color: getComplianceColor(dailyArrivalCompliance) }}
+                  >
+                    {dailyArrivalCompliance === null ? '—' : `${dailyArrivalCompliance}%`}
+                  </Text>
+                  <Text variant="labelMedium">Camión llegado según plan</Text>
+                  <ProgressBar
+                    style={styles.progressBar}
+                    progress={(dailyArrivalCompliance ?? 0) / 100}
+                    color={getComplianceColor(dailyArrivalCompliance)}
+                  />
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() => openDetail(`Agenda de hoy (${todayItems.length})`, todayItems)}
+              >
+                <Card.Content>
+                  <Text
+                    variant="displaySmall"
+                    style={{ color: getComplianceColor(dailyScheduleAdherence) }}
+                  >
+                    {dailyScheduleAdherence === null ? '—' : `${dailyScheduleAdherence}%`}
+                  </Text>
+                  <Text variant="labelMedium">Adherencia horaria</Text>
+                  <ProgressBar
+                    style={styles.progressBar}
+                    progress={(dailyScheduleAdherence ?? 0) / 100}
+                    color={getComplianceColor(dailyScheduleAdherence)}
+                  />
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
+                    'Viajes ejecutados hoy',
+                    todayItems.filter((item) => arrivalsByPlanItem.has(item.id)),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.on_time }}>
+                    {registeredTodayCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes ejecutados hoy</Text>
                 </Card.Content>
               </Card>
               <Card
@@ -762,6 +828,41 @@ export function DashboardScreen() {
                     progress={(weeklyScheduleAdherence ?? 0) / 100}
                     color={getComplianceColor(weeklyScheduleAdherence)}
                   />
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
+                    'Viajes ejecutados esta semana',
+                    weekItems.filter((item) => arrivalsByPlanItem.has(item.id)),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.on_time }}>
+                    {registeredWeekCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes ejecutados semana</Text>
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(
+                    'Viajes pendientes esta semana',
+                    weekItems.filter((item) => {
+                      const status = getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now);
+                      return status === 'pending' || status === 'overdue';
+                    }),
+                  )
+                }
+              >
+                <Card.Content>
+                  <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.overdue }}>
+                    {pendingWeekCount}
+                  </Text>
+                  <Text variant="labelMedium">Viajes pendientes semana</Text>
                 </Card.Content>
               </Card>
             </View>
