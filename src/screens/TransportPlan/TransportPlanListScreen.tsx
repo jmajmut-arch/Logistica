@@ -47,7 +47,7 @@ type DaySection = { day: number; title: string; data: TransportPlanItem[] };
 
 // Cuántos días con plan se muestran de entrada en la vista Lista, antes de tocar "Cargar
 // más": con historiales largos, agrupar y renderizar todo de una es lo más lento.
-const DAY_PAGE_SIZE = 20;
+const DAY_PAGE_SIZE = 7;
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
