@@ -23,10 +23,12 @@ import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
+import { userRepository } from '@/data/repositories/userRepository';
 import type { Carrier } from '@/domain/entities/Carrier';
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
+import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 import { matchesOperatorScope } from '@/utils/operatorScope';
@@ -64,6 +66,7 @@ export function LoadArrivalFormScreen() {
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
+  const [users, setUsers] = useState<User[] | null>(null);
   const [editingArrival, setEditingArrival] = useState<LoadArrival | null>(null);
   const [loading, setLoading] = useState(arrivalId !== undefined);
   const siteId = arrivalId !== undefined ? (editingArrival?.siteId ?? 0) : (currentSiteId ?? 0);
@@ -84,11 +87,13 @@ export function LoadArrivalFormScreen() {
       carrierRepository.findAll(),
       transportPlanRepository.findAll(),
       loadArrivalRepository.findAll(),
-    ]).then(([loadedSites, loadedCarriers, loadedPlanItems, loadedArrivals]) => {
+      userRepository.findAll(),
+    ]).then(([loadedSites, loadedCarriers, loadedPlanItems, loadedArrivals, loadedUsers]) => {
       setSites(loadedSites);
       setCarriers(loadedCarriers);
       setPlanItems(loadedPlanItems);
       setArrivals(loadedArrivals);
+      setUsers(loadedUsers);
     });
   }, []);
 
@@ -110,6 +115,11 @@ export function LoadArrivalFormScreen() {
   const carriersById = useMemo(
     () => new Map((carriers ?? []).map((carrier) => [carrier.id, carrier])),
     [carriers],
+  );
+
+  const usersById = useMemo(
+    () => new Map((users ?? []).map((user) => [user.id, user])),
+    [users],
   );
 
   const registeredPlanItemIds = useMemo(
@@ -134,7 +144,6 @@ export function LoadArrivalFormScreen() {
           item.scheduledAt >= dayStart &&
           item.scheduledAt < dayEnd &&
           !registeredPlanItemIds.has(item.id) &&
-          !item.cancelledByOperator &&
           matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -152,7 +161,6 @@ export function LoadArrivalFormScreen() {
           item.siteId === siteId &&
           item.scheduledAt < dayStart &&
           !registeredPlanItemIds.has(item.id) &&
-          !item.cancelledByOperator &&
           matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -191,7 +199,7 @@ export function LoadArrivalFormScreen() {
     Promise.resolve().then(() => {
       if (requestedPlanItemId !== undefined) {
         const item = pendingItemsForSite.find((candidate) => candidate.id === requestedPlanItemId);
-        if (!item) {
+        if (!item || item.cancelledByOperator) {
           return;
         }
         setActive(item);
@@ -252,9 +260,12 @@ export function LoadArrivalFormScreen() {
     if (active === null || active === 'unplanned') {
       return;
     }
+    if (!currentUser) {
+      return;
+    }
     setSubmitting(true);
     try {
-      await transportPlanRepository.markCancelledByOperator(active.id);
+      await transportPlanRepository.markCancelledByOperator(active.id, currentUser.id);
       navigation.goBack();
     } finally {
       setSubmitting(false);
@@ -276,7 +287,14 @@ export function LoadArrivalFormScreen() {
     submit(combineDayAndBlock(startOfDay(active.scheduledAt), blockMinutes), active.id, active.carrierId);
   };
 
-  if (sites === null || carriers === null || planItems === null || arrivals === null || loading) {
+  if (
+    sites === null ||
+    carriers === null ||
+    planItems === null ||
+    arrivals === null ||
+    users === null ||
+    loading
+  ) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -321,6 +339,9 @@ export function LoadArrivalFormScreen() {
                 Pendientes atrasados
               </Text>
               {overduePendingItemsForSite.map((item) => {
+                if (item.cancelledByOperator) {
+                  return <CancelledPlanItemCard key={item.id} item={item} usersById={usersById} />;
+                }
                 const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
                 return (
                   <Card
@@ -368,6 +389,9 @@ export function LoadArrivalFormScreen() {
             </Text>
           )}
           {pendingItemsForSite.map((item) => {
+            if (item.cancelledByOperator) {
+              return <CancelledPlanItemCard key={item.id} item={item} usersById={usersById} />;
+            }
             const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
             return (
               <Card key={item.id} style={styles.planItemCard} onPress={() => openPlanItem(item)}>
@@ -552,6 +576,44 @@ export function LoadArrivalFormScreen() {
   );
 }
 
+// Viaje marcado como "no llegó" por el operador: se muestra en la lista para dejar registro
+// en la bodega/planta, pero ya no es una tarjeta pendiente accionable (sin onPress).
+function CancelledPlanItemCard({
+  item,
+  usersById,
+}: {
+  item: TransportPlanItem;
+  usersById: Map<number, User>;
+}) {
+  const cancelledByName =
+    item.cancelledBy !== null ? usersById.get(item.cancelledBy)?.name : undefined;
+  return (
+    <Card style={[styles.planItemCard, styles.cancelledCard]}>
+      <Card.Content style={styles.planItemContent}>
+        <View style={styles.planItemTimeWide}>
+          <Text variant="bodySmall" style={styles.cancelledLabel}>
+            {item.hasNoSchedule
+              ? format(new Date(item.scheduledAt), 'dd-MM')
+              : format(new Date(item.scheduledAt), 'dd-MM HH:mm')}
+          </Text>
+        </View>
+        <View style={styles.planItemText}>
+          <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
+          <Text variant="bodySmall" style={styles.cancelledLabel}>
+            Cancelado por {cancelledByName ?? 'operador'}
+            {item.cancelledAt ? ` · ${format(new Date(item.cancelledAt), 'dd-MM HH:mm')}` : ''}
+          </Text>
+        </View>
+        <MaterialCommunityIcons
+          name="close-circle-outline"
+          size={22}
+          color={DISPLAY_STATUS_COLORS.cancelled}
+        />
+      </Card.Content>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     padding: 16,
@@ -604,6 +666,14 @@ const styles = StyleSheet.create({
   overdueCard: {
     borderLeftWidth: 3,
     borderLeftColor: DISPLAY_STATUS_COLORS.overdue,
+  },
+  cancelledCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: DISPLAY_STATUS_COLORS.cancelled,
+    opacity: 0.85,
+  },
+  cancelledLabel: {
+    color: DISPLAY_STATUS_COLORS.cancelled,
   },
   planItemText: {
     flex: 1,

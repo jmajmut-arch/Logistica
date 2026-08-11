@@ -21,8 +21,13 @@ export interface TransportPlanItem {
   cancelled: boolean;
   /** El operador marcó este viaje como "no llegó" desde Llegadas — a diferencia de
    * `cancelled`, sigue contando en el total planificado del período como incumplimiento
-   * (falla estadística), solo deja de mostrarse como pendiente por registrar. */
+   * (falla estadística) y sigue apareciendo en el plan y en Llegadas, solo que como
+   * cancelado en vez de pendiente por registrar. */
   cancelledByOperator: boolean;
+  /** Quién y cuándo lo canceló, para dejar registro de qué operador lo marcó. Nulos si
+   * cancelledByOperator es false. */
+  cancelledBy: number | null;
+  cancelledAt: number | null;
   requiresHeavyCrane: boolean;
   createdBy: number;
   createdAt: number;

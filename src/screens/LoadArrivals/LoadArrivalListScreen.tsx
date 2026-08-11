@@ -24,10 +24,12 @@ import { carrierRepository } from '@/data/repositories/carrierRepository';
 import { loadArrivalRepository } from '@/data/repositories/loadArrivalRepository';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import { transportPlanRepository } from '@/data/repositories/transportPlanRepository';
+import { userRepository } from '@/data/repositories/userRepository';
 import type { Carrier } from '@/domain/entities/Carrier';
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
+import type { User } from '@/domain/entities/User';
 import { getDisplayStatus, getPlanItemStatus } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
@@ -56,21 +58,24 @@ export function LoadArrivalListScreen() {
   const [planItemsById, setPlanItemsById] = useState<Map<number, TransportPlanItem>>(new Map());
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
   const [carriersById, setCarriersById] = useState<Map<number, Carrier>>(new Map());
+  const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
   const [arrivalToDelete, setArrivalToDelete] = useState<LoadArrival | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [loadedArrivals, loadedPlanItems, sites, carriers] = await Promise.all([
+    const [loadedArrivals, loadedPlanItems, sites, carriers, users] = await Promise.all([
       loadArrivalRepository.findAll(),
       transportPlanRepository.findAll(),
       siteRepository.findAll(),
       carrierRepository.findAll(),
+      userRepository.findAll(),
     ]);
     setArrivals(loadedArrivals);
     setPlanItems(loadedPlanItems);
     setPlanItemsById(new Map(loadedPlanItems.map((item) => [item.id, item])));
     setSitesById(new Map(sites.map((site) => [site.id, site])));
     setCarriersById(new Map(carriers.map((carrier) => [carrier.id, carrier])));
+    setUsersById(new Map(users.map((user) => [user.id, user])));
   }, []);
 
   useFocusRefresh(loadData);
@@ -150,7 +155,6 @@ export function LoadArrivalListScreen() {
           item.scheduledAt >= dayStart &&
           item.scheduledAt < dayEnd &&
           !registeredPlanItemIds.has(item.id) &&
-          !item.cancelledByOperator &&
           matchesOperatorScope(item.operationType, currentOperatorScope),
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -286,6 +290,37 @@ export function LoadArrivalListScreen() {
                 <Text style={styles.emptyPending}>Ya registraste todo lo planificado para hoy.</Text>
               ) : (
                 pendingItemsForSite.map((item) => {
+                  if (item.cancelledByOperator) {
+                    const cancelledByName =
+                      item.cancelledBy !== null ? usersById.get(item.cancelledBy)?.name : undefined;
+                    return (
+                      <Card key={item.id} style={[styles.pendingCard, styles.cancelledCard]}>
+                        <Card.Content style={styles.pendingContent}>
+                          <View style={styles.pendingTime}>
+                            <Text variant={item.hasNoSchedule ? 'bodySmall' : 'titleMedium'} style={styles.cancelledLabel}>
+                              {item.hasNoSchedule
+                                ? 'Sin horario'
+                                : format(new Date(item.scheduledAt), 'HH:mm')}
+                            </Text>
+                          </View>
+                          <View style={styles.pendingText}>
+                            <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
+                            <Text variant="bodySmall" style={styles.cancelledLabel}>
+                              Cancelado por {cancelledByName ?? 'operador'}
+                              {item.cancelledAt
+                                ? ` · ${format(new Date(item.cancelledAt), 'dd-MM HH:mm')}`
+                                : ''}
+                            </Text>
+                          </View>
+                          <MaterialCommunityIcons
+                            name="close-circle-outline"
+                            size={22}
+                            color={DISPLAY_STATUS_COLORS.cancelled}
+                          />
+                        </Card.Content>
+                      </Card>
+                    );
+                  }
                   const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
                   return (
                     <Card
@@ -457,6 +492,14 @@ const styles = StyleSheet.create({
   },
   pendingDetail: {
     opacity: 0.7,
+  },
+  cancelledCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: DISPLAY_STATUS_COLORS.cancelled,
+    opacity: 0.85,
+  },
+  cancelledLabel: {
+    color: DISPLAY_STATUS_COLORS.cancelled,
   },
   rightActions: {
     flexDirection: 'row',

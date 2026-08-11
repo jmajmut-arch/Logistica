@@ -104,11 +104,12 @@ export const transportPlanRepository = {
 
   /** El operador registra que el viaje nunca llegó. A diferencia de cancel(), el item
    * sigue existiendo para el resto de la app (no se excluye de findAll/findByDateRange):
-   * cuenta como incumplimiento en el % de cumplimiento en vez de desaparecer. */
-  async markCancelledByOperator(id: number): Promise<void> {
+   * cuenta como incumplimiento en el % de cumplimiento y sigue apareciendo en el plan y en
+   * Llegadas, con quién y cuándo lo canceló para dejar registro. */
+  async markCancelledByOperator(id: number, userId: number): Promise<void> {
     const { error } = await supabase
       .from('transport_plan_items')
-      .update({ cancelled_by_operator: true })
+      .update({ cancelled_by_operator: true, cancelled_by: userId, cancelled_at: Date.now() })
       .eq('id', id);
     if (error) throw error;
   },

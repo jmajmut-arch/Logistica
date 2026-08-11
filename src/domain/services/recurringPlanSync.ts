@@ -57,6 +57,8 @@ export async function ensureRecurringPlanOccurrences(): Promise<void> {
         recurrenceRuleId: rule.id,
         cancelled: false,
         cancelledByOperator: false,
+        cancelledBy: null,
+        cancelledAt: null,
         createdBy: rule.createdBy,
       });
       coveredWeeks.add(weekStart);

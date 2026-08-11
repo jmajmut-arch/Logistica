@@ -131,6 +131,8 @@ export function TransportPlanFormScreen() {
   const [originalCreatedBy, setOriginalCreatedBy] = useState<number | null>(null);
   const [originalRecurrenceRuleId, setOriginalRecurrenceRuleId] = useState<number | null>(null);
   const [originalCancelledByOperator, setOriginalCancelledByOperator] = useState(false);
+  const [originalCancelledBy, setOriginalCancelledBy] = useState<number | null>(null);
+  const [originalCancelledAt, setOriginalCancelledAt] = useState<number | null>(null);
 
   useEffect(() => {
     siteRepository.findAll().then(setSites);
@@ -158,6 +160,8 @@ export function TransportPlanFormScreen() {
         setOriginalCreatedBy(item.createdBy);
         setOriginalRecurrenceRuleId(item.recurrenceRuleId);
         setOriginalCancelledByOperator(item.cancelledByOperator);
+        setOriginalCancelledBy(item.cancelledBy);
+        setOriginalCancelledAt(item.cancelledAt);
       }
       setLoading(false);
     });
@@ -297,6 +301,8 @@ export function TransportPlanFormScreen() {
               recurrenceRuleId: originalRecurrenceRuleId,
               cancelled: false,
               cancelledByOperator: originalCancelledByOperator,
+              cancelledBy: originalCancelledBy,
+              cancelledAt: originalCancelledAt,
               createdBy: originalCreatedBy ?? currentUser.id,
             });
           } else {
@@ -312,6 +318,8 @@ export function TransportPlanFormScreen() {
               recurrenceRuleId: null,
               cancelled: false,
               cancelledByOperator: false,
+              cancelledBy: null,
+              cancelledAt: null,
               createdBy: currentUser.id,
             });
           }
@@ -351,6 +359,8 @@ export function TransportPlanFormScreen() {
               recurrenceRuleId: originalRecurrenceRuleId,
               cancelled: false,
               cancelledByOperator: originalCancelledByOperator,
+              cancelledBy: originalCancelledBy,
+              cancelledAt: originalCancelledAt,
               createdBy: originalCreatedBy ?? currentUser.id,
             });
           } else {
@@ -366,6 +376,8 @@ export function TransportPlanFormScreen() {
               recurrenceRuleId: null,
               cancelled: false,
               cancelledByOperator: false,
+              cancelledBy: null,
+              cancelledAt: null,
               createdBy: currentUser.id,
             });
           }
