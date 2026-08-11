@@ -35,8 +35,8 @@ import {
 } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
-import { OPERATION_TYPES } from '@/types/enums';
-import { matchesOperatorScope } from '@/utils/operatorScope';
+import { OPERATION_TYPES, type OperatorScope } from '@/types/enums';
+import { matchesOperatorScope, OPERATOR_SCOPE_LABELS } from '@/utils/operatorScope';
 import { getWeekNumber, startOfDay, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
   DISPLAY_STATUS_COLORS,
@@ -55,7 +55,16 @@ const EXTENDED_STATUS_ORDER: ExtendedDisplayStatus[] = [...STATUS_ORDER, 'out_of
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 // Paleta rotativa para el donut de destinos (sitios): a diferencia de los estados del
 // plan, la cantidad de sitios es variable, así que no hay un color fijo por sitio.
-const SITE_CHART_COLORS = ['#38bdf8', '#fb923c', '#34d399', '#f472b6', '#a78bfa', '#facc15', '#22d3ee', '#fb7185'];
+const SITE_CHART_COLORS = [
+  '#38bdf8',
+  '#fb923c',
+  '#34d399',
+  '#f472b6',
+  '#a78bfa',
+  '#facc15',
+  '#22d3ee',
+  '#fb7185',
+];
 // Tope de días para el desglose diario del rango personalizado: un rango de meses no
 // debería intentar dibujar cientos de barras.
 const MAX_RANGE_DAYS = 92;
@@ -102,6 +111,9 @@ export function DashboardScreen() {
   const [customRange, setCustomRange] = useState<{ start: number; end: number } | null>(null);
   const [rangePickerVisible, setRangePickerVisible] = useState(false);
   const [craneFilter, setCraneFilter] = useState<'all' | 'crane' | 'no_crane'>('all');
+  // Supervisor y planificador eligen qué segmento del dashboard ver (el operador ya viene
+  // acotado a su propio frente de trabajo desde el login, así que no necesita el toggle).
+  const [dashboardScope, setDashboardScope] = useState<OperatorScope>('plan_transporte');
 
   const openDetail = useCallback((title: string, items: TransportPlanItem[]) => {
     setDetail({ kind: 'items', title, items });
@@ -147,18 +159,28 @@ export function DashboardScreen() {
   );
 
   // Al operador se le acota todo el dashboard a su propio patio/bodega y al frente de
-  // trabajo elegidos al iniciar sesión; supervisor y planificador siguen viendo todo.
+  // trabajo elegidos al iniciar sesión. Supervisor y planificador ven todo el sitio, pero
+  // el dashboard igual queda separado en los mismos dos segmentos (plan semanal / home
+  // delivery) mediante el toggle, en vez de mezclarlos.
   const isOperatorScoped = currentUser?.role === 'operator' && currentSiteId !== null;
+  const effectiveScope: OperatorScope = isOperatorScoped
+    ? (currentOperatorScope ?? 'plan_transporte')
+    : dashboardScope;
 
   const scopedPlanItems = useMemo(() => {
     const items = planItems ?? [];
-    return isOperatorScoped
-      ? items.filter(
-          (item) =>
-            item.siteId === currentSiteId && matchesOperatorScope(item.operationType, currentOperatorScope),
-        )
-      : items;
-  }, [planItems, isOperatorScoped, currentSiteId, currentOperatorScope]);
+    return items.filter((item) => {
+      if (isOperatorScoped && item.siteId !== currentSiteId) {
+        return false;
+      }
+      return matchesOperatorScope(item.operationType, effectiveScope);
+    });
+  }, [planItems, isOperatorScoped, currentSiteId, effectiveScope]);
+
+  const scopedOperationTypes = useMemo(
+    () => OPERATION_TYPES.filter((type) => matchesOperatorScope(type, effectiveScope)),
+    [effectiveScope],
+  );
 
   const todayItems = useMemo(
     () =>
@@ -231,7 +253,8 @@ export function DashboardScreen() {
   }, [arrivals, customRange, isOperatorScoped, currentSiteId]);
 
   const customRangeDisplayStatuses = useMemo(
-    () => customRangeItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
+    () =>
+      customRangeItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
     [customRangeItems, arrivalsByPlanItem, now],
   );
 
@@ -299,8 +322,12 @@ export function DashboardScreen() {
       WEEKDAY_LABELS.map((label, index) => {
         const start = weekStart + index * DAY_MS;
         const end = start + DAY_MS;
-        const items = weekItems.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
-        const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
+        const items = weekItems.filter(
+          (item) => item.scheduledAt >= start && item.scheduledAt < end,
+        );
+        const statuses = items.map((item) =>
+          getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now),
+        );
         const unplannedCount = weekUnplannedArrivals.filter(
           (arrival) => arrival.arrivedAt >= start && arrival.arrivedAt < end,
         ).length;
@@ -323,7 +350,10 @@ export function DashboardScreen() {
     return counts;
   }
 
-  const todayStatusCounts = useMemo(() => countByStatus(todayDisplayStatuses), [todayDisplayStatuses]);
+  const todayStatusCounts = useMemo(
+    () => countByStatus(todayDisplayStatuses),
+    [todayDisplayStatuses],
+  );
   const weekStatusCounts = useMemo(() => countByStatus(weekDisplayStatuses), [weekDisplayStatuses]);
   const customRangeStatusCounts = useMemo(
     () => countByStatus(customRangeDisplayStatuses),
@@ -348,8 +378,12 @@ export function DashboardScreen() {
     }[] = [];
     for (let start = customRange.start; start <= customRange.end; start += DAY_MS) {
       const end = start + DAY_MS;
-      const items = customRangeItems.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
-      const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
+      const items = customRangeItems.filter(
+        (item) => item.scheduledAt >= start && item.scheduledAt < end,
+      );
+      const statuses = items.map((item) =>
+        getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now),
+      );
       const unplannedCount = customRangeUnplannedArrivals.filter(
         (arrival) => arrival.arrivedAt >= start && arrival.arrivedAt < end,
       ).length;
@@ -375,17 +409,20 @@ export function DashboardScreen() {
       .sort((a, b) => b.count - a.count);
   }, [customRangeItems]);
 
-  const pendingTodayCount = (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
+  const pendingTodayCount =
+    (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
   const registeredTodayCount = todayItems.length - pendingTodayCount;
 
   const complianceByOperationType = useMemo(
     () =>
-      OPERATION_TYPES.map((type) => {
+      scopedOperationTypes.map((type) => {
         const items = weekItems.filter((item) => item.operationType === type);
-        const statuses = items.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now));
+        const statuses = items.map((item) =>
+          getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now),
+        );
         return { type, count: items.length, percentage: getCompliancePercentage(statuses), items };
       }),
-    [weekItems, arrivalsByPlanItem, now],
+    [scopedOperationTypes, weekItems, arrivalsByPlanItem, now],
   );
 
   const agendaItems = agendaScope === 'day' ? todayItems : weekItems;
@@ -400,7 +437,8 @@ export function DashboardScreen() {
     );
   }, [agendaItems, statusFilter, arrivalsByPlanItem, now]);
 
-  const agendaUnplannedArrivals = agendaScope === 'day' ? todayUnplannedArrivals : weekUnplannedArrivals;
+  const agendaUnplannedArrivals =
+    agendaScope === 'day' ? todayUnplannedArrivals : weekUnplannedArrivals;
 
   // Destinos (sitios) de las cargas del período elegido en el toggle Hoy/Semana de la
   // agenda, para ver de un vistazo hacia dónde se concentra el tráfico planificado.
@@ -419,7 +457,10 @@ export function DashboardScreen() {
     const status = getDisplayStatus(item, arrival, now);
     const timeFormat = wideTime ? 'EEE dd-MM HH:mm' : 'HH:mm';
     return (
-      <Card key={item.id} style={[styles.itemCard, { borderLeftColor: DISPLAY_STATUS_COLORS[status] }]}>
+      <Card
+        key={item.id}
+        style={[styles.itemCard, { borderLeftColor: DISPLAY_STATUS_COLORS[status] }]}
+      >
         <Card.Content style={styles.itemContent}>
           <View style={wideTime ? styles.timeColumnWide : styles.timeColumn}>
             <Text variant={item.hasNoSchedule ? 'bodyMedium' : 'titleMedium'}>
@@ -470,6 +511,21 @@ export function DashboardScreen() {
         ]}
         ListHeaderComponent={
           <View>
+            {!isOperatorScoped && (
+              <SegmentedButtons
+                style={styles.scopeToggle}
+                value={dashboardScope}
+                onValueChange={(value) => setDashboardScope(value as OperatorScope)}
+                buttons={[
+                  { value: 'plan_transporte', label: 'Plan semanal', icon: 'warehouse' },
+                  {
+                    value: 'home_delivery',
+                    label: OPERATOR_SCOPE_LABELS.home_delivery,
+                    icon: 'home-city-outline',
+                  },
+                ]}
+              />
+            )}
             <Text variant="titleLarge" style={styles.dateHeader}>
               {capitalize(format(new Date(dayStart), "EEEE dd 'de' MMMM", { locale: es }))}
             </Text>
@@ -487,7 +543,10 @@ export function DashboardScreen() {
                 onPress={() => openDetail(`Agenda de hoy (${todayItems.length})`, todayItems)}
               >
                 <Card.Content>
-                  <Text variant="displaySmall" style={{ color: getComplianceColor(dailyCompliance) }}>
+                  <Text
+                    variant="displaySmall"
+                    style={{ color: getComplianceColor(dailyCompliance) }}
+                  >
                     {dailyCompliance === null ? '—' : `${dailyCompliance}%`}
                   </Text>
                   <Text variant="labelMedium">Cumplimiento hoy</Text>
@@ -505,7 +564,10 @@ export function DashboardScreen() {
                 }
               >
                 <Card.Content>
-                  <Text variant="displaySmall" style={{ color: getComplianceColor(weeklyCompliance) }}>
+                  <Text
+                    variant="displaySmall"
+                    style={{ color: getComplianceColor(weeklyCompliance) }}
+                  >
                     {weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}
                   </Text>
                   <Text variant="labelMedium">Cumplimiento semana</Text>
@@ -543,8 +605,15 @@ export function DashboardScreen() {
                   Rango personalizado
                 </Text>
                 <View style={styles.rangePickerRow}>
-                  <Pressable onPress={() => setRangePickerVisible(true)} style={styles.rangePickerButton}>
-                    <MaterialCommunityIcons name="calendar-range" size={20} color={PALETTE.primary} />
+                  <Pressable
+                    onPress={() => setRangePickerVisible(true)}
+                    style={styles.rangePickerButton}
+                  >
+                    <MaterialCommunityIcons
+                      name="calendar-range"
+                      size={20}
+                      color={PALETTE.primary}
+                    />
                     <Text variant="bodyMedium" style={styles.rangePickerText}>
                       {customRange
                         ? `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')}`
@@ -571,7 +640,10 @@ export function DashboardScreen() {
                         )
                       }
                     >
-                      <Text variant="displaySmall" style={{ color: getComplianceColor(customRangeCompliance) }}>
+                      <Text
+                        variant="displaySmall"
+                        style={{ color: getComplianceColor(customRangeCompliance) }}
+                      >
                         {customRangeCompliance === null ? '—' : `${customRangeCompliance}%`}
                       </Text>
                       <Text variant="labelMedium">Cumplimiento del rango</Text>
@@ -593,14 +665,18 @@ export function DashboardScreen() {
                     </Text>
                   ) : (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={{ width: Math.max(300, customRangeComplianceByDay.length * 44) }}>
+                      <View
+                        style={{ width: Math.max(300, customRangeComplianceByDay.length * 44) }}
+                      >
                         <WeekBarChart
                           data={customRangeComplianceByDay.map((day) => ({
                             ...day,
                             onPress: () =>
                               openDetail(
                                 `${day.label} — ${day.items.length} planificados${
-                                  day.unplannedCount > 0 ? ` (+${day.unplannedCount} no planificados)` : ''
+                                  day.unplannedCount > 0
+                                    ? ` (+${day.unplannedCount} no planificados)`
+                                    : ''
                                 }`,
                                 day.items,
                               ),
@@ -634,7 +710,9 @@ export function DashboardScreen() {
                               : (customRangeStatusCounts.get(status) ?? 0),
                           color: EXTENDED_STATUS_COLORS[status],
                         }))}
-                        centerValue={String(customRangeItems.length + customRangeUnplannedArrivals.length)}
+                        centerValue={String(
+                          customRangeItems.length + customRangeUnplannedArrivals.length,
+                        )}
                         centerLabel={
                           customRangeItems.length + customRangeUnplannedArrivals.length === 1
                             ? 'viaje'
@@ -648,20 +726,27 @@ export function DashboardScreen() {
                             style={styles.legendRow}
                             onPress={() => {
                               if (status === 'out_of_plan') {
-                                openUnplannedDetail('No planificado · rango', customRangeUnplannedArrivals);
+                                openUnplannedDetail(
+                                  'No planificado · rango',
+                                  customRangeUnplannedArrivals,
+                                );
                                 return;
                               }
                               openDetail(
                                 `${EXTENDED_STATUS_LABELS[status]} · rango`,
                                 customRangeItems.filter(
                                   (item) =>
-                                    getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
+                                    getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
+                                    status,
                                 ),
                               );
                             }}
                           >
                             <View
-                              style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]}
+                              style={[
+                                styles.legendDot,
+                                { backgroundColor: EXTENDED_STATUS_COLORS[status] },
+                              ]}
                             />
                             <Text variant="bodyMedium" style={styles.legendLabel}>
                               {EXTENDED_STATUS_LABELS[status]}
@@ -716,7 +801,10 @@ export function DashboardScreen() {
                             <View
                               style={[
                                 styles.legendDot,
-                                { backgroundColor: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length] },
+                                {
+                                  backgroundColor:
+                                    SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                                },
                               ]}
                             />
                             <Text variant="bodyMedium" style={styles.legendLabel}>
@@ -745,7 +833,11 @@ export function DashboardScreen() {
                   onValueChange={(value) => setCraneFilter(value as 'all' | 'crane' | 'no_crane')}
                   buttons={[
                     { value: 'all', label: `Todos (${futurePlanItems.length})` },
-                    { value: 'crane', label: `Con grúa (${futureCraneItems.length})`, icon: 'crane' },
+                    {
+                      value: 'crane',
+                      label: `Con grúa (${futureCraneItems.length})`,
+                      icon: 'crane',
+                    },
                     { value: 'no_crane', label: `Sin grúa (${futureNoCraneItems.length})` },
                   ]}
                 />
@@ -764,7 +856,11 @@ export function DashboardScreen() {
                     onPress={() =>
                       openDetail(
                         `Viajes futuros${
-                          craneFilter === 'crane' ? ' · con grúa' : craneFilter === 'no_crane' ? ' · sin grúa' : ''
+                          craneFilter === 'crane'
+                            ? ' · con grúa'
+                            : craneFilter === 'no_crane'
+                              ? ' · sin grúa'
+                              : ''
                         } (${filteredFutureItems.length})`,
                         filteredFutureItems,
                       )
@@ -818,12 +914,18 @@ export function DashboardScreen() {
                               `${EXTENDED_STATUS_LABELS[status]} · hoy`,
                               todayItems.filter(
                                 (item) =>
-                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
+                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
+                                  status,
                               ),
                             );
                           }}
                         >
-                          <View style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]} />
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: EXTENDED_STATUS_COLORS[status] },
+                            ]}
+                          />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
                             {EXTENDED_STATUS_LABELS[status]}
                           </Text>
@@ -899,12 +1001,18 @@ export function DashboardScreen() {
                               `${EXTENDED_STATUS_LABELS[status]} · semana`,
                               weekItems.filter(
                                 (item) =>
-                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) === status,
+                                  getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now) ===
+                                  status,
                               ),
                             );
                           }}
                         >
-                          <View style={[styles.legendDot, { backgroundColor: EXTENDED_STATUS_COLORS[status] }]} />
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: EXTENDED_STATUS_COLORS[status] },
+                            ]}
+                          />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
                             {EXTENDED_STATUS_LABELS[status]}
                           </Text>
@@ -921,35 +1029,41 @@ export function DashboardScreen() {
               </Card.Content>
             </Card>
 
-            <Card style={styles.wideCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.cardTitle}>
-                  Cumplimiento por tipo · Semana {weekNumber}
-                </Text>
-                {complianceByOperationType.map(({ type, count, percentage, items }) => (
-                  <Pressable
-                    key={type}
-                    style={styles.typeRow}
-                    onPress={() => openDetail(`${OPERATION_TYPE_LABELS[type]} · semana`, items)}
-                  >
-                    <View style={styles.typeHeaderRow}>
-                      <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[type]}</Text>
-                      <Text variant="bodyMedium" style={{ color: getComplianceColor(percentage) }}>
-                        {percentage === null ? '—' : `${percentage}%`}
+            {scopedOperationTypes.length > 1 && (
+              <Card style={styles.wideCard}>
+                <Card.Content>
+                  <Text variant="titleMedium" style={styles.cardTitle}>
+                    Cumplimiento por tipo · Semana {weekNumber}
+                  </Text>
+                  {complianceByOperationType.map(({ type, count, percentage, items }) => (
+                    <Pressable
+                      key={type}
+                      style={styles.typeRow}
+                      onPress={() => openDetail(`${OPERATION_TYPE_LABELS[type]} · semana`, items)}
+                    >
+                      <View style={styles.typeHeaderRow}>
+                        <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[type]}</Text>
+                        <Text
+                          variant="bodyMedium"
+                          style={{ color: getComplianceColor(percentage) }}
+                        >
+                          {percentage === null ? '—' : `${percentage}%`}
+                        </Text>
+                      </View>
+                      <ProgressBar
+                        style={styles.progressBar}
+                        progress={(percentage ?? 0) / 100}
+                        color={getComplianceColor(percentage)}
+                      />
+                      <Text variant="bodySmall" style={styles.itemDescription}>
+                        {count} {count === 1 ? 'viaje planificado' : 'viajes planificados'} esta
+                        semana
                       </Text>
-                    </View>
-                    <ProgressBar
-                      style={styles.progressBar}
-                      progress={(percentage ?? 0) / 100}
-                      color={getComplianceColor(percentage)}
-                    />
-                    <Text variant="bodySmall" style={styles.itemDescription}>
-                      {count} {count === 1 ? 'viaje planificado' : 'viajes planificados'} esta semana
-                    </Text>
-                  </Pressable>
-                ))}
-              </Card.Content>
-            </Card>
+                    </Pressable>
+                  ))}
+                </Card.Content>
+              </Card>
+            )}
 
             <Card style={styles.wideCard}>
               <Card.Content>
@@ -958,7 +1072,8 @@ export function DashboardScreen() {
                 </Text>
                 {agendaItemsBySite.length === 0 ? (
                   <Text variant="bodySmall" style={styles.itemDescription}>
-                    No hay viajes planificados {agendaScope === 'day' ? 'para hoy' : 'para esta semana'} todavía.
+                    No hay viajes planificados{' '}
+                    {agendaScope === 'day' ? 'para hoy' : 'para esta semana'} todavía.
                   </Text>
                 ) : (
                   <View style={styles.donutRow}>
@@ -988,7 +1103,10 @@ export function DashboardScreen() {
                           <View
                             style={[
                               styles.legendDot,
-                              { backgroundColor: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length] },
+                              {
+                                backgroundColor:
+                                  SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                              },
                             ]}
                           />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
@@ -1052,7 +1170,9 @@ export function DashboardScreen() {
           agendaUnplannedArrivals.length === 0 ? null : (
             <View>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                {agendaScope === 'day' ? 'Viajes no planificados de hoy' : 'Viajes no planificados de la semana'}
+                {agendaScope === 'day'
+                  ? 'Viajes no planificados de hoy'
+                  : 'Viajes no planificados de la semana'}
               </Text>
               {agendaUnplannedArrivals.map((arrival) => (
                 <Card key={arrival.id} style={styles.itemCard}>
@@ -1084,13 +1204,20 @@ export function DashboardScreen() {
         onConfirm={({ startDate, endDate }) => {
           setRangePickerVisible(false);
           if (startDate && endDate) {
-            setCustomRange({ start: startOfDay(startDate.getTime()), end: startOfDay(endDate.getTime()) });
+            setCustomRange({
+              start: startOfDay(startDate.getTime()),
+              end: startOfDay(endDate.getTime()),
+            });
           }
         }}
       />
 
       <Portal>
-        <Dialog visible={detail !== null} onDismiss={() => setDetail(null)} style={styles.detailDialog}>
+        <Dialog
+          visible={detail !== null}
+          onDismiss={() => setDetail(null)}
+          style={styles.detailDialog}
+        >
           <Dialog.Title>{detail?.title}</Dialog.Title>
           <Dialog.ScrollArea style={styles.detailScrollArea}>
             <ScrollView contentContainerStyle={styles.detailScrollContent}>
@@ -1102,14 +1229,17 @@ export function DashboardScreen() {
                 ))}
               {detail?.kind === 'unplanned' &&
                 (detail.arrivals.length === 0 ? (
-                  <Text style={styles.itemDescription}>No hay cargas fuera de plan en este grupo.</Text>
+                  <Text style={styles.itemDescription}>
+                    No hay cargas fuera de plan en este grupo.
+                  </Text>
                 ) : (
                   detail.arrivals.map((arrival) => (
                     <Card key={arrival.id} style={styles.itemCard}>
                       <Card.Content>
                         <Text variant="bodyMedium">{siteName(arrival.siteId)}</Text>
                         <Text variant="bodySmall" style={styles.itemDescription}>
-                          Llegó {format(new Date(arrival.arrivedAt), 'EEE dd-MM HH:mm', { locale: es })}
+                          Llegó{' '}
+                          {format(new Date(arrival.arrivedAt), 'EEE dd-MM HH:mm', { locale: es })}
                         </Text>
                       </Card.Content>
                     </Card>
@@ -1145,6 +1275,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  scopeToggle: {
+    marginBottom: 12,
   },
   dateHeader: {
     marginBottom: 0,
