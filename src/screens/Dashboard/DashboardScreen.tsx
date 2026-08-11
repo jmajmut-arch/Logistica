@@ -337,17 +337,6 @@ export function DashboardScreen() {
     [weekItems, arrivalsByPlanItem, now],
   );
 
-  // El % de cumplimiento usa el estado "de pantalla" (con la distinción overdue) y suma
-  // las cargas fuera de plan como incumplimiento adicional: un pendiente cuya hora ya
-  // pasó, o una carga que llegó sin estar planificada, cuentan igual en contra del %.
-  const dailyCompliance = useMemo(
-    () => combinedCompliance(todayDisplayStatuses, todayUnplannedArrivals.length),
-    [todayDisplayStatuses, todayUnplannedArrivals],
-  );
-  const weeklyCompliance = useMemo(
-    () => combinedCompliance(weekDisplayStatuses, weekUnplannedArrivals.length),
-    [weekDisplayStatuses, weekUnplannedArrivals],
-  );
   // Desglose del cumplimiento en sus dos causas: si el camión llegó (sin importar la hora)
   // y, entre los que llegaron, si respetaron el horario planificado. Se calcula igual para
   // hoy y para la semana, para que ambas secciones del Dashboard tengan la misma estructura.
@@ -620,30 +609,11 @@ export function DashboardScreen() {
                 <Card.Content>
                   <Text
                     variant="displaySmall"
-                    style={{ color: getComplianceColor(dailyCompliance) }}
-                  >
-                    {dailyCompliance === null ? '—' : `${dailyCompliance}%`}
-                  </Text>
-                  <Text variant="labelMedium">Cumplimiento hoy</Text>
-                  <ProgressBar
-                    style={styles.progressBar}
-                    progress={(dailyCompliance ?? 0) / 100}
-                    color={getComplianceColor(dailyCompliance)}
-                  />
-                </Card.Content>
-              </Card>
-              <Card
-                style={styles.complianceTile}
-                onPress={() => openDetail(`Agenda de hoy (${todayItems.length})`, todayItems)}
-              >
-                <Card.Content>
-                  <Text
-                    variant="displaySmall"
                     style={{ color: getComplianceColor(dailyArrivalCompliance) }}
                   >
                     {dailyArrivalCompliance === null ? '—' : `${dailyArrivalCompliance}%`}
                   </Text>
-                  <Text variant="labelMedium">Camión llegado según plan</Text>
+                  <Text variant="labelMedium">Cumplimiento hoy (camiones recepcionados según plan)</Text>
                   <ProgressBar
                     style={styles.progressBar}
                     progress={(dailyArrivalCompliance ?? 0) / 100}
@@ -808,32 +778,11 @@ export function DashboardScreen() {
                 <Card.Content>
                   <Text
                     variant="displaySmall"
-                    style={{ color: getComplianceColor(weeklyCompliance) }}
-                  >
-                    {weeklyCompliance === null ? '—' : `${weeklyCompliance}%`}
-                  </Text>
-                  <Text variant="labelMedium">Cumplimiento semana</Text>
-                  <ProgressBar
-                    style={styles.progressBar}
-                    progress={(weeklyCompliance ?? 0) / 100}
-                    color={getComplianceColor(weeklyCompliance)}
-                  />
-                </Card.Content>
-              </Card>
-              <Card
-                style={styles.complianceTile}
-                onPress={() =>
-                  openDetail(`Agenda de la semana ${weekNumber} (${weekItems.length})`, weekItems)
-                }
-              >
-                <Card.Content>
-                  <Text
-                    variant="displaySmall"
                     style={{ color: getComplianceColor(weeklyArrivalCompliance) }}
                   >
                     {weeklyArrivalCompliance === null ? '—' : `${weeklyArrivalCompliance}%`}
                   </Text>
-                  <Text variant="labelMedium">Camión llegado según plan</Text>
+                  <Text variant="labelMedium">Cumplimiento semana (camiones recepcionados según plan)</Text>
                   <ProgressBar
                     style={styles.progressBar}
                     progress={(weeklyArrivalCompliance ?? 0) / 100}
