@@ -21,7 +21,7 @@ function formTitle(route: RouteProp<TransportPlanStackParamList, 'TransportPlanF
 }
 
 export function TransportPlanStack({ scope }: { scope: OperatorScope }) {
-  const listTitle = scope === 'home_delivery' ? 'Plan home delivery' : 'Plan semanal';
+  const listTitle = scope === 'home_delivery' ? 'Plan home delivery' : 'Plan semanal de transporte';
 
   return (
     <PlanScopeProvider value={scope}>

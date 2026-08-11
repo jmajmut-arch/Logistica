@@ -286,7 +286,7 @@ export function LoginScreen() {
         </View>
 
         <View style={styles.footerGroup}>
-          <Text style={styles.footer}>Plan semanal · Registro de llegadas · Cumplimiento</Text>
+          <Text style={styles.footer}>Plan semanal de transporte · Registro de llegadas · Cumplimiento</Text>
           <Text style={styles.credit}>Desarrollado por Joel Majmut</Text>
         </View>
       </View>

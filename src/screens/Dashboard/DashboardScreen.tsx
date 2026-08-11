@@ -548,7 +548,8 @@ export function DashboardScreen() {
         ListHeaderComponent={
           <View>
             <Text variant="headlineSmall" style={styles.dashboardTitle}>
-              Dashboard · {effectiveScope === 'home_delivery' ? 'Home delivery' : 'Plan semanal'}
+              Dashboard ·{' '}
+              {effectiveScope === 'home_delivery' ? 'Home delivery' : 'Plan semanal de transporte'}
             </Text>
             {!isOperatorScoped && (
               <SegmentedButtons
@@ -556,7 +557,7 @@ export function DashboardScreen() {
                 value={dashboardScope}
                 onValueChange={(value) => setDashboardScope(value as OperatorScope)}
                 buttons={[
-                  { value: 'plan_transporte', label: 'Plan semanal', icon: 'warehouse' },
+                  { value: 'plan_transporte', label: 'Plan semanal de transporte', icon: 'warehouse' },
                   {
                     value: 'home_delivery',
                     label: OPERATOR_SCOPE_LABELS.home_delivery,

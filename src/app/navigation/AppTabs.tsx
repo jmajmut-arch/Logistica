@@ -60,7 +60,7 @@ export function AppTabs() {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
       {role === 'admin' && (
-        <Tab.Screen name="TransportPlan" options={{ title: 'Plan semanal', headerShown: false }}>
+        <Tab.Screen name="TransportPlan" options={{ title: 'Plan semanal de transporte', headerShown: false }}>
           {() => <TransportPlanStack scope="plan_transporte" />}
         </Tab.Screen>
       )}
