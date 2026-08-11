@@ -68,16 +68,18 @@ export const EXTENDED_STATUS_COLORS: Record<ExtendedDisplayStatus, string> = {
   out_of_plan: '#a78bfa',
 };
 
-// En plan semanal (transporte) casi no llegan camiones fuera de plan — lo que sí pasa es
-// que un viaje planificado se cancela, así que ahí "No planificado" se muestra como "Viaje
-// cancelado". Home delivery mantiene el texto original.
-export function getUnplannedLabel(scope: OperatorScope | null): string {
-  return scope === 'plan_transporte' ? 'Viaje cancelado' : EXTENDED_STATUS_LABELS.out_of_plan;
+// Antes, en plan de transporte esto se mostraba como "Viaje cancelado" (no había una
+// acción real de cancelar un viaje planificado). Ahora que sí existe — ver
+// transportPlanRepository.markCancelledByOperator y el estado 'cancelled' — hay que
+// dejar ese texto exclusivo para esa acción, así que aquí queda un solo texto para ambos
+// scopes, sin importar el parámetro (se mantiene por si a futuro vuelve a distinguirse).
+export function getUnplannedLabel(_scope: OperatorScope | null): string {
+  return EXTENDED_STATUS_LABELS.out_of_plan;
 }
 
 /** Forma adjetiva/plural de getUnplannedLabel, para frases como "3 no planificados". */
-export function getUnplannedCountLabel(scope: OperatorScope | null): string {
-  return scope === 'plan_transporte' ? 'cancelados' : 'no planificados';
+export function getUnplannedCountLabel(_scope: OperatorScope | null): string {
+  return 'no planificados';
 }
 
 export function getExtendedStatusLabel(
