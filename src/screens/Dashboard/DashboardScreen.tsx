@@ -53,6 +53,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const STATUS_ORDER: DisplayStatus[] = ['overdue', 'late', 'pending', 'early', 'on_time'];
 const EXTENDED_STATUS_ORDER: ExtendedDisplayStatus[] = [...STATUS_ORDER, 'out_of_plan'];
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+// Paleta rotativa para el donut de destinos (sitios): a diferencia de los estados del
+// plan, la cantidad de sitios es variable, así que no hay un color fijo por sitio.
+const SITE_CHART_COLORS = ['#38bdf8', '#fb923c', '#34d399', '#f472b6', '#a78bfa', '#facc15', '#22d3ee', '#fb7185'];
 
 type DetailState =
   | { kind: 'items'; title: string; items: TransportPlanItem[] }
@@ -350,6 +353,18 @@ export function DashboardScreen() {
   }, [agendaItems, statusFilter, arrivalsByPlanItem, now]);
 
   const agendaUnplannedArrivals = agendaScope === 'day' ? todayUnplannedArrivals : weekUnplannedArrivals;
+
+  // Destinos (sitios) de las cargas del período elegido en el toggle Hoy/Semana de la
+  // agenda, para ver de un vistazo hacia dónde se concentra el tráfico planificado.
+  const agendaItemsBySite = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of agendaItems) {
+      counts.set(item.siteId, (counts.get(item.siteId) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([siteId, count]) => ({ siteId, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [agendaItems]);
 
   function renderPlanItemCard(item: TransportPlanItem, wideTime: boolean) {
     const arrival = arrivalsByPlanItem.get(item.id);
@@ -789,6 +804,60 @@ export function DashboardScreen() {
                     </Text>
                   </Pressable>
                 ))}
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Destinos de las cargas · {agendaScope === 'day' ? 'hoy' : `semana ${weekNumber}`}
+                </Text>
+                {agendaItemsBySite.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes planificados {agendaScope === 'day' ? 'para hoy' : 'para esta semana'} todavía.
+                  </Text>
+                ) : (
+                  <View style={styles.donutRow}>
+                    <DonutChart
+                      segments={agendaItemsBySite.map((entry, index) => ({
+                        key: String(entry.siteId),
+                        value: entry.count,
+                        color: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length],
+                      }))}
+                      centerValue={String(agendaItems.length)}
+                      centerLabel={agendaItems.length === 1 ? 'viaje' : 'viajes'}
+                    />
+                    <View style={styles.legend}>
+                      {agendaItemsBySite.map((entry, index) => (
+                        <Pressable
+                          key={entry.siteId}
+                          style={styles.legendRow}
+                          onPress={() =>
+                            openDetail(
+                              `${siteName(entry.siteId)} · ${
+                                agendaScope === 'day' ? 'hoy' : `semana ${weekNumber}`
+                              } (${entry.count})`,
+                              agendaItems.filter((item) => item.siteId === entry.siteId),
+                            )
+                          }
+                        >
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: SITE_CHART_COLORS[index % SITE_CHART_COLORS.length] },
+                            ]}
+                          />
+                          <Text variant="bodyMedium" style={styles.legendLabel}>
+                            {siteName(entry.siteId)}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.legendCount}>
+                            {entry.count}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </Card.Content>
             </Card>
 
