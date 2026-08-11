@@ -3,7 +3,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, HelperText, Menu, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
+import { Button, Chip, HelperText, Menu, SegmentedButtons, Switch, Text, TextInput } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -101,7 +101,7 @@ export function TransportPlanFormScreen() {
   const [date, setDate] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [hasNoSchedule, setHasNoSchedule] = useState(false);
-  const [blockMinutes, setBlockMinutes] = useState<number | null>(null);
+  const [selectedBlocks, setSelectedBlocks] = useState<Set<number>>(new Set());
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
   const [carrierId, setCarrierId] = useState(0);
   const [carrierMenuVisible, setCarrierMenuVisible] = useState(false);
@@ -132,7 +132,7 @@ export function TransportPlanFormScreen() {
           `${scheduled.getFullYear()}-${pad(scheduled.getMonth() + 1)}-${pad(scheduled.getDate())}`,
         );
         setHasNoSchedule(item.hasNoSchedule);
-        setBlockMinutes(blockMinutesOf(item.scheduledAt));
+        setSelectedBlocks(new Set([blockMinutesOf(item.scheduledAt)]));
         setCarrierId(item.carrierId ?? 0);
         setRequiresHeavyCrane(item.requiresHeavyCrane);
         setReference(item.reference ?? '');
@@ -147,10 +147,19 @@ export function TransportPlanFormScreen() {
   // Solo tiene sentido "sin horario" para una fecha puntual: una regla permanente
   // necesita una hora fija para poder repetirse cada semana a esa misma hora.
   const isOneOff = !(isRecurring && canBeRecurring);
+  // Solo al crear (no al editar una ocurrencia puntual) se permite elegir varios horarios
+  // a la vez — por ejemplo, home delivery con 5+ horarios de retiro el mismo día.
+  const isCreatingNew = planItemId === undefined;
+
+  const sortedSelectedBlocks = useMemo(
+    () => Array.from(selectedBlocks).sort((a, b) => a - b),
+    [selectedBlocks],
+  );
+  const previewBlockMinutes = sortedSelectedBlocks[0] ?? null;
 
   const scheduledAt = useMemo(
-    () => parseScheduledAt(date.trim(), blockMinutes, isOneOff && hasNoSchedule),
-    [date, blockMinutes, isOneOff, hasNoSchedule],
+    () => parseScheduledAt(date.trim(), previewBlockMinutes, isOneOff && hasNoSchedule),
+    [date, previewBlockMinutes, isOneOff, hasNoSchedule],
   );
   const weekNumber = scheduledAt !== null ? getWeekNumber(scheduledAt) : null;
 
@@ -165,7 +174,7 @@ export function TransportPlanFormScreen() {
     setSiteError(false);
 
     if (isRecurring && canBeRecurring) {
-      if (dayOfWeek === null || blockMinutes === null) {
+      if (dayOfWeek === null || sortedSelectedBlocks.length === 0) {
         setDateError(true);
         return;
       }
@@ -173,18 +182,22 @@ export function TransportPlanFormScreen() {
 
       setSubmitting(true);
       try {
-        await recurringPlanRuleRepository.create({
-          operationType,
-          siteId,
-          carrierId: carrierId || null,
-          dayOfWeek,
-          blockMinutes,
-          requiresHeavyCrane,
-          reference: reference.trim() || null,
-          notes: notes.trim() || null,
-          active: true,
-          createdBy: currentUser.id,
-        });
+        // Un horario de retiro por regla: varios horarios seleccionados crean varias
+        // reglas permanentes independientes para el mismo día (ej. 5+ horarios de retiro).
+        for (const block of sortedSelectedBlocks) {
+          await recurringPlanRuleRepository.create({
+            operationType,
+            siteId,
+            carrierId: carrierId || null,
+            dayOfWeek,
+            blockMinutes: block,
+            requiresHeavyCrane,
+            reference: reference.trim() || null,
+            notes: notes.trim() || null,
+            active: true,
+            createdBy: currentUser.id,
+          });
+        }
         await ensureRecurringPlanOccurrences();
         navigation.goBack();
       } finally {
@@ -193,7 +206,55 @@ export function TransportPlanFormScreen() {
       return;
     }
 
-    if (scheduledAt === null) {
+    if (isOneOff && hasNoSchedule) {
+      if (scheduledAt === null) {
+        setDateError(true);
+        return;
+      }
+      setDateError(false);
+
+      setSubmitting(true);
+      try {
+        if (planItemId !== undefined) {
+          await transportPlanRepository.update(planItemId, {
+            operationType,
+            siteId,
+            scheduledAt,
+            hasNoSchedule: true,
+            carrierId: carrierId || null,
+            requiresHeavyCrane,
+            reference: reference.trim() || null,
+            notes: notes.trim() || null,
+            recurrenceRuleId: originalRecurrenceRuleId,
+            cancelled: false,
+            createdBy: originalCreatedBy ?? currentUser.id,
+          });
+        } else {
+          await transportPlanRepository.create({
+            operationType,
+            siteId,
+            scheduledAt,
+            hasNoSchedule: true,
+            carrierId: carrierId || null,
+            requiresHeavyCrane,
+            reference: reference.trim() || null,
+            notes: notes.trim() || null,
+            recurrenceRuleId: null,
+            cancelled: false,
+            createdBy: currentUser.id,
+          });
+        }
+        navigation.goBack();
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Editar una ocurrencia puntual sigue siendo un solo horario; al crear, se puede elegir
+    // más de uno para dejar varios items del plan del mismo día en un solo envío.
+    const blocksToSubmit = isCreatingNew ? sortedSelectedBlocks : sortedSelectedBlocks.slice(0, 1);
+    if (!DATE_PATTERN.test(date.trim()) || blocksToSubmit.length === 0) {
       setDateError(true);
       return;
     }
@@ -201,34 +262,40 @@ export function TransportPlanFormScreen() {
 
     setSubmitting(true);
     try {
-      if (planItemId !== undefined) {
-        await transportPlanRepository.update(planItemId, {
-          operationType,
-          siteId,
-          scheduledAt,
-          hasNoSchedule,
-          carrierId: carrierId || null,
-          requiresHeavyCrane,
-          reference: reference.trim() || null,
-          notes: notes.trim() || null,
-          recurrenceRuleId: originalRecurrenceRuleId,
-          cancelled: false,
-          createdBy: originalCreatedBy ?? currentUser.id,
-        });
-      } else {
-        await transportPlanRepository.create({
-          operationType,
-          siteId,
-          scheduledAt,
-          hasNoSchedule,
-          carrierId: carrierId || null,
-          requiresHeavyCrane,
-          reference: reference.trim() || null,
-          notes: notes.trim() || null,
-          recurrenceRuleId: null,
-          cancelled: false,
-          createdBy: currentUser.id,
-        });
+      for (const block of blocksToSubmit) {
+        const scheduledAtForBlock = parseScheduledAt(date.trim(), block, false);
+        if (scheduledAtForBlock === null) {
+          continue;
+        }
+        if (planItemId !== undefined) {
+          await transportPlanRepository.update(planItemId, {
+            operationType,
+            siteId,
+            scheduledAt: scheduledAtForBlock,
+            hasNoSchedule: false,
+            carrierId: carrierId || null,
+            requiresHeavyCrane,
+            reference: reference.trim() || null,
+            notes: notes.trim() || null,
+            recurrenceRuleId: originalRecurrenceRuleId,
+            cancelled: false,
+            createdBy: originalCreatedBy ?? currentUser.id,
+          });
+        } else {
+          await transportPlanRepository.create({
+            operationType,
+            siteId,
+            scheduledAt: scheduledAtForBlock,
+            hasNoSchedule: false,
+            carrierId: carrierId || null,
+            requiresHeavyCrane,
+            reference: reference.trim() || null,
+            notes: notes.trim() || null,
+            recurrenceRuleId: null,
+            cancelled: false,
+            createdBy: currentUser.id,
+          });
+        }
       }
       navigation.goBack();
     } finally {
@@ -247,7 +314,7 @@ export function TransportPlanFormScreen() {
   const selectedSite = sites.find((site) => site.id === siteId);
   const selectedCarrier = carriers.find((carrier) => carrier.id === carrierId);
   const selectedDate = dateStringToDate(date);
-  const selectedBlock = TIME_BLOCKS.find((block) => block.minutes === blockMinutes);
+  const selectedBlock = TIME_BLOCKS.find((block) => block.minutes === sortedSelectedBlocks[0]);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -376,8 +443,14 @@ export function TransportPlanFormScreen() {
             anchor={
               <Pressable onPress={() => setBlockMenuVisible(true)}>
                 <TextInput
-                  label="Hora"
-                  value={selectedBlock?.label ?? ''}
+                  label={isCreatingNew ? 'Horarios' : 'Hora'}
+                  value={
+                    isCreatingNew
+                      ? sortedSelectedBlocks.length <= 1
+                        ? (selectedBlock?.label ?? '')
+                        : `${sortedSelectedBlocks.length} horarios seleccionados`
+                      : (selectedBlock?.label ?? '')
+                  }
                   editable={false}
                   mode="outlined"
                   right={<TextInput.Icon icon="menu-down" />}
@@ -391,14 +464,51 @@ export function TransportPlanFormScreen() {
                 <Menu.Item
                   key={block.minutes}
                   title={block.label}
+                  leadingIcon={isCreatingNew && selectedBlocks.has(block.minutes) ? 'check' : undefined}
                   onPress={() => {
-                    setBlockMinutes(block.minutes);
-                    setBlockMenuVisible(false);
+                    if (isCreatingNew) {
+                      setSelectedBlocks((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(block.minutes)) {
+                          next.delete(block.minutes);
+                        } else {
+                          next.add(block.minutes);
+                        }
+                        return next;
+                      });
+                    } else {
+                      setSelectedBlocks(new Set([block.minutes]));
+                      setBlockMenuVisible(false);
+                    }
                   }}
                 />
               ))}
             </ScrollView>
           </Menu>
+          {isCreatingNew && sortedSelectedBlocks.length > 0 && (
+            <View style={styles.blockChipsRow}>
+              {sortedSelectedBlocks.map((block) => (
+                <Chip
+                  key={block}
+                  onClose={() =>
+                    setSelectedBlocks((prev) => {
+                      const next = new Set(prev);
+                      next.delete(block);
+                      return next;
+                    })
+                  }
+                  style={styles.blockChip}
+                >
+                  {TIME_BLOCKS.find((candidate) => candidate.minutes === block)?.label}
+                </Chip>
+              ))}
+            </View>
+          )}
+          {isCreatingNew && (
+            <HelperText type="info">
+              Puedes elegir más de un horario para dejar varios items del plan de una vez
+            </HelperText>
+          )}
         </View>
       )}
       {dateError ? (
@@ -506,6 +616,15 @@ const styles = StyleSheet.create({
   },
   timeMenuScroll: {
     maxHeight: 320,
+  },
+  blockChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  blockChip: {
+    marginBottom: 4,
   },
   recurringRow: {
     flexDirection: 'row',
