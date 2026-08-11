@@ -144,7 +144,7 @@ export function LoadArrivalListScreen() {
     };
   }, [todayItemsForSite, arrivalsByPlanItem]);
 
-  const pendingItemsForSite = useMemo(() => {
+  const unregisteredTodayForSite = useMemo(() => {
     if (currentSiteId === null) {
       return [];
     }
@@ -159,6 +159,21 @@ export function LoadArrivalListScreen() {
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
   }, [planItems, currentSiteId, dayStart, dayEnd, registeredPlanItemIds, currentOperatorScope]);
+
+  // Separados de los pendientes accionables: si se mezclan en la misma lista, el título
+  // "Pendientes de hoy" deja de calzar con el conteo real de pendientes del resumen (un
+  // cancelado ya no es "pendiente", solo queda como registro).
+  const pendingItemsForSite = useMemo(
+    () => unregisteredTodayForSite.filter((item) => !item.cancelledByOperator),
+    [unregisteredTodayForSite],
+  );
+  const cancelledTodayForSite = useMemo(
+    () =>
+      unregisteredTodayForSite
+        .filter((item) => item.cancelledByOperator)
+        .sort((a, b) => (b.cancelledAt ?? 0) - (a.cancelledAt ?? 0)),
+    [unregisteredTodayForSite],
+  );
 
   // Igual que "Pendientes de hoy": el operador solo debe ver lo ya registrado de su propio
   // patio/bodega y del día de hoy, no el historial completo de todos los sitios.
@@ -287,40 +302,13 @@ export function LoadArrivalListScreen() {
                   No tienes un sitio asignado. Elígelo desde el ícono de ubicación arriba.
                 </Text>
               ) : pendingItemsForSite.length === 0 ? (
-                <Text style={styles.emptyPending}>Ya registraste todo lo planificado para hoy.</Text>
+                <Text style={styles.emptyPending}>
+                  {unregisteredTodayForSite.length === 0
+                    ? 'Ya registraste todo lo planificado para hoy.'
+                    : 'Ya no queda nada pendiente por registrar hoy.'}
+                </Text>
               ) : (
                 pendingItemsForSite.map((item) => {
-                  if (item.cancelledByOperator) {
-                    const cancelledByName =
-                      item.cancelledBy !== null ? usersById.get(item.cancelledBy)?.name : undefined;
-                    return (
-                      <Card key={item.id} style={[styles.pendingCard, styles.cancelledCard]}>
-                        <Card.Content style={styles.pendingContent}>
-                          <View style={styles.pendingTime}>
-                            <Text variant={item.hasNoSchedule ? 'bodySmall' : 'titleMedium'} style={styles.cancelledLabel}>
-                              {item.hasNoSchedule
-                                ? 'Sin horario'
-                                : format(new Date(item.scheduledAt), 'HH:mm')}
-                            </Text>
-                          </View>
-                          <View style={styles.pendingText}>
-                            <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
-                            <Text variant="bodySmall" style={styles.cancelledLabel}>
-                              Cancelado por {cancelledByName ?? 'operador'}
-                              {item.cancelledAt
-                                ? ` · ${format(new Date(item.cancelledAt), 'dd-MM HH:mm')}`
-                                : ''}
-                            </Text>
-                          </View>
-                          <MaterialCommunityIcons
-                            name="close-circle-outline"
-                            size={22}
-                            color={DISPLAY_STATUS_COLORS.cancelled}
-                          />
-                        </Card.Content>
-                      </Card>
-                    );
-                  }
                   const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
                   return (
                     <Card
@@ -364,6 +352,48 @@ export function LoadArrivalListScreen() {
                     </View>
                   </Card.Content>
                 </Card>
+              )}
+
+              {cancelledTodayForSite.length > 0 && (
+                <>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>
+                    Cancelados hoy
+                  </Text>
+                  {cancelledTodayForSite.map((item) => {
+                    const cancelledByName =
+                      item.cancelledBy !== null ? usersById.get(item.cancelledBy)?.name : undefined;
+                    return (
+                      <Card key={item.id} style={[styles.pendingCard, styles.cancelledCard]}>
+                        <Card.Content style={styles.pendingContent}>
+                          <View style={styles.pendingTime}>
+                            <Text
+                              variant={item.hasNoSchedule ? 'bodySmall' : 'titleMedium'}
+                              style={styles.cancelledLabel}
+                            >
+                              {item.hasNoSchedule
+                                ? 'Sin horario'
+                                : format(new Date(item.scheduledAt), 'HH:mm')}
+                            </Text>
+                          </View>
+                          <View style={styles.pendingText}>
+                            <Text variant="bodyMedium">{OPERATION_TYPE_LABELS[item.operationType]}</Text>
+                            <Text variant="bodySmall" style={styles.cancelledLabel}>
+                              Cancelado por {cancelledByName ?? 'operador'}
+                              {item.cancelledAt
+                                ? ` · ${format(new Date(item.cancelledAt), 'dd-MM HH:mm')}`
+                                : ''}
+                            </Text>
+                          </View>
+                          <MaterialCommunityIcons
+                            name="close-circle-outline"
+                            size={22}
+                            color={DISPLAY_STATUS_COLORS.cancelled}
+                          />
+                        </Card.Content>
+                      </Card>
+                    );
+                  })}
+                </>
               )}
 
               <Text variant="titleMedium" style={styles.sectionTitle}>

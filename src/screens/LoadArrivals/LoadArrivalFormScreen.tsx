@@ -133,7 +133,7 @@ export function LoadArrivalFormScreen() {
     [arrivals, arrivalId],
   );
 
-  const pendingItemsForSite = useMemo(() => {
+  const todayItemsForSite = useMemo(() => {
     if (!planItems || siteId === 0) {
       return [];
     }
@@ -151,7 +151,7 @@ export function LoadArrivalFormScreen() {
 
   // Viajes planificados para días anteriores que nunca se registraron: se muestran aparte
   // para que el operador también pueda ponerse al día, aunque la hora o el día ya pasó.
-  const overduePendingItemsForSite = useMemo(() => {
+  const overdueItemsForSite = useMemo(() => {
     if (!planItems || siteId === 0) {
       return [];
     }
@@ -165,6 +165,25 @@ export function LoadArrivalFormScreen() {
       )
       .sort((a, b) => a.scheduledAt - b.scheduledAt);
   }, [planItems, siteId, dayStart, registeredPlanItemIds, currentOperatorScope]);
+
+  // Separados de los pendientes accionables: si se mezclan en la misma lista, el texto de
+  // "Pendientes de hoy" deja de calzar con el conteo real de pendientes (el cancelado ya no
+  // es "pendiente", solo queda como registro).
+  const pendingItemsForSite = useMemo(
+    () => todayItemsForSite.filter((item) => !item.cancelledByOperator),
+    [todayItemsForSite],
+  );
+  const overduePendingItemsForSite = useMemo(
+    () => overdueItemsForSite.filter((item) => !item.cancelledByOperator),
+    [overdueItemsForSite],
+  );
+  const cancelledItemsForSite = useMemo(
+    () =>
+      [...overdueItemsForSite, ...todayItemsForSite]
+        .filter((item) => item.cancelledByOperator)
+        .sort((a, b) => (b.cancelledAt ?? 0) - (a.cancelledAt ?? 0)),
+    [overdueItemsForSite, todayItemsForSite],
+  );
 
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
@@ -200,7 +219,7 @@ export function LoadArrivalFormScreen() {
     Promise.resolve().then(() => {
       if (requestedPlanItemId !== undefined) {
         const item = pendingItemsForSite.find((candidate) => candidate.id === requestedPlanItemId);
-        if (!item || item.cancelledByOperator) {
+        if (!item) {
           return;
         }
         setActive(item);
@@ -340,9 +359,6 @@ export function LoadArrivalFormScreen() {
                 Pendientes atrasados
               </Text>
               {overduePendingItemsForSite.map((item) => {
-                if (item.cancelledByOperator) {
-                  return <CancelledPlanItemCard key={item.id} item={item} usersById={usersById} />;
-                }
                 const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
                 return (
                   <Card
@@ -386,13 +402,12 @@ export function LoadArrivalFormScreen() {
           </Text>
           {pendingItemsForSite.length === 0 && (
             <Text style={styles.emptyPlan}>
-              Hoy no hay carga planificada para {selectedSite?.name ?? 'este sitio'}.
+              {todayItemsForSite.length === 0
+                ? `Hoy no hay carga planificada para ${selectedSite?.name ?? 'este sitio'}.`
+                : 'Ya no queda nada pendiente por registrar hoy.'}
             </Text>
           )}
           {pendingItemsForSite.map((item) => {
-            if (item.cancelledByOperator) {
-              return <CancelledPlanItemCard key={item.id} item={item} usersById={usersById} />;
-            }
             const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
             return (
               <Card key={item.id} style={styles.planItemCard} onPress={() => openPlanItem(item)}>
@@ -421,6 +436,18 @@ export function LoadArrivalFormScreen() {
               </Card>
             );
           })}
+
+          {cancelledItemsForSite.length > 0 && (
+            <>
+              <Divider style={styles.divider} />
+              <Text variant="bodyMedium" style={[styles.label, styles.cancelledLabel]}>
+                Cancelados
+              </Text>
+              {cancelledItemsForSite.map((item) => (
+                <CancelledPlanItemCard key={item.id} item={item} usersById={usersById} />
+              ))}
+            </>
+          )}
 
           <Divider style={styles.divider} />
           <List.Item
