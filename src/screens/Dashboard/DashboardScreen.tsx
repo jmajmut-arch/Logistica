@@ -44,6 +44,9 @@ import {
   EXTENDED_STATUS_COLORS,
   EXTENDED_STATUS_LABELS,
   getComplianceColor,
+  getExtendedStatusLabel,
+  getUnplannedCountLabel,
+  getUnplannedLabel,
   OPERATION_TYPE_LABELS,
   type ExtendedDisplayStatus,
 } from '@/utils/transportPlanDisplay';
@@ -574,7 +577,7 @@ export function DashboardScreen() {
               {todayItems.length > 0 &&
                 ` · ${registeredTodayCount} de ${todayItems.length} registrados hoy`}
               {todayUnplannedArrivals.length > 0 &&
-                ` · ${todayUnplannedArrivals.length} no planificados`}
+                ` · ${todayUnplannedArrivals.length} ${getUnplannedCountLabel(effectiveScope)}`}
             </Text>
 
             <View style={styles.grid}>
@@ -757,7 +760,7 @@ export function DashboardScreen() {
                               openDetail(
                                 `${day.label} — ${day.items.length} planificados${
                                   day.unplannedCount > 0
-                                    ? ` (+${day.unplannedCount} no planificados)`
+                                    ? ` (+${day.unplannedCount} ${getUnplannedCountLabel(effectiveScope)})`
                                     : ''
                                 }`,
                                 day.items,
@@ -809,7 +812,7 @@ export function DashboardScreen() {
                             onPress={() => {
                               if (status === 'out_of_plan') {
                                 openUnplannedDetail(
-                                  'No planificado · rango',
+                                  `${getUnplannedLabel(effectiveScope)} · rango`,
                                   customRangeUnplannedArrivals,
                                 );
                                 return;
@@ -831,7 +834,7 @@ export function DashboardScreen() {
                               ]}
                             />
                             <Text variant="bodyMedium" style={styles.legendLabel}>
-                              {EXTENDED_STATUS_LABELS[status]}
+                              {getExtendedStatusLabel(status, effectiveScope)}
                             </Text>
                             <Text variant="bodyMedium" style={styles.legendCount}>
                               {status === 'out_of_plan'
@@ -989,7 +992,10 @@ export function DashboardScreen() {
                           style={styles.legendRow}
                           onPress={() => {
                             if (status === 'out_of_plan') {
-                              openUnplannedDetail('No planificado · hoy', todayUnplannedArrivals);
+                              openUnplannedDetail(
+                                `${getUnplannedLabel(effectiveScope)} · hoy`,
+                                todayUnplannedArrivals,
+                              );
                               return;
                             }
                             openDetail(
@@ -1009,7 +1015,7 @@ export function DashboardScreen() {
                             ]}
                           />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {EXTENDED_STATUS_LABELS[status]}
+                            {getExtendedStatusLabel(status, effectiveScope)}
                           </Text>
                           <Text variant="bodyMedium" style={styles.legendCount}>
                             {status === 'out_of_plan'
@@ -1035,7 +1041,9 @@ export function DashboardScreen() {
                     onPress: () =>
                       openDetail(
                         `${capitalize(day.label)} — ${day.items.length} planificados${
-                          day.unplannedCount > 0 ? ` (+${day.unplannedCount} no planificados)` : ''
+                          day.unplannedCount > 0
+                            ? ` (+${day.unplannedCount} ${getUnplannedCountLabel(effectiveScope)})`
+                            : ''
                         }`,
                         day.items,
                       ),
@@ -1076,7 +1084,10 @@ export function DashboardScreen() {
                           style={styles.legendRow}
                           onPress={() => {
                             if (status === 'out_of_plan') {
-                              openUnplannedDetail('No planificado · semana', weekUnplannedArrivals);
+                              openUnplannedDetail(
+                                `${getUnplannedLabel(effectiveScope)} · semana`,
+                                weekUnplannedArrivals,
+                              );
                               return;
                             }
                             openDetail(
@@ -1096,7 +1107,7 @@ export function DashboardScreen() {
                             ]}
                           />
                           <Text variant="bodyMedium" style={styles.legendLabel}>
-                            {EXTENDED_STATUS_LABELS[status]}
+                            {getExtendedStatusLabel(status, effectiveScope)}
                           </Text>
                           <Text variant="bodyMedium" style={styles.legendCount}>
                             {status === 'out_of_plan'
@@ -1253,8 +1264,8 @@ export function DashboardScreen() {
             <View>
               <Text variant="titleMedium" style={styles.sectionTitle}>
                 {agendaScope === 'day'
-                  ? 'Viajes no planificados de hoy'
-                  : 'Viajes no planificados de la semana'}
+                  ? `Viajes ${getUnplannedCountLabel(effectiveScope)} de hoy`
+                  : `Viajes ${getUnplannedCountLabel(effectiveScope)} de la semana`}
               </Text>
               {agendaUnplannedArrivals.map((arrival) => (
                 <Card key={arrival.id} style={styles.itemCard}>

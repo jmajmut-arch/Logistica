@@ -1,5 +1,5 @@
 import type { DisplayStatus, PlanItemStatus } from '@/domain/rules/complianceStatus';
-import type { OperationType } from '@/types/enums';
+import type { OperationType, OperatorScope } from '@/types/enums';
 
 export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
   carga_subida: 'Carga subida',
@@ -62,6 +62,25 @@ export const EXTENDED_STATUS_COLORS: Record<ExtendedDisplayStatus, string> = {
   ...DISPLAY_STATUS_COLORS,
   out_of_plan: '#a78bfa',
 };
+
+// En plan semanal (transporte) casi no llegan camiones fuera de plan — lo que sí pasa es
+// que un viaje planificado se cancela, así que ahí "No planificado" se muestra como "Viaje
+// cancelado". Home delivery mantiene el texto original.
+export function getUnplannedLabel(scope: OperatorScope | null): string {
+  return scope === 'plan_transporte' ? 'Viaje cancelado' : EXTENDED_STATUS_LABELS.out_of_plan;
+}
+
+/** Forma adjetiva/plural de getUnplannedLabel, para frases como "3 no planificados". */
+export function getUnplannedCountLabel(scope: OperatorScope | null): string {
+  return scope === 'plan_transporte' ? 'cancelados' : 'no planificados';
+}
+
+export function getExtendedStatusLabel(
+  status: ExtendedDisplayStatus,
+  scope: OperatorScope | null,
+): string {
+  return status === 'out_of_plan' ? getUnplannedLabel(scope) : EXTENDED_STATUS_LABELS[status];
+}
 
 // Aviso de que el viaje requiere una grúa especial de alto tonelaje: se muestra en el
 // plan, en el registro de llegadas del operador y en el dashboard, para que quien reciba

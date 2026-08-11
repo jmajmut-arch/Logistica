@@ -33,7 +33,7 @@ import { useSessionStore } from '@/store/sessionStore';
 import { PALETTE } from '@/theme';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { startOfToday } from '@/utils/timeBlocks';
-import { OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
+import { getUnplannedLabel, OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
 import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
@@ -214,7 +214,7 @@ export function LoadArrivalListScreen() {
                   <Card.Content style={styles.pendingContent}>
                     <MaterialCommunityIcons name="plus-circle-outline" size={24} color={PALETTE.primary} />
                     <View style={styles.pendingText}>
-                      <Text variant="bodyMedium">Viaje no planificado</Text>
+                      <Text variant="bodyMedium">{getUnplannedLabel(currentOperatorScope)}</Text>
                       <Text variant="bodySmall" style={styles.pendingDetail}>
                         Llegó algo que no estaba en el plan
                       </Text>
@@ -239,7 +239,11 @@ export function LoadArrivalListScreen() {
           const planItem = item.planItemId !== null ? planItemsById.get(item.planItemId) : undefined;
           return (
             <List.Item
-              title={planItem ? OPERATION_TYPE_LABELS[planItem.operationType] : 'Viaje no planificado'}
+              title={
+                planItem
+                  ? OPERATION_TYPE_LABELS[planItem.operationType]
+                  : getUnplannedLabel(currentOperatorScope)
+              }
               description={describe(item, planItem)}
               left={(props) => <List.Icon {...props} icon="package-variant-closed" />}
               onPress={() => navigation.navigate('LoadArrivalForm', { arrivalId: item.id })}

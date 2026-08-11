@@ -38,7 +38,11 @@ import {
   startOfToday,
   TIME_BLOCKS,
 } from '@/utils/timeBlocks';
-import { DISPLAY_STATUS_COLORS, OPERATION_TYPE_LABELS } from '@/utils/transportPlanDisplay';
+import {
+  DISPLAY_STATUS_COLORS,
+  getUnplannedLabel,
+  OPERATION_TYPE_LABELS,
+} from '@/utils/transportPlanDisplay';
 
 import type { LoadArrivalsStackParamList } from './LoadArrivalsStack';
 
@@ -377,7 +381,7 @@ export function LoadArrivalFormScreen() {
 
           <Divider style={styles.divider} />
           <List.Item
-            title="Viaje no planificado"
+            title={getUnplannedLabel(currentOperatorScope)}
             description="Llegó algo que no estaba en el plan"
             left={(props) => <List.Icon {...props} icon="plus-circle-outline" />}
             onPress={openUnplanned}
