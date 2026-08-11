@@ -95,6 +95,7 @@ export function DashboardScreen() {
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [customRange, setCustomRange] = useState<{ start: number; end: number } | null>(null);
   const [rangePickerVisible, setRangePickerVisible] = useState(false);
+  const [craneFilter, setCraneFilter] = useState<'all' | 'crane' | 'no_crane'>('all');
 
   const openDetail = useCallback((title: string, items: TransportPlanItem[]) => {
     setDetail({ kind: 'items', title, items });
@@ -232,6 +233,38 @@ export function DashboardScreen() {
     () => combinedCompliance(customRangeDisplayStatuses, customRangeUnplannedArrivals.length),
     [customRangeDisplayStatuses, customRangeUnplannedArrivals],
   );
+
+  // Viajes que todavía están por venir: sin llegada registrada, y no vencidos (un "sin
+  // horario" siempre cuenta como próximo hasta que se registre, igual que en el estado de
+  // cumplimiento). Sirve para que el supervisor prepare con anticipación la grúa de 32 t.
+  const futurePlanItems = useMemo(
+    () =>
+      scopedPlanItems
+        .filter((item) => {
+          if (arrivalsByPlanItem.has(item.id)) {
+            return false;
+          }
+          return item.hasNoSchedule || item.scheduledAt >= now;
+        })
+        .sort((a, b) => a.scheduledAt - b.scheduledAt),
+    [scopedPlanItems, arrivalsByPlanItem, now],
+  );
+
+  const futureCraneItems = useMemo(
+    () => futurePlanItems.filter((item) => item.requiresHeavyCrane),
+    [futurePlanItems],
+  );
+  const futureNoCraneItems = useMemo(
+    () => futurePlanItems.filter((item) => !item.requiresHeavyCrane),
+    [futurePlanItems],
+  );
+
+  const filteredFutureItems =
+    craneFilter === 'crane'
+      ? futureCraneItems
+      : craneFilter === 'no_crane'
+        ? futureNoCraneItems
+        : futurePlanItems;
 
   const todayDisplayStatuses = useMemo(
     () => todayItems.map((item) => getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now)),
@@ -539,6 +572,51 @@ export function DashboardScreen() {
                       </View>
                     </>
                   ))}
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.wideCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.cardTitle}>
+                  Viajes futuros y grúa de 32 t
+                </Text>
+                <SegmentedButtons
+                  style={styles.craneFilterToggle}
+                  value={craneFilter}
+                  onValueChange={(value) => setCraneFilter(value as 'all' | 'crane' | 'no_crane')}
+                  buttons={[
+                    { value: 'all', label: `Todos (${futurePlanItems.length})` },
+                    { value: 'crane', label: `Con grúa (${futureCraneItems.length})`, icon: 'crane' },
+                    { value: 'no_crane', label: `Sin grúa (${futureNoCraneItems.length})` },
+                  ]}
+                />
+                {filteredFutureItems.length === 0 ? (
+                  <Text variant="bodySmall" style={styles.itemDescription}>
+                    No hay viajes futuros
+                    {craneFilter === 'crane'
+                      ? ' que requieran grúa.'
+                      : craneFilter === 'no_crane'
+                        ? ' sin grúa.'
+                        : ' planificados.'}
+                  </Text>
+                ) : (
+                  <Pressable
+                    style={styles.rangeComplianceRow}
+                    onPress={() =>
+                      openDetail(
+                        `Viajes futuros${
+                          craneFilter === 'crane' ? ' · con grúa' : craneFilter === 'no_crane' ? ' · sin grúa' : ''
+                        } (${filteredFutureItems.length})`,
+                        filteredFutureItems,
+                      )
+                    }
+                  >
+                    <Text variant="displaySmall" style={{ color: PALETTE.primary }}>
+                      {filteredFutureItems.length}
+                    </Text>
+                    <Text variant="labelMedium">Toca para ver el detalle</Text>
+                  </Pressable>
+                )}
               </Card.Content>
             </Card>
 
@@ -913,6 +991,9 @@ const styles = StyleSheet.create({
   },
   rangeComplianceRow: {
     marginTop: 8,
+    marginBottom: 4,
+  },
+  craneFilterToggle: {
     marginBottom: 4,
   },
   donutRow: {
