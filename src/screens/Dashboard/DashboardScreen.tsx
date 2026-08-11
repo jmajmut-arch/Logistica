@@ -96,6 +96,32 @@ function combinedCompliance(planStatuses: DisplayStatus[], unplannedCount: numbe
   return Math.round((onTime / total) * 100);
 }
 
+/** % de items planificados a los que efectivamente llegó un camión, sin importar si fue a
+ * tiempo, atrasado o anticipado — mide si el camión llegó según lo planificado. */
+function arrivalCompliance(planStatuses: DisplayStatus[]): number | null {
+  if (planStatuses.length === 0) {
+    return null;
+  }
+  const arrived = planStatuses.filter(
+    (status) => status === 'on_time' || status === 'late' || status === 'early',
+  ).length;
+  return Math.round((arrived / planStatuses.length) * 100);
+}
+
+/** % de los camiones que sí llegaron y lo hicieron dentro del horario planificado — mide
+ * adherencia horaria solo entre los que llegaron (si nunca llegó, ya lo penaliza
+ * arrivalCompliance, no esta métrica). */
+function scheduleAdherence(planStatuses: DisplayStatus[]): number | null {
+  const arrived = planStatuses.filter(
+    (status) => status === 'on_time' || status === 'late' || status === 'early',
+  );
+  if (arrived.length === 0) {
+    return null;
+  }
+  const onTime = arrived.filter((status) => status === 'on_time').length;
+  return Math.round((onTime / arrived.length) * 100);
+}
+
 export function DashboardScreen() {
   const currentUser = useSessionStore((state) => state.currentUser);
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
@@ -315,6 +341,16 @@ export function DashboardScreen() {
   const weeklyCompliance = useMemo(
     () => combinedCompliance(weekDisplayStatuses, weekUnplannedArrivals.length),
     [weekDisplayStatuses, weekUnplannedArrivals],
+  );
+  // Desglose del cumplimiento semanal en sus dos causas: si el camión llegó (sin importar
+  // la hora) y, entre los que llegaron, si respetaron el horario planificado.
+  const weeklyArrivalCompliance = useMemo(
+    () => arrivalCompliance(weekDisplayStatuses),
+    [weekDisplayStatuses],
+  );
+  const weeklyScheduleAdherence = useMemo(
+    () => scheduleAdherence(weekDisplayStatuses),
+    [weekDisplayStatuses],
   );
 
   const weeklyComplianceByDay = useMemo(
@@ -578,6 +614,48 @@ export function DashboardScreen() {
                     style={styles.progressBar}
                     progress={(weeklyCompliance ?? 0) / 100}
                     color={getComplianceColor(weeklyCompliance)}
+                  />
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(`Agenda de la semana ${weekNumber} (${weekItems.length})`, weekItems)
+                }
+              >
+                <Card.Content>
+                  <Text
+                    variant="displaySmall"
+                    style={{ color: getComplianceColor(weeklyArrivalCompliance) }}
+                  >
+                    {weeklyArrivalCompliance === null ? '—' : `${weeklyArrivalCompliance}%`}
+                  </Text>
+                  <Text variant="labelMedium">Camión llegado según plan</Text>
+                  <ProgressBar
+                    style={styles.progressBar}
+                    progress={(weeklyArrivalCompliance ?? 0) / 100}
+                    color={getComplianceColor(weeklyArrivalCompliance)}
+                  />
+                </Card.Content>
+              </Card>
+              <Card
+                style={styles.complianceTile}
+                onPress={() =>
+                  openDetail(`Agenda de la semana ${weekNumber} (${weekItems.length})`, weekItems)
+                }
+              >
+                <Card.Content>
+                  <Text
+                    variant="displaySmall"
+                    style={{ color: getComplianceColor(weeklyScheduleAdherence) }}
+                  >
+                    {weeklyScheduleAdherence === null ? '—' : `${weeklyScheduleAdherence}%`}
+                  </Text>
+                  <Text variant="labelMedium">Adherencia horaria</Text>
+                  <ProgressBar
+                    style={styles.progressBar}
+                    progress={(weeklyScheduleAdherence ?? 0) / 100}
+                    color={getComplianceColor(weeklyScheduleAdherence)}
                   />
                 </Card.Content>
               </Card>
