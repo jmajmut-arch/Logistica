@@ -462,10 +462,21 @@ export function DashboardScreen() {
 
   const pendingTodayCount =
     (todayStatusCounts.get('pending') ?? 0) + (todayStatusCounts.get('overdue') ?? 0);
-  const registeredTodayCount = todayItems.length - pendingTodayCount;
+  // Ejecutados = con llegada real registrada. No es "total - pendientes": un viaje
+  // cancelado por el operador tampoco es pendiente, pero tampoco se ejecutó — si se
+  // restaba solo lo pendiente, un cancelado quedaba contado como ejecutado.
+  const registeredTodayCount =
+    (todayStatusCounts.get('on_time') ?? 0) +
+    (todayStatusCounts.get('late') ?? 0) +
+    (todayStatusCounts.get('early') ?? 0);
+  const cancelledTodayCount = todayStatusCounts.get('cancelled') ?? 0;
   const pendingWeekCount =
     (weekStatusCounts.get('pending') ?? 0) + (weekStatusCounts.get('overdue') ?? 0);
-  const registeredWeekCount = weekItems.length - pendingWeekCount;
+  const registeredWeekCount =
+    (weekStatusCounts.get('on_time') ?? 0) +
+    (weekStatusCounts.get('late') ?? 0) +
+    (weekStatusCounts.get('early') ?? 0);
+  const cancelledWeekCount = weekStatusCounts.get('cancelled') ?? 0;
 
   const complianceByOperationType = useMemo(
     () =>
@@ -691,6 +702,24 @@ export function DashboardScreen() {
                   <Text variant="labelMedium">Viajes pendientes hoy</Text>
                 </Card.Content>
               </Card>
+              {effectiveScope === 'plan_transporte' && (
+                <Card
+                  style={styles.complianceTile}
+                  onPress={() =>
+                    openDetail(
+                      'Viajes cancelados hoy',
+                      todayItems.filter((item) => item.cancelledByOperator),
+                    )
+                  }
+                >
+                  <Card.Content>
+                    <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                      {cancelledTodayCount}
+                    </Text>
+                    <Text variant="labelMedium">Viajes cancelados hoy</Text>
+                  </Card.Content>
+                </Card>
+              )}
             </View>
 
             <Card style={styles.wideCard}>
@@ -865,6 +894,24 @@ export function DashboardScreen() {
                   <Text variant="labelMedium">Viajes pendientes semana</Text>
                 </Card.Content>
               </Card>
+              {effectiveScope === 'plan_transporte' && (
+                <Card
+                  style={styles.complianceTile}
+                  onPress={() =>
+                    openDetail(
+                      'Viajes cancelados esta semana',
+                      weekItems.filter((item) => item.cancelledByOperator),
+                    )
+                  }
+                >
+                  <Card.Content>
+                    <Text variant="displaySmall" style={{ color: DISPLAY_STATUS_COLORS.cancelled }}>
+                      {cancelledWeekCount}
+                    </Text>
+                    <Text variant="labelMedium">Viajes cancelados semana</Text>
+                  </Card.Content>
+                </Card>
+              )}
             </View>
 
             <Card style={styles.wideCard}>
