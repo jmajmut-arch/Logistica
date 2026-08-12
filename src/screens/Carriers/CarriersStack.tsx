@@ -2,7 +2,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 import { CarrierFormScreen } from './CarrierFormScreen';
 import { CarrierListScreen } from './CarrierListScreen';
@@ -19,6 +19,7 @@ function formTitle(route: RouteProp<CarriersStackParamList, 'CarrierForm'>): str
 }
 
 export function CarriersStack() {
+  const PALETTE = useAppPalette();
   return (
     <Stack.Navigator
       screenOptions={{

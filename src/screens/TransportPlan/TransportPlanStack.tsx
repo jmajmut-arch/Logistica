@@ -2,7 +2,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import type { OperatorScope } from '@/types/enums';
 
 import { PlanScopeProvider } from './PlanScopeContext';
@@ -22,6 +22,7 @@ function formTitle(route: RouteProp<TransportPlanStackParamList, 'TransportPlanF
 
 export function TransportPlanStack({ scope }: { scope: OperatorScope }) {
   const listTitle = scope === 'home_delivery' ? 'Plan home delivery' : 'Plan semanal de transporte';
+  const PALETTE = useAppPalette();
 
   return (
     <PlanScopeProvider value={scope}>

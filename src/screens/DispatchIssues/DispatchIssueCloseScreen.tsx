@@ -17,7 +17,7 @@ import type { DispatchIssue } from '@/domain/entities/DispatchIssue';
 import type { Site } from '@/domain/entities/Site';
 import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import {
   DISPATCH_ISSUE_STATUS_COLORS,
   DISPATCH_ISSUE_STATUS_LABELS,
@@ -39,6 +39,7 @@ export function DispatchIssueCloseScreen() {
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const PALETTE = useAppPalette();
 
   useEffect(() => {
     Promise.all([
@@ -118,11 +119,15 @@ export function DispatchIssueCloseScreen() {
           </Text>
           {issue.guideFileUrl !== null && (
             <Pressable
-              style={styles.fileRow}
+              style={[styles.fileRow, { borderColor: PALETTE.border }]}
               onPress={() => Linking.openURL(issue.guideFileUrl!)}
             >
               <MaterialCommunityIcons name="file-document-outline" size={20} color={PALETTE.secondary} />
-              <Text variant="bodyMedium" style={styles.fileName} numberOfLines={1}>
+              <Text
+                variant="bodyMedium"
+                style={[styles.fileName, { color: PALETTE.secondary }]}
+                numberOfLines={1}
+              >
                 {issue.guideFileName ?? 'Ver documento adjunto'}
               </Text>
             </Pressable>
@@ -224,11 +229,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: PALETTE.border,
     borderRadius: 4,
   },
   fileName: {
     flex: 1,
-    color: PALETTE.secondary,
   },
 });

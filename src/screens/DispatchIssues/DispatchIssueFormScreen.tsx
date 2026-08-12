@@ -16,7 +16,7 @@ import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import type { User } from '@/domain/entities/User';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { DISPATCH_ISSUE_TYPES, type DispatchIssueType } from '@/types/enums';
 import { DISPATCH_ISSUE_TYPE_LABELS, DISPATCH_ISSUE_TYPE_LABELS_SHORT } from '@/utils/dispatchIssueDisplay';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
@@ -53,6 +53,7 @@ export function DispatchIssueFormScreen() {
   const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const PALETTE = useAppPalette();
 
   useEffect(() => {
     siteRepository.findAll().then(setSites);
@@ -319,7 +320,7 @@ export function DispatchIssueFormScreen() {
         Documento de la guía (opcional)
       </Text>
       {pickedFile ? (
-        <View style={styles.fileRow}>
+        <View style={[styles.fileRow, { borderColor: PALETTE.border }]}>
           <MaterialCommunityIcons name="file-document-outline" size={20} color={PALETTE.primary} />
           <Text style={styles.fileName} numberOfLines={1}>
             {pickedFile.name}
@@ -364,7 +365,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: PALETTE.border,
     borderRadius: 4,
   },
   fileName: {

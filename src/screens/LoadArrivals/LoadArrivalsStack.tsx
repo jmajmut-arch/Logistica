@@ -2,7 +2,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 import { LoadArrivalFormScreen } from './LoadArrivalFormScreen';
 import { LoadArrivalListScreen } from './LoadArrivalListScreen';
@@ -21,6 +21,7 @@ function formTitle(route: RouteProp<LoadArrivalsStackParamList, 'LoadArrivalForm
 }
 
 export function LoadArrivalsStack() {
+  const PALETTE = useAppPalette();
   return (
     <Stack.Navigator
       screenOptions={{

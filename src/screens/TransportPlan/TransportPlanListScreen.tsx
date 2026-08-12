@@ -29,7 +29,7 @@ import type { Carrier } from '@/domain/entities/Carrier';
 import type { Site } from '@/domain/entities/Site';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { ensureRecurringPlanOccurrences } from '@/domain/services/recurringPlanSync';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { getWeekNumber, startOfDay, startOfToday, startOfWeek } from '@/utils/timeBlocks';
 import {
@@ -56,6 +56,7 @@ export function TransportPlanListScreen() {
   const navigation = useNavigation<Navigation>();
   const planManagerScope = usePlanScope();
   const today = useMemo(() => startOfToday(), []);
+  const PALETTE = useAppPalette();
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [sitesById, setSitesById] = useState<Map<number, Site>>(new Map());
   const [carriersById, setCarriersById] = useState<Map<number, Carrier>>(new Map());
@@ -279,7 +280,7 @@ export function TransportPlanListScreen() {
     <View style={styles.rangePickerRow}>
       <Pressable onPress={() => setRangePickerVisible(true)} style={styles.rangePickerButton}>
         <MaterialCommunityIcons name="calendar-range" size={20} color={PALETTE.primary} />
-        <Text variant="bodyMedium" style={styles.rangePickerText}>
+        <Text variant="bodyMedium" style={[styles.rangePickerText, { color: PALETTE.primary }]}>
           {customRange
             ? `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')}`
             : 'Ver rango de fechas'}
@@ -337,8 +338,8 @@ export function TransportPlanListScreen() {
           }
           ListEmptyComponent={emptyState}
           renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text variant="titleSmall" style={styles.sectionHeaderText}>
+            <View style={[styles.sectionHeader, { backgroundColor: PALETTE.background }]}>
+              <Text variant="titleSmall" style={[styles.sectionHeaderText, { color: PALETTE.textMuted }]}>
                 {section.title}
               </Text>
             </View>
@@ -413,14 +414,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sectionHeader: {
-    backgroundColor: PALETTE.background,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 6,
   },
-  sectionHeaderText: {
-    color: PALETTE.textMuted,
-  },
+  sectionHeaderText: {},
   rangePickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,9 +433,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
   },
-  rangePickerText: {
-    color: PALETTE.primary,
-  },
+  rangePickerText: {},
   itemCard: {
     marginHorizontal: 16,
     marginBottom: 8,

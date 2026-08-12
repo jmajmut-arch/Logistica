@@ -33,7 +33,7 @@ import type { User } from '@/domain/entities/User';
 import { splitCancelledByOperator } from '@/domain/rules/cancelledTrips';
 import { getDisplayStatus, getPlanItemStatus } from '@/domain/rules/complianceStatus';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { startOfToday } from '@/utils/timeBlocks';
 import {
@@ -54,6 +54,7 @@ export function LoadArrivalListScreen() {
   const navigation = useNavigation<Navigation>();
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
   const currentOperatorScope = useSessionStore((state) => state.currentOperatorScope);
+  const PALETTE = useAppPalette();
   const [arrivals, setArrivals] = useState<LoadArrival[] | null>(null);
   const [planItems, setPlanItems] = useState<TransportPlanItem[]>([]);
   const [planItemsById, setPlanItemsById] = useState<Map<number, TransportPlanItem>>(new Map());

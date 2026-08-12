@@ -2,7 +2,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 import { UserFormScreen } from './UserFormScreen';
 import { UserListScreen } from './UserListScreen';
@@ -19,6 +19,7 @@ function formTitle(route: RouteProp<UsersStackParamList, 'UserForm'>): string {
 }
 
 export function UsersStack() {
+  const PALETTE = useAppPalette();
   return (
     <Stack.Navigator
       screenOptions={{

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { startOfWeek } from '@/utils/timeBlocks';
 import { HEAVY_CRANE_COLOR } from '@/utils/transportPlanDisplay';
 
@@ -60,6 +60,7 @@ export function MonthCalendar({
 }: MonthCalendarProps) {
   const days = useMemo(() => getMonthGridDays(month), [month]);
   const currentMonthIndex = month.getMonth();
+  const PALETTE = useAppPalette();
 
   return (
     <View>
@@ -97,13 +98,17 @@ export function MonthCalendar({
               )}
               <Text
                 variant="bodyMedium"
-                style={[styles.cellText, !inMonth && styles.cellTextMuted, isToday && styles.cellTextToday]}
+                style={[
+                  styles.cellText,
+                  !inMonth && styles.cellTextMuted,
+                  isToday && { color: PALETTE.primary, fontWeight: '700' },
+                ]}
               >
                 {new Date(day).getDate()}
               </Text>
               {count > 0 && (
-                <View style={styles.countBadge}>
-                  <Text style={styles.countBadgeText}>{count}</Text>
+                <View style={[styles.countBadge, { backgroundColor: PALETTE.primary }]}>
+                  <Text style={[styles.countBadgeText, { color: PALETTE.onPrimary }]}>{count}</Text>
                 </View>
               )}
             </Pressable>
@@ -153,22 +158,16 @@ const styles = StyleSheet.create({
   cellTextMuted: {
     opacity: 0.3,
   },
-  cellTextToday: {
-    color: PALETTE.primary,
-    fontWeight: '700',
-  },
   countBadge: {
     marginTop: 2,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: PALETTE.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
   countBadgeText: {
-    color: PALETTE.onPrimary,
     fontSize: 10,
     fontWeight: '700',
   },

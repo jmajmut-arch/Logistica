@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 interface EmptyStateProps {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -10,6 +10,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon, message }: EmptyStateProps) {
+  const PALETTE = useAppPalette();
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>

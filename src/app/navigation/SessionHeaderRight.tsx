@@ -6,7 +6,7 @@ import { Menu, Text } from 'react-native-paper';
 import { siteRepository } from '@/data/repositories/siteRepository';
 import type { Site } from '@/domain/entities/Site';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { OPERATOR_SCOPES } from '@/types/enums';
 import { OPERATOR_SCOPE_LABELS } from '@/utils/operatorScope';
 import { ROLE_LABELS } from '@/utils/userDisplay';
@@ -22,6 +22,7 @@ export function SessionHeaderRight() {
   const [sites, setSites] = useState<Site[]>([]);
   const [siteMenuVisible, setSiteMenuVisible] = useState(false);
   const [scopeMenuVisible, setScopeMenuVisible] = useState(false);
+  const PALETTE = useAppPalette();
 
   const isOperator = currentUser?.role === 'operator';
 
@@ -50,7 +51,7 @@ export function SessionHeaderRight() {
             anchor={
               <Pressable onPress={() => setScopeMenuVisible(true)} style={styles.scopePill}>
                 <MaterialCommunityIcons name="briefcase-outline" size={16} color={PALETTE.primary} />
-                <Text variant="labelMedium" numberOfLines={1} style={styles.siteLabel}>
+                <Text variant="labelMedium" numberOfLines={1} style={[styles.siteLabel, { color: PALETTE.primary }]}>
                   {currentOperatorScope ? OPERATOR_SCOPE_LABELS[currentOperatorScope] : 'Elegir'}
                 </Text>
               </Pressable>
@@ -73,7 +74,7 @@ export function SessionHeaderRight() {
             anchor={
               <Pressable onPress={() => setSiteMenuVisible(true)} style={styles.sitePill}>
                 <MaterialCommunityIcons name="map-marker-outline" size={16} color={PALETTE.primary} />
-                <Text variant="labelMedium" numberOfLines={1} style={styles.siteLabel}>
+                <Text variant="labelMedium" numberOfLines={1} style={[styles.siteLabel, { color: PALETTE.primary }]}>
                   {currentSiteName()}
                 </Text>
               </Pressable>
@@ -130,7 +131,5 @@ const styles = StyleSheet.create({
     gap: 4,
     maxWidth: 100,
   },
-  siteLabel: {
-    color: PALETTE.primary,
-  },
+  siteLabel: {},
 });

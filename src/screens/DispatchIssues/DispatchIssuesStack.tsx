@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 import { DispatchIssueCloseScreen } from './DispatchIssueCloseScreen';
 import { DispatchIssueFormScreen } from './DispatchIssueFormScreen';
@@ -16,6 +16,7 @@ export type DispatchIssuesStackParamList = {
 const Stack = createNativeStackNavigator<DispatchIssuesStackParamList>();
 
 export function DispatchIssuesStack() {
+  const PALETTE = useAppPalette();
   return (
     <Stack.Navigator
       screenOptions={{

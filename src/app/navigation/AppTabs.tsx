@@ -6,10 +6,11 @@ import { CarriersStack } from '@/screens/Carriers/CarriersStack';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
 import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
 import { SitesStack } from '@/screens/Sites/SitesStack';
+import { ThemeSettingsScreen } from '@/screens/ThemeSettings/ThemeSettingsScreen';
 import { TransportPlanStack } from '@/screens/TransportPlan/TransportPlanStack';
 import { UsersStack } from '@/screens/Users/UsersStack';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 export type AppTabsParamList = {
   Dashboard: undefined;
@@ -20,6 +21,7 @@ export type AppTabsParamList = {
   Users: undefined;
   LoadArrivals: undefined;
   DispatchIssues: undefined;
+  ThemeSettings: undefined;
 };
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
@@ -33,10 +35,12 @@ const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIc
   Users: 'account-group-outline',
   LoadArrivals: 'package-variant-closed',
   DispatchIssues: 'file-alert-outline',
+  ThemeSettings: 'palette-outline',
 };
 
 export function AppTabs() {
   const role = useSessionStore((state) => state.currentUser?.role);
+  const PALETTE = useAppPalette();
 
   return (
     <Tab.Navigator
@@ -95,6 +99,13 @@ export function AppTabs() {
           name="Users"
           component={UsersStack}
           options={{ title: 'Personas', headerShown: false }}
+        />
+      )}
+      {role === 'admin' && (
+        <Tab.Screen
+          name="ThemeSettings"
+          component={ThemeSettingsScreen}
+          options={{ title: 'Colores' }}
         />
       )}
     </Tab.Navigator>

@@ -31,7 +31,7 @@ import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import type { User } from '@/domain/entities/User';
 import { splitCancelledByOperator } from '@/domain/rules/cancelledTrips';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import {
@@ -62,6 +62,7 @@ export function LoadArrivalFormScreen() {
   const currentUser = useSessionStore((state) => state.currentUser);
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
   const currentOperatorScope = useSessionStore((state) => state.currentOperatorScope);
+  const PALETTE = useAppPalette();
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [carriers, setCarriers] = useState<Carrier[] | null>(null);
@@ -327,7 +328,7 @@ export function LoadArrivalFormScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {selectedSite ? (
-        <View style={styles.siteBanner}>
+        <View style={[styles.siteBanner, { backgroundColor: PALETTE.surface }]}>
           <MaterialCommunityIcons
             name={selectedSite.type === 'patio' ? 'texture-box' : 'warehouse'}
             size={22}
@@ -670,7 +671,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: PALETTE.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,

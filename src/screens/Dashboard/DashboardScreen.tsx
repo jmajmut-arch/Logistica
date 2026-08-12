@@ -43,7 +43,7 @@ import {
   scheduleAdherence,
 } from '@/domain/rules/dashboardMetrics';
 import { useSessionStore } from '@/store/sessionStore';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 import { OPERATION_TYPES, type OperatorScope } from '@/types/enums';
 import { matchesOperatorScope, OPERATOR_SCOPE_LABELS } from '@/utils/operatorScope';
 import { getWeekNumber, startOfDay, startOfToday, startOfWeek } from '@/utils/timeBlocks';
@@ -101,6 +101,7 @@ export function DashboardScreen() {
   const currentUser = useSessionStore((state) => state.currentUser);
   const currentSiteId = useSessionStore((state) => state.currentSiteId);
   const currentOperatorScope = useSessionStore((state) => state.currentOperatorScope);
+  const PALETTE = useAppPalette();
 
   const [planItems, setPlanItems] = useState<TransportPlanItem[] | null>(null);
   const [arrivals, setArrivals] = useState<LoadArrival[]>([]);
@@ -561,7 +562,7 @@ export function DashboardScreen() {
                 ` · ${todayUnplannedArrivals.length} ${getUnplannedCountLabel(effectiveScope)}`}
             </Text>
 
-            <Text variant="titleMedium" style={styles.groupTitle}>
+            <Text variant="titleMedium" style={[styles.groupTitle, { color: PALETTE.primary }]}>
               Hoy
             </Text>
             <View style={styles.grid}>
@@ -781,7 +782,7 @@ export function DashboardScreen() {
               </Card.Content>
             </Card>
 
-            <Text variant="titleMedium" style={styles.groupTitle}>
+            <Text variant="titleMedium" style={[styles.groupTitle, { color: PALETTE.primary }]}>
               Esta semana · Semana {weekNumber}
             </Text>
             <View style={styles.grid}>
@@ -1063,7 +1064,7 @@ export function DashboardScreen() {
               </Card>
             )}
 
-            <Text variant="titleMedium" style={styles.groupTitle}>
+            <Text variant="titleMedium" style={[styles.groupTitle, { color: PALETTE.primary }]}>
               Viajes futuros
             </Text>
             <Card style={styles.wideCard}>
@@ -1119,7 +1120,7 @@ export function DashboardScreen() {
               </Card.Content>
             </Card>
 
-            <Text variant="titleMedium" style={styles.groupTitle}>
+            <Text variant="titleMedium" style={[styles.groupTitle, { color: PALETTE.primary }]}>
               Rango personalizado
             </Text>
             <Card style={styles.wideCard}>
@@ -1137,7 +1138,7 @@ export function DashboardScreen() {
                       size={20}
                       color={PALETTE.primary}
                     />
-                    <Text variant="bodyMedium" style={styles.rangePickerText}>
+                    <Text variant="bodyMedium" style={[styles.rangePickerText, { color: PALETTE.primary }]}>
                       {customRange
                         ? `${format(new Date(customRange.start), 'dd-MM-yyyy')} — ${format(new Date(customRange.end), 'dd-MM-yyyy')}`
                         : 'Elegir rango de fechas'}
@@ -1514,7 +1515,6 @@ const styles = StyleSheet.create({
   },
   groupTitle: {
     fontWeight: '700',
-    color: PALETTE.primary,
     marginTop: 20,
     marginBottom: 8,
   },
@@ -1564,9 +1564,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
   },
-  rangePickerText: {
-    color: PALETTE.primary,
-  },
+  rangePickerText: {},
   rangeComplianceRow: {
     marginTop: 8,
     marginBottom: 4,

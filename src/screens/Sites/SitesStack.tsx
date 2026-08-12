@@ -2,7 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
-import { PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
 
 import { SiteFormScreen } from './SiteFormScreen';
 import { SiteListScreen } from './SiteListScreen';
@@ -19,6 +19,7 @@ function siteFormTitle(route: RouteProp<SitesStackParamList, 'SiteForm'>): strin
 }
 
 export function SitesStack() {
+  const PALETTE = useAppPalette();
   return (
     <Stack.Navigator
       screenOptions={{
