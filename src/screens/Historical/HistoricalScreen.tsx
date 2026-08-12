@@ -14,6 +14,8 @@ import { useAppPalette } from '@/store/themeStore';
 import type { OperatorScope } from '@/types/enums';
 import { matchesOperatorScope, OPERATOR_SCOPE_LABELS } from '@/utils/operatorScope';
 import {
+  getWeekNumber,
+  startOfDay,
   startOfMonth,
   startOfNextMonth,
   startOfNextYear,
@@ -23,18 +25,31 @@ import {
 import { getComplianceColor } from '@/utils/transportPlanDisplay';
 import { useFocusRefresh } from '@/utils/useFocusRefresh';
 
-type Granularity = 'week' | 'month' | 'year';
+type Granularity = 'day' | 'week' | 'month' | 'year';
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+const DAY_BUCKETS = 14;
 const WEEK_BUCKETS = 12;
 const MONTH_BUCKETS = 12;
 const YEAR_BUCKETS = 5;
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const DATE_FORMAT = new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit' });
 
 const GRANULARITY_LABELS: Record<Granularity, string> = {
+  day: 'Día',
   week: 'Semana',
   month: 'Mes',
   year: 'Año',
+};
+
+// "últimas" concuerda con "semanas" (femenino); el resto son masculinos ("días", "meses",
+// "años"), así que necesitan "últimos".
+const GRANULARITY_QUANTIFIER: Record<Granularity, string> = {
+  day: 'últimos',
+  week: 'últimas',
+  month: 'últimos',
+  year: 'últimos',
 };
 
 interface HistoryBucket {
@@ -127,13 +142,22 @@ export function HistoricalScreen() {
   );
 
   const buckets = useMemo<HistoryBucket[]>(() => {
+    if (granularity === 'day') {
+      const currentDayStart = startOfDay(now);
+      return Array.from({ length: DAY_BUCKETS }, (_, index) => {
+        const start = currentDayStart - (DAY_BUCKETS - 1 - index) * DAY_MS;
+        const end = start + DAY_MS;
+        const label = DATE_FORMAT.format(start);
+        return buildBucket(label, label, start, end, scopedItems, arrivalsByPlanItem, now);
+      });
+    }
     if (granularity === 'week') {
       const currentWeekStart = startOfWeek(now);
       return Array.from({ length: WEEK_BUCKETS }, (_, index) => {
         const start = currentWeekStart - (WEEK_BUCKETS - 1 - index) * WEEK_MS;
         const end = start + WEEK_MS;
-        const label = new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit' }).format(start);
-        const rangeLabel = `${label} – ${new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit' }).format(end - 1)}`;
+        const label = `S${getWeekNumber(start)}`;
+        const rangeLabel = `Semana ${getWeekNumber(start)} · ${DATE_FORMAT.format(start)} – ${DATE_FORMAT.format(end - 1)}`;
         return buildBucket(label, rangeLabel, start, end, scopedItems, arrivalsByPlanItem, now);
       });
     }
@@ -194,6 +218,7 @@ export function HistoricalScreen() {
         value={granularity}
         onValueChange={(value) => setGranularity(value as Granularity)}
         buttons={[
+          { value: 'day', label: 'Día', icon: 'calendar-today' },
           { value: 'week', label: 'Semana', icon: 'calendar-week-outline' },
           { value: 'month', label: 'Mes', icon: 'calendar-month-outline' },
           { value: 'year', label: 'Año', icon: 'calendar-blank-outline' },
@@ -203,7 +228,8 @@ export function HistoricalScreen() {
       <Card style={styles.wideCard}>
         <Card.Content>
           <Text variant="titleMedium" style={styles.cardTitle}>
-            Cumplimiento por {GRANULARITY_LABELS[granularity].toLowerCase()} · últimas {buckets.length}
+            Cumplimiento por {GRANULARITY_LABELS[granularity].toLowerCase()} ·{' '}
+            {GRANULARITY_QUANTIFIER[granularity]} {buckets.length}
           </Text>
           <WeekBarChart
             data={buckets.map((bucket) => ({
