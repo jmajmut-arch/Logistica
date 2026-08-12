@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SessionHeaderRight } from '@/app/navigation/SessionHeaderRight';
 import { CarriersStack } from '@/screens/Carriers/CarriersStack';
 import { DashboardScreen } from '@/screens/Dashboard/DashboardScreen';
+import { HistoricalScreen } from '@/screens/Historical/HistoricalScreen';
 import { LoadArrivalsStack } from '@/screens/LoadArrivals/LoadArrivalsStack';
 import { SitesStack } from '@/screens/Sites/SitesStack';
 import { ThemeSettingsScreen } from '@/screens/ThemeSettings/ThemeSettingsScreen';
@@ -14,6 +15,7 @@ import { useAppPalette } from '@/store/themeStore';
 
 export type AppTabsParamList = {
   Dashboard: undefined;
+  Historical: undefined;
   TransportPlan: undefined;
   HomeDeliveryPlan: undefined;
   Sites: undefined;
@@ -28,6 +30,7 @@ const Tab = createBottomTabNavigator<AppTabsParamList>();
 
 const TAB_ICONS: Record<keyof AppTabsParamList, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Dashboard: 'view-dashboard-outline',
+  Historical: 'chart-line',
   TransportPlan: 'calendar-clock-outline',
   HomeDeliveryPlan: 'home-city-outline',
   Sites: 'warehouse',
@@ -63,6 +66,7 @@ export function AppTabs() {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+      <Tab.Screen name="Historical" component={HistoricalScreen} options={{ title: 'Histórico' }} />
       {role === 'admin' && (
         <Tab.Screen name="TransportPlan" options={{ title: 'Plan semanal de transporte', headerShown: false }}>
           {() => <TransportPlanStack scope="plan_transporte" />}

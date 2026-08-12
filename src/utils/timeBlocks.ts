@@ -58,6 +58,30 @@ export function startOfWeek(reference: number = Date.now()): number {
   return date.getTime();
 }
 
+/** Inicio del mes (00:00 local, día 1) que contiene `reference` (por defecto hoy). */
+export function startOfMonth(reference: number = Date.now()): number {
+  const date = new Date(reference);
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+/** Inicio del mes calendario siguiente al que contiene `reference`. */
+export function startOfNextMonth(reference: number = Date.now()): number {
+  const date = new Date(reference);
+  return new Date(date.getFullYear(), date.getMonth() + 1, 1).getTime();
+}
+
+/** Inicio del año (00:00 local, 1 de enero) que contiene `reference` (por defecto hoy). */
+export function startOfYear(reference: number = Date.now()): number {
+  const date = new Date(reference);
+  return new Date(date.getFullYear(), 0, 1).getTime();
+}
+
+/** Inicio del año calendario siguiente al que contiene `reference`. */
+export function startOfNextYear(reference: number = Date.now()): number {
+  const date = new Date(reference);
+  return new Date(date.getFullYear() + 1, 0, 1).getTime();
+}
+
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
