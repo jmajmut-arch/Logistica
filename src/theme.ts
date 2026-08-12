@@ -18,6 +18,16 @@ export interface Palette {
 
 export type ThemeId = 'dark' | 'light' | 'emerald';
 
+/** Aplica transparencia a un color de la paleta (formato `#rrggbb`) — para glows, overlays
+ * y demás variantes translúcidas que antes eran literales `rgba(...)` fijos y por eso no
+ * seguían el tema elegido. */
+export function withAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export const THEME_LABELS: Record<ThemeId, string> = {
   dark: 'Oscuro',
   light: 'Claro',
