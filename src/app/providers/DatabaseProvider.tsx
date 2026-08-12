@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 
 import { supabase } from '@/data/supabase/client';
-import { useAppPalette } from '@/store/themeStore';
+import { loadThemeFromServer, useAppPalette } from '@/store/themeStore';
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
@@ -25,6 +25,9 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
           setReady(true);
         }
       });
+    // No bloquea el arranque: si falla, este dispositivo simplemente sigue con el último
+    // tema que ya tenía (local o el default), y se sincroniza en el próximo inicio.
+    loadThemeFromServer().catch(() => {});
   }, []);
 
   if (error) {
