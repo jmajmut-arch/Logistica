@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import { DatePickerModal } from 'react-native-paper-dates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { HeavyCraneBadge } from '@/components/HeavyCraneBadge';
@@ -77,6 +78,10 @@ export function LoadArrivalFormScreen() {
   const [dialogStep, setDialogStep] = useState<'choose' | 'time'>('choose');
   const [blockMinutes, setBlockMinutes] = useState(0);
   const [blockMenuVisible, setBlockMenuVisible] = useState(false);
+  // Día de la llegada real, independiente del día planificado — para poder registrar
+  // llegadas de días anteriores que quedaron sin ingresar a tiempo.
+  const [arrivalDay, setArrivalDay] = useState(() => startOfToday());
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [unplannedCarrierId, setUnplannedCarrierId] = useState(0);
   const [unplannedCarrierMenuVisible, setUnplannedCarrierMenuVisible] = useState(false);
   const [unplannedCarrierError, setUnplannedCarrierError] = useState(false);
@@ -187,6 +192,7 @@ export function LoadArrivalFormScreen() {
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
     setBlockMinutes(blockMinutesOf(item.scheduledAt));
+    setArrivalDay(startOfDay(item.scheduledAt));
     // Siempre se abre en 'choose': aunque no tenga horario que "cumplir", ahí vive la
     // opción de marcarlo como viaje cancelado (ver el paso 'choose' del diálogo).
     setDialogStep('choose');
@@ -201,6 +207,7 @@ export function LoadArrivalFormScreen() {
     setBlockMinutes(
       editingUnplanned ? blockMinutesOf(editingUnplanned.arrivedAt) : blockMinutesOf(Date.now()),
     );
+    setArrivalDay(editingUnplanned ? startOfDay(editingUnplanned.arrivedAt) : startOfToday());
   };
 
   useEffect(() => {
@@ -223,12 +230,14 @@ export function LoadArrivalFormScreen() {
         }
         setActive(item);
         setBlockMinutes(blockMinutesOf(item.scheduledAt));
+        setArrivalDay(startOfDay(item.scheduledAt));
         setDialogStep('choose');
         setAutoOpened(true);
         return;
       }
       setActive('unplanned');
       setDialogStep('time');
+      setArrivalDay(startOfToday());
       setUnplannedCarrierError(false);
       setUnplannedCarrierId(0);
       setBlockMinutes(blockMinutesOf(Date.now()));
@@ -300,10 +309,10 @@ export function LoadArrivalFormScreen() {
         setUnplannedCarrierError(true);
         return;
       }
-      submit(combineDayAndBlock(startOfToday(), blockMinutes), null, unplannedCarrierId);
+      submit(combineDayAndBlock(arrivalDay, blockMinutes), null, unplannedCarrierId);
       return;
     }
-    submit(combineDayAndBlock(startOfDay(active.scheduledAt), blockMinutes), active.id, active.carrierId);
+    submit(combineDayAndBlock(arrivalDay, blockMinutes), active.id, active.carrierId);
   };
 
   if (
@@ -519,13 +528,31 @@ export function LoadArrivalFormScreen() {
             <>
               <Dialog.Title>Hora de llegada</Dialog.Title>
               <Dialog.Content>
-                <Text style={styles.dialogDayLabel}>
-                  Día:{' '}
-                  {format(
-                    new Date(active === 'unplanned' ? startOfToday() : startOfDay(active.scheduledAt)),
-                    'dd-MM-yyyy',
-                  )}
-                </Text>
+                <Pressable onPress={() => setDatePickerVisible(true)}>
+                  <TextInput
+                    label="Día"
+                    value={format(new Date(arrivalDay), 'dd-MM-yyyy')}
+                    editable={false}
+                    mode="outlined"
+                    right={<TextInput.Icon icon="calendar" />}
+                    pointerEvents="none"
+                    style={styles.field}
+                  />
+                </Pressable>
+                <DatePickerModal
+                  locale="es"
+                  mode="single"
+                  visible={datePickerVisible}
+                  date={new Date(arrivalDay)}
+                  validRange={{ endDate: new Date() }}
+                  onDismiss={() => setDatePickerVisible(false)}
+                  onConfirm={({ date: picked }) => {
+                    setDatePickerVisible(false);
+                    if (picked) {
+                      setArrivalDay(startOfDay(picked.getTime()));
+                    }
+                  }}
+                />
                 {active !== 'unplanned' && active.hasNoSchedule && (
                   <Text style={styles.dialogDayLabel}>
                     Este viaje no tiene horario planificado — solo registra la hora de llegada.
