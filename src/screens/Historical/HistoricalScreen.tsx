@@ -8,7 +8,7 @@ import { transportPlanRepository } from '@/data/repositories/transportPlanReposi
 import type { LoadArrival } from '@/domain/entities/LoadArrival';
 import type { TransportPlanItem } from '@/domain/entities/TransportPlanItem';
 import { getDisplayStatus, type DisplayStatus } from '@/domain/rules/complianceStatus';
-import { arrivalCompliance, countByStatus } from '@/domain/rules/dashboardMetrics';
+import { combinedCompliance, countByStatus } from '@/domain/rules/dashboardMetrics';
 import { useSessionStore } from '@/store/sessionStore';
 import { useAppPalette } from '@/store/themeStore';
 import type { OperatorScope } from '@/types/enums';
@@ -60,6 +60,7 @@ interface HistoryBucket {
   executed: number;
   pending: number;
   cancelled: number;
+  unplanned: number;
 }
 
 function buildBucket(
@@ -69,6 +70,7 @@ function buildBucket(
   end: number,
   items: TransportPlanItem[],
   arrivalsByPlanItem: Map<number, LoadArrival>,
+  unplannedArrivals: LoadArrival[],
   now: number,
 ): HistoryBucket {
   const bucketItems = items.filter((item) => item.scheduledAt >= start && item.scheduledAt < end);
@@ -76,14 +78,20 @@ function buildBucket(
     getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now),
   );
   const counts = countByStatus(statuses);
+  // Igual que en el Dashboard: las cargas fuera de plan también cuentan como incumplimiento
+  // del período, aunque no tengan horario planificado contra el cual medirse.
+  const unplanned = unplannedArrivals.filter(
+    (arrival) => arrival.arrivedAt >= start && arrival.arrivedAt < end,
+  ).length;
   return {
     label,
     rangeLabel,
-    percentage: arrivalCompliance(statuses),
+    percentage: combinedCompliance(statuses, unplanned),
     total: bucketItems.length,
     executed: (counts.get('on_time') ?? 0) + (counts.get('late') ?? 0) + (counts.get('early') ?? 0),
     pending: (counts.get('pending') ?? 0) + (counts.get('overdue') ?? 0),
     cancelled: counts.get('cancelled') ?? 0,
+    unplanned,
   };
 }
 
@@ -141,6 +149,18 @@ export function HistoricalScreen() {
     [planItems, isOperatorScoped, currentSiteId, effectiveScope],
   );
 
+  // Cargas fuera de plan: igual que en el Dashboard, se acotan al sitio del operador pero
+  // no al toggle plan de transporte/home delivery — no tienen operationType contra el cual
+  // filtrar por frente de trabajo.
+  const scopedUnplannedArrivals = useMemo(
+    () =>
+      arrivals.filter(
+        (arrival) =>
+          arrival.planItemId === null && (!isOperatorScoped || arrival.siteId === currentSiteId),
+      ),
+    [arrivals, isOperatorScoped, currentSiteId],
+  );
+
   const buckets = useMemo<HistoryBucket[]>(() => {
     if (granularity === 'day') {
       const currentDayStart = startOfDay(now);
@@ -148,7 +168,16 @@ export function HistoricalScreen() {
         const start = currentDayStart - (DAY_BUCKETS - 1 - index) * DAY_MS;
         const end = start + DAY_MS;
         const label = DATE_FORMAT.format(start);
-        return buildBucket(label, label, start, end, scopedItems, arrivalsByPlanItem, now);
+        return buildBucket(
+          label,
+          label,
+          start,
+          end,
+          scopedItems,
+          arrivalsByPlanItem,
+          scopedUnplannedArrivals,
+          now,
+        );
       });
     }
     if (granularity === 'week') {
@@ -158,7 +187,16 @@ export function HistoricalScreen() {
         const end = start + WEEK_MS;
         const label = `S${getWeekNumber(start)}`;
         const rangeLabel = `Semana ${getWeekNumber(start)} · ${DATE_FORMAT.format(start)} – ${DATE_FORMAT.format(end - 1)}`;
-        return buildBucket(label, rangeLabel, start, end, scopedItems, arrivalsByPlanItem, now);
+        return buildBucket(
+          label,
+          rangeLabel,
+          start,
+          end,
+          scopedItems,
+          arrivalsByPlanItem,
+          scopedUnplannedArrivals,
+          now,
+        );
       });
     }
     if (granularity === 'month') {
@@ -169,7 +207,16 @@ export function HistoricalScreen() {
         const start = monthDate.getTime();
         const end = startOfNextMonth(start);
         const label = `${MONTH_LABELS[monthDate.getMonth()]} ${monthDate.getFullYear() % 100}`;
-        return buildBucket(label, label, start, end, scopedItems, arrivalsByPlanItem, now);
+        return buildBucket(
+          label,
+          label,
+          start,
+          end,
+          scopedItems,
+          arrivalsByPlanItem,
+          scopedUnplannedArrivals,
+          now,
+        );
       });
     }
     const currentYear = new Date(startOfYear(now)).getFullYear();
@@ -177,22 +224,34 @@ export function HistoricalScreen() {
       const year = currentYear - (YEAR_BUCKETS - 1 - index);
       const start = new Date(year, 0, 1).getTime();
       const end = startOfNextYear(start);
-      return buildBucket(String(year), String(year), start, end, scopedItems, arrivalsByPlanItem, now);
+      return buildBucket(
+        String(year),
+        String(year),
+        start,
+        end,
+        scopedItems,
+        arrivalsByPlanItem,
+        scopedUnplannedArrivals,
+        now,
+      );
     });
-  }, [granularity, scopedItems, arrivalsByPlanItem, now]);
+  }, [granularity, scopedItems, arrivalsByPlanItem, scopedUnplannedArrivals, now]);
 
   const summary = useMemo(() => {
-    const withData = buckets.filter((bucket) => bucket.total > 0);
+    // bucket.percentage puede no ser null aunque total sea 0 (solo hubo cargas fuera de
+    // plan), así que no basta con mirar total para saber si el período tiene datos.
+    const withData = buckets.filter((bucket) => bucket.percentage !== null);
     const total = buckets.reduce((sum, bucket) => sum + bucket.total, 0);
     const executed = buckets.reduce((sum, bucket) => sum + bucket.executed, 0);
     const cancelled = buckets.reduce((sum, bucket) => sum + bucket.cancelled, 0);
+    const unplanned = buckets.reduce((sum, bucket) => sum + bucket.unplanned, 0);
     const averagePercentage =
       withData.length === 0
         ? null
         : Math.round(
             withData.reduce((sum, bucket) => sum + (bucket.percentage ?? 0), 0) / withData.length,
           );
-    return { total, executed, cancelled, averagePercentage };
+    return { total, executed, cancelled, unplanned, averagePercentage };
   }, [buckets]);
 
   return (
@@ -276,6 +335,12 @@ export function HistoricalScreen() {
                 Cancelados
               </Text>
             </View>
+            <View style={styles.summaryItem}>
+              <Text variant="headlineSmall">{summary.unplanned}</Text>
+              <Text variant="labelSmall" style={[styles.summaryLabel, { color: PALETTE.textMuted }]}>
+                No planificados
+              </Text>
+            </View>
           </View>
         </Card.Content>
       </Card>
@@ -294,6 +359,7 @@ export function HistoricalScreen() {
                 <Text>Ejecutados: {selectedBucket.executed}</Text>
                 <Text>Pendientes: {selectedBucket.pending}</Text>
                 <Text>Cancelados: {selectedBucket.cancelled}</Text>
+                <Text>No planificados: {selectedBucket.unplanned}</Text>
               </Dialog.Content>
               <Dialog.Actions>
                 <Button onPress={() => setSelectedBucket(null)}>Cerrar</Button>

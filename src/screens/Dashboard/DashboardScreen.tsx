@@ -313,17 +313,20 @@ export function DashboardScreen() {
   // Desglose del cumplimiento en sus dos causas: si el camión llegó (sin importar la hora)
   // y, entre los que llegaron, si respetaron el horario planificado. Se calcula igual para
   // hoy y para la semana, para que ambas secciones del Dashboard tengan la misma estructura.
+  // Igual que customRangeCompliance: las cargas fuera de plan también deben bajar el %,
+  // aunque no tengan horario contra el cual medirse — si no, un día con puros viajes no
+  // planificados se ve igual de "cumplido" que uno sin ningún camión.
   const dailyArrivalCompliance = useMemo(
-    () => arrivalCompliance(todayDisplayStatuses),
-    [todayDisplayStatuses],
+    () => combinedCompliance(todayDisplayStatuses, todayUnplannedArrivals.length),
+    [todayDisplayStatuses, todayUnplannedArrivals],
   );
   const dailyScheduleAdherence = useMemo(
     () => scheduleAdherence(todayDisplayStatuses),
     [todayDisplayStatuses],
   );
   const weeklyArrivalCompliance = useMemo(
-    () => arrivalCompliance(weekDisplayStatuses),
-    [weekDisplayStatuses],
+    () => combinedCompliance(weekDisplayStatuses, weekUnplannedArrivals.length),
+    [weekDisplayStatuses, weekUnplannedArrivals],
   );
   const weeklyScheduleAdherence = useMemo(
     () => scheduleAdherence(weekDisplayStatuses),
