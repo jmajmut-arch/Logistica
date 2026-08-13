@@ -239,7 +239,8 @@ export function LoadArrivalFormScreen() {
     }
     const requestedPlanItemId = route.params?.planItemId;
     const shouldOpenUnplanned = route.params?.openUnplanned === true;
-    if (requestedPlanItemId === undefined && !shouldOpenUnplanned) {
+    const shouldOpenBackdated = route.params?.openBackdated === true;
+    if (requestedPlanItemId === undefined && !shouldOpenUnplanned && !shouldOpenBackdated) {
       return;
     }
     // Se difiere a un microtask porque estamos reaccionando a datos recién cargados
@@ -260,10 +261,15 @@ export function LoadArrivalFormScreen() {
       }
       setActive('unplanned');
       setDialogStep('time');
-      setArrivalDay(startOfToday());
+      // "Registrar llegada de un día anterior" parte de ayer (en vez de hoy) para que sea
+      // obvio que hay que cambiar la fecha, y se abre el calendario de una vez.
+      setArrivalDay(shouldOpenBackdated ? startOfToday() - DAY_MS : startOfToday());
       setUnplannedCarrierError(false);
       setUnplannedCarrierId(0);
       setBlockMinutes(blockMinutesOf(Date.now()));
+      if (shouldOpenBackdated) {
+        setDatePickerVisible(true);
+      }
       setAutoOpened(true);
     });
   }, [autoOpened, arrivalId, planItems, pendingItemsForSite, route.params]);

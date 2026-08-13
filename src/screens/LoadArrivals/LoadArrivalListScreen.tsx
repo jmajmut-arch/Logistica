@@ -348,6 +348,22 @@ export function LoadArrivalListScreen() {
                   </Card.Content>
                 </Card>
               )}
+              {currentSiteId !== null && (
+                <Card
+                  style={styles.pendingCard}
+                  onPress={() => navigation.navigate('LoadArrivalForm', { openBackdated: true })}
+                >
+                  <Card.Content style={styles.pendingContent}>
+                    <MaterialCommunityIcons name="calendar-arrow-left" size={24} color={PALETTE.secondary} />
+                    <View style={styles.pendingText}>
+                      <Text variant="bodyMedium">Registrar llegada de un día anterior</Text>
+                      <Text variant="bodySmall" style={styles.pendingDetail}>
+                        Elige la fecha y te muestro lo planificado ese día
+                      </Text>
+                    </View>
+                  </Card.Content>
+                </Card>
+              )}
 
               {cancelledTodayForSite.length > 0 && (
                 <>

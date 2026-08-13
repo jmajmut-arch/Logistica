@@ -10,7 +10,7 @@ import { LoadArrivalListScreen } from './LoadArrivalListScreen';
 export type LoadArrivalsStackParamList = {
   LoadArrivalList: undefined;
   LoadArrivalForm:
-    | { arrivalId?: number; planItemId?: number; openUnplanned?: boolean }
+    | { arrivalId?: number; planItemId?: number; openUnplanned?: boolean; openBackdated?: boolean }
     | undefined;
 };
 
