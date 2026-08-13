@@ -189,6 +189,28 @@ export function LoadArrivalFormScreen() {
     [overdueItemsForSite, todayItemsForSite],
   );
 
+  // Lo planificado para el día elegido en el selector de fecha del paso "Hora de llegada" —
+  // para que, al registrar una llegada de un día anterior, el operador vea si en realidad
+  // había algo planificado ese día (y pueda elegirlo) en vez de dejarlo como "no
+  // planificado" por error.
+  const itemsForArrivalDay = useMemo(() => {
+    if (!planItems || siteId === 0) {
+      return [];
+    }
+    const dayEndExclusive = arrivalDay + DAY_MS;
+    return planItems
+      .filter(
+        (item) =>
+          item.siteId === siteId &&
+          item.scheduledAt >= arrivalDay &&
+          item.scheduledAt < dayEndExclusive &&
+          !item.cancelledByOperator &&
+          !registeredPlanItemIds.has(item.id) &&
+          matchesOperatorScope(item.operationType, currentOperatorScope),
+      )
+      .sort((a, b) => a.scheduledAt - b.scheduledAt);
+  }, [planItems, siteId, arrivalDay, registeredPlanItemIds, currentOperatorScope]);
+
   const openPlanItem = (item: TransportPlanItem) => {
     setActive(item);
     setBlockMinutes(blockMinutesOf(item.scheduledAt));
@@ -553,6 +575,56 @@ export function LoadArrivalFormScreen() {
                     }
                   }}
                 />
+
+                {itemsForArrivalDay.length > 0 ? (
+                  <View style={styles.dayPlanSection}>
+                    <Text variant="labelSmall" style={styles.dialogDayLabel}>
+                      Plan de {format(new Date(arrivalDay), 'dd-MM-yyyy')} para {selectedSite?.name}
+                    </Text>
+                    {itemsForArrivalDay.map((item) => {
+                      const isSelected = active !== 'unplanned' && active.id === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => {
+                            setActive(item);
+                            setBlockMinutes(blockMinutesOf(item.scheduledAt));
+                          }}
+                          style={[
+                            styles.dayPlanRow,
+                            { borderColor: PALETTE.border },
+                            isSelected && { borderColor: PALETTE.primary, backgroundColor: PALETTE.surface },
+                          ]}
+                        >
+                          <Text variant="bodySmall" style={styles.dayPlanRowText}>
+                            {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
+                            {' · '}
+                            {OPERATION_TYPE_LABELS[item.operationType]}
+                          </Text>
+                          <MaterialCommunityIcons
+                            name={isSelected ? 'check-circle' : 'circle-outline'}
+                            size={18}
+                            color={isSelected ? PALETTE.primary : PALETTE.textMuted}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                    {active !== 'unplanned' && (
+                      <Pressable onPress={() => setActive('unplanned')} style={styles.dayPlanUnplannedLink}>
+                        <Text variant="bodySmall" style={{ color: PALETTE.secondary }}>
+                          Ninguno de estos — es una carga no planificada
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ) : (
+                  active === 'unplanned' && (
+                    <Text style={styles.dialogDayLabel}>
+                      No había nada planificado para este día en {selectedSite?.name}.
+                    </Text>
+                  )
+                )}
+
                 {active !== 'unplanned' && active.hasNoSchedule && (
                   <Text style={styles.dialogDayLabel}>
                     Este viaje no tiene horario planificado — solo registra la hora de llegada.
@@ -754,6 +826,26 @@ const styles = StyleSheet.create({
   },
   dialogDayLabel: {
     marginBottom: 12,
+  },
+  dayPlanSection: {
+    marginBottom: 12,
+    gap: 6,
+  },
+  dayPlanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  dayPlanRowText: {
+    flex: 1,
+  },
+  dayPlanUnplannedLink: {
+    marginTop: 2,
   },
   craneWarning: {
     marginTop: 8,
