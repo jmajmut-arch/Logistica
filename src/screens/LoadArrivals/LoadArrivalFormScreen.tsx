@@ -33,6 +33,7 @@ import type { User } from '@/domain/entities/User';
 import { splitCancelledByOperator } from '@/domain/rules/cancelledTrips';
 import { useSessionStore } from '@/store/sessionStore';
 import { useAppPalette } from '@/store/themeStore';
+import { withAlpha } from '@/theme';
 import { matchesOperatorScope } from '@/utils/operatorScope';
 import { SITE_TYPE_LABELS } from '@/utils/siteDisplay';
 import {
@@ -550,16 +551,23 @@ export function LoadArrivalFormScreen() {
             <>
               <Dialog.Title>Hora de llegada</Dialog.Title>
               <Dialog.Content>
-                <Pressable onPress={() => setDatePickerVisible(true)}>
-                  <TextInput
-                    label="Día"
-                    value={format(new Date(arrivalDay), 'dd-MM-yyyy')}
-                    editable={false}
-                    mode="outlined"
-                    right={<TextInput.Icon icon="calendar" />}
-                    pointerEvents="none"
-                    style={styles.field}
-                  />
+                <Pressable
+                  onPress={() => setDatePickerVisible(true)}
+                  style={[
+                    styles.dayPickerCard,
+                    { backgroundColor: PALETTE.surfaceVariant, borderColor: PALETTE.border },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="calendar-month-outline" size={26} color={PALETTE.primary} />
+                  <View style={styles.dayPickerTextGroup}>
+                    <Text variant="labelSmall" style={{ color: PALETTE.textMuted }}>
+                      Día de la llegada
+                    </Text>
+                    <Text variant="titleMedium" style={{ color: PALETTE.text }}>
+                      {format(new Date(arrivalDay), "EEEE dd 'de' MMMM", { locale: es })}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-down" size={22} color={PALETTE.textMuted} />
                 </Pressable>
                 <DatePickerModal
                   locale="es"
@@ -578,8 +586,8 @@ export function LoadArrivalFormScreen() {
 
                 {itemsForArrivalDay.length > 0 ? (
                   <View style={styles.dayPlanSection}>
-                    <Text variant="labelSmall" style={styles.dialogDayLabel}>
-                      Plan de {format(new Date(arrivalDay), 'dd-MM-yyyy')} para {selectedSite?.name}
+                    <Text variant="labelSmall" style={[styles.dialogDayLabel, { color: PALETTE.textMuted }]}>
+                      PLAN DE ESE DÍA EN {selectedSite?.name?.toUpperCase()}
                     </Text>
                     {itemsForArrivalDay.map((item) => {
                       const isSelected = active !== 'unplanned' && active.id === item.id;
@@ -591,21 +599,27 @@ export function LoadArrivalFormScreen() {
                             setBlockMinutes(blockMinutesOf(item.scheduledAt));
                           }}
                           style={[
-                            styles.dayPlanRow,
-                            { borderColor: PALETTE.border },
-                            isSelected && { borderColor: PALETTE.primary, backgroundColor: PALETTE.surface },
+                            styles.dayPlanCard,
+                            { backgroundColor: PALETTE.surfaceVariant, borderColor: 'transparent' },
+                            isSelected && {
+                              borderColor: PALETTE.primary,
+                              backgroundColor: withAlpha(PALETTE.primary, 0.12),
+                            },
                           ]}
                         >
-                          <Text variant="bodySmall" style={styles.dayPlanRowText}>
-                            {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
-                            {' · '}
-                            {OPERATION_TYPE_LABELS[item.operationType]}
-                          </Text>
                           <MaterialCommunityIcons
                             name={isSelected ? 'check-circle' : 'circle-outline'}
-                            size={18}
+                            size={24}
                             color={isSelected ? PALETTE.primary : PALETTE.textMuted}
                           />
+                          <View style={styles.dayPlanCardText}>
+                            <Text variant="titleSmall" style={{ color: PALETTE.text }}>
+                              {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
+                            </Text>
+                            <Text variant="bodySmall" style={{ color: PALETTE.textMuted }}>
+                              {OPERATION_TYPE_LABELS[item.operationType]}
+                            </Text>
+                          </View>
                         </Pressable>
                       );
                     })}
@@ -619,9 +633,17 @@ export function LoadArrivalFormScreen() {
                   </View>
                 ) : (
                   active === 'unplanned' && (
-                    <Text style={styles.dialogDayLabel}>
-                      No había nada planificado para este día en {selectedSite?.name}.
-                    </Text>
+                    <View
+                      style={[
+                        styles.dayPlanEmpty,
+                        { backgroundColor: PALETTE.surfaceVariant, borderColor: PALETTE.border },
+                      ]}
+                    >
+                      <MaterialCommunityIcons name="calendar-remove-outline" size={20} color={PALETTE.textMuted} />
+                      <Text variant="bodySmall" style={{ color: PALETTE.textMuted, flex: 1 }}>
+                        No había nada planificado para este día en {selectedSite?.name}.
+                      </Text>
+                    </View>
                   )
                 )}
 
@@ -825,27 +847,51 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   dialogDayLabel: {
-    marginBottom: 12,
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  dayPickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  dayPickerTextGroup: {
+    flex: 1,
+    gap: 2,
   },
   dayPlanSection: {
     marginBottom: 12,
-    gap: 6,
+    gap: 8,
   },
-  dayPlanRow: {
+  dayPlanCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    gap: 12,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
-  dayPlanRowText: {
+  dayPlanCardText: {
     flex: 1,
+    gap: 1,
+  },
+  dayPlanEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
   },
   dayPlanUnplannedLink: {
     marginTop: 2,
+    paddingVertical: 4,
   },
   craneWarning: {
     marginTop: 8,
