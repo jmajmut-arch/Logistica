@@ -63,6 +63,8 @@ export function LoadArrivalListScreen() {
   const [usersById, setUsersById] = useState<Map<number, User>>(new Map());
   const [arrivalToDelete, setArrivalToDelete] = useState<LoadArrival | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [revertTarget, setRevertTarget] = useState<TransportPlanItem | null>(null);
+  const [reverting, setReverting] = useState(false);
 
   const loadData = useCallback(async () => {
     const [loadedArrivals, loadedPlanItems, sites, carriers, users] = await Promise.all([
@@ -197,6 +199,21 @@ export function LoadArrivalListScreen() {
       await loadData();
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Deshace un "viaje cancelado" marcado por error: vuelve a la lista de pendientes.
+  const confirmRevert = async () => {
+    if (!revertTarget) {
+      return;
+    }
+    setReverting(true);
+    try {
+      await transportPlanRepository.revertCancelledByOperator(revertTarget.id);
+      setRevertTarget(null);
+      await loadData();
+    } finally {
+      setReverting(false);
     }
   };
 
@@ -374,7 +391,11 @@ export function LoadArrivalListScreen() {
                     const cancelledByName =
                       item.cancelledBy !== null ? usersById.get(item.cancelledBy)?.name : undefined;
                     return (
-                      <Card key={item.id} style={[styles.pendingCard, styles.cancelledCard]}>
+                      <Card
+                        key={item.id}
+                        style={[styles.pendingCard, styles.cancelledCard]}
+                        onPress={() => setRevertTarget(item)}
+                      >
                         <Card.Content style={styles.pendingContent}>
                           <View style={styles.pendingTime}>
                             <Text
@@ -396,7 +417,7 @@ export function LoadArrivalListScreen() {
                             </Text>
                           </View>
                           <MaterialCommunityIcons
-                            name="close-circle-outline"
+                            name="undo"
                             size={22}
                             color={DISPLAY_STATUS_COLORS.cancelled}
                           />
@@ -462,6 +483,19 @@ export function LoadArrivalListScreen() {
             <Button onPress={() => setArrivalToDelete(null)}>Cancelar</Button>
             <Button onPress={confirmDelete} loading={deleting} disabled={deleting}>
               Eliminar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={revertTarget !== null} onDismiss={() => setRevertTarget(null)}>
+          <Dialog.Title>¿Deshacer cancelación?</Dialog.Title>
+          <Dialog.Content>
+            <Text>El viaje volverá a quedar pendiente por registrar.</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRevertTarget(null)}>Cancelar</Button>
+            <Button mode="contained" onPress={confirmRevert} loading={reverting} disabled={reverting}>
+              Sí, deshacer
             </Button>
           </Dialog.Actions>
         </Dialog>

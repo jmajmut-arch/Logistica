@@ -88,6 +88,8 @@ export function LoadArrivalFormScreen() {
   const [unplannedCarrierError, setUnplannedCarrierError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);
+  const [revertTarget, setRevertTarget] = useState<TransportPlanItem | null>(null);
+  const [reverting, setReverting] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -329,6 +331,28 @@ export function LoadArrivalFormScreen() {
     }
   };
 
+  // Deshace un "viaje cancelado" marcado por error: vuelve a la lista de pendientes tal
+  // como estaba antes de cancelarlo.
+  const confirmRevert = async () => {
+    if (revertTarget === null) {
+      return;
+    }
+    setReverting(true);
+    try {
+      await transportPlanRepository.revertCancelledByOperator(revertTarget.id);
+      setPlanItems((current) =>
+        (current ?? []).map((item) =>
+          item.id === revertTarget.id
+            ? { ...item, cancelledByOperator: false, cancelledBy: null, cancelledAt: null }
+            : item,
+        ),
+      );
+      setRevertTarget(null);
+    } finally {
+      setReverting(false);
+    }
+  };
+
   const confirmOtherTime = () => {
     if (active === null) {
       return;
@@ -481,7 +505,12 @@ export function LoadArrivalFormScreen() {
                 Cancelados
               </Text>
               {cancelledItemsForSite.map((item) => (
-                <CancelledPlanItemCard key={item.id} item={item} usersById={usersById} />
+                <CancelledPlanItemCard
+                  key={item.id}
+                  item={item}
+                  usersById={usersById}
+                  onPress={() => setRevertTarget(item)}
+                />
               ))}
             </>
           )}
@@ -749,24 +778,43 @@ export function LoadArrivalFormScreen() {
             </>
           )}
         </Dialog>
+
+        <Dialog visible={revertTarget !== null} onDismiss={() => setRevertTarget(null)}>
+          <Dialog.Title>¿Deshacer cancelación?</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              {revertTarget && !revertTarget.hasNoSchedule
+                ? `El viaje planificado ${format(new Date(revertTarget.scheduledAt), 'EEE dd-MM HH:mm', { locale: es })} volverá a quedar pendiente por registrar.`
+                : 'El viaje volverá a quedar pendiente por registrar.'}
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRevertTarget(null)}>Cancelar</Button>
+            <Button mode="contained" onPress={confirmRevert} loading={reverting} disabled={reverting}>
+              Sí, deshacer
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
     </ScrollView>
   );
 }
 
 // Viaje marcado como "no llegó" por el operador: se muestra en la lista para dejar registro
-// en la bodega/planta, pero ya no es una tarjeta pendiente accionable (sin onPress).
+// en la bodega/planta, con la opción de deshacerlo si se marcó por error.
 function CancelledPlanItemCard({
   item,
   usersById,
+  onPress,
 }: {
   item: TransportPlanItem;
   usersById: Map<number, User>;
+  onPress: () => void;
 }) {
   const cancelledByName =
     item.cancelledBy !== null ? usersById.get(item.cancelledBy)?.name : undefined;
   return (
-    <Card style={[styles.planItemCard, styles.cancelledCard]}>
+    <Card style={[styles.planItemCard, styles.cancelledCard]} onPress={onPress}>
       <Card.Content style={styles.planItemContent}>
         <View style={styles.planItemTimeWide}>
           <Text variant="bodySmall" style={styles.cancelledLabel}>
@@ -782,11 +830,7 @@ function CancelledPlanItemCard({
             {item.cancelledAt ? ` · ${format(new Date(item.cancelledAt), 'dd-MM HH:mm')}` : ''}
           </Text>
         </View>
-        <MaterialCommunityIcons
-          name="close-circle-outline"
-          size={22}
-          color={DISPLAY_STATUS_COLORS.cancelled}
-        />
+        <MaterialCommunityIcons name="undo" size={22} color={DISPLAY_STATUS_COLORS.cancelled} />
       </Card.Content>
     </Card>
   );

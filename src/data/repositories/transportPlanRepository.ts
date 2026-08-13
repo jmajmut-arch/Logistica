@@ -113,4 +113,14 @@ export const transportPlanRepository = {
       .eq('id', id);
     if (error) throw error;
   },
+
+  /** Deshace un "viaje cancelado" marcado por error: vuelve a quedar pendiente por
+   * registrar, como si nunca se hubiera marcado. */
+  async revertCancelledByOperator(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('transport_plan_items')
+      .update({ cancelled_by_operator: false, cancelled_by: null, cancelled_at: null })
+      .eq('id', id);
+    if (error) throw error;
+  },
 };
