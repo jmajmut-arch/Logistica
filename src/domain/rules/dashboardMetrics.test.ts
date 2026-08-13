@@ -1,3 +1,4 @@
+import type { DisplayStatus } from '@/domain/rules/complianceStatus';
 import {
   arrivalCompliance,
   cancelledCount,
@@ -55,18 +56,36 @@ describe('arrivalCompliance', () => {
 });
 
 describe('scheduleAdherence', () => {
+  const scheduled = (status: DisplayStatus) => ({ status, hasNoSchedule: false });
+  const noSchedule = (status: DisplayStatus) => ({ status, hasNoSchedule: true });
+
   it('returns null when nobody arrived yet', () => {
-    expect(scheduleAdherence(['pending', 'overdue', 'cancelled'])).toBeNull();
+    expect(
+      scheduleAdherence([scheduled('pending'), scheduled('overdue'), scheduled('cancelled')]),
+    ).toBeNull();
   });
 
   it('is the on-time share among only the ones that arrived', () => {
     // 1 on_time out of 2 arrived (late doesn't count as arrived-but-late here, it's the
     // denominator); the pending one must not dilute the ratio since it never arrived.
-    expect(scheduleAdherence(['on_time', 'late', 'pending'])).toBe(50);
+    expect(scheduleAdherence([scheduled('on_time'), scheduled('late'), scheduled('pending')])).toBe(
+      50,
+    );
   });
 
   it('is 100 when every arrival was on time', () => {
-    expect(scheduleAdherence(['on_time', 'on_time'])).toBe(100);
+    expect(scheduleAdherence([scheduled('on_time'), scheduled('on_time')])).toBe(100);
+  });
+
+  it('never counts a no-schedule arrival as on time, even though its status is on_time', () => {
+    // getPlanItemStatus resolves any arrival on a no-schedule item to 'on_time' (nothing to
+    // measure lateness against), but that must not count as punctuality here — there was no
+    // hour to have been on time for.
+    expect(scheduleAdherence([noSchedule('on_time'), scheduled('on_time')])).toBe(50);
+  });
+
+  it('still counts a no-schedule arrival toward the arrived denominator', () => {
+    expect(scheduleAdherence([noSchedule('on_time')])).toBe(0);
   });
 });
 

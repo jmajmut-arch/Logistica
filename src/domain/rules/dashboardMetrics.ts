@@ -34,17 +34,25 @@ export function arrivalCompliance(planStatuses: DisplayStatus[]): number | null 
   return Math.round((arrived / planStatuses.length) * 100);
 }
 
+export interface AdherenceEntry {
+  status: DisplayStatus;
+  hasNoSchedule: boolean;
+}
+
 /** % de los camiones que sí llegaron y lo hicieron dentro del horario planificado — mide
  * adherencia horaria solo entre los que llegaron (si nunca llegó, ya lo penaliza
- * arrivalCompliance, no esta métrica). */
-export function scheduleAdherence(planStatuses: DisplayStatus[]): number | null {
-  const arrived = planStatuses.filter(
-    (status) => status === 'on_time' || status === 'late' || status === 'early',
+ * arrivalCompliance, no esta métrica). Un item "sin horario" siempre cuenta como
+ * `on_time` en getPlanItemStatus (no hay hora contra la cual medir atraso/anticipo), pero
+ * para esta métrica específica de puntualidad no tiene sentido contarlo como "a tiempo" —
+ * cae en la categoría de 0% adherencia, aunque sigue sumando al total de llegados. */
+export function scheduleAdherence(entries: AdherenceEntry[]): number | null {
+  const arrived = entries.filter(
+    (entry) => entry.status === 'on_time' || entry.status === 'late' || entry.status === 'early',
   );
   if (arrived.length === 0) {
     return null;
   }
-  const onTime = arrived.filter((status) => status === 'on_time').length;
+  const onTime = arrived.filter((entry) => entry.status === 'on_time' && !entry.hasNoSchedule).length;
   return Math.round((onTime / arrived.length) * 100);
 }
 

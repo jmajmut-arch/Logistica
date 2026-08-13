@@ -310,6 +310,29 @@ export function DashboardScreen() {
     [weekItems, arrivalsByPlanItem, now],
   );
 
+  // Igual que arriba, pero conservando hasNoSchedule: un item "sin horario" que llegó
+  // siempre resuelve a on_time (no hay hora contra la cual medir atraso/anticipo), pero
+  // para "Adherencia horaria" no debe contar como puntual — no había hora indicada que
+  // cumplir. scheduleAdherence necesita este dato aparte para excluirlo del numerador sin
+  // sacarlo del denominador de "llegados".
+  const todayAdherenceEntries = useMemo(
+    () =>
+      todayItems.map((item) => ({
+        status: getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now),
+        hasNoSchedule: item.hasNoSchedule,
+      })),
+    [todayItems, arrivalsByPlanItem, now],
+  );
+
+  const weekAdherenceEntries = useMemo(
+    () =>
+      weekItems.map((item) => ({
+        status: getDisplayStatus(item, arrivalsByPlanItem.get(item.id), now),
+        hasNoSchedule: item.hasNoSchedule,
+      })),
+    [weekItems, arrivalsByPlanItem, now],
+  );
+
   // Desglose del cumplimiento en sus dos causas: si el camión llegó (sin importar la hora)
   // y, entre los que llegaron, si respetaron el horario planificado. Se calcula igual para
   // hoy y para la semana, para que ambas secciones del Dashboard tengan la misma estructura.
@@ -321,16 +344,16 @@ export function DashboardScreen() {
     [todayDisplayStatuses, todayUnplannedArrivals],
   );
   const dailyScheduleAdherence = useMemo(
-    () => scheduleAdherence(todayDisplayStatuses),
-    [todayDisplayStatuses],
+    () => scheduleAdherence(todayAdherenceEntries),
+    [todayAdherenceEntries],
   );
   const weeklyArrivalCompliance = useMemo(
     () => combinedCompliance(weekDisplayStatuses, weekUnplannedArrivals.length),
     [weekDisplayStatuses, weekUnplannedArrivals],
   );
   const weeklyScheduleAdherence = useMemo(
-    () => scheduleAdherence(weekDisplayStatuses),
-    [weekDisplayStatuses],
+    () => scheduleAdherence(weekAdherenceEntries),
+    [weekAdherenceEntries],
   );
 
   const weeklyComplianceByDay = useMemo(
