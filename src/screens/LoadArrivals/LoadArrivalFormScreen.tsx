@@ -589,6 +589,7 @@ export function LoadArrivalFormScreen() {
                     <Text variant="labelSmall" style={[styles.dialogDayLabel, { color: PALETTE.textMuted }]}>
                       PLAN DE ESE DÍA EN {selectedSite?.name?.toUpperCase()}
                     </Text>
+                    <ScrollView style={styles.dayPlanScroll} nestedScrollEnabled>
                     {itemsForArrivalDay.map((item) => {
                       const isSelected = active !== 'unplanned' && active.id === item.id;
                       return (
@@ -623,6 +624,7 @@ export function LoadArrivalFormScreen() {
                         </Pressable>
                       );
                     })}
+                    </ScrollView>
                     {active !== 'unplanned' && (
                       <Pressable onPress={() => setActive('unplanned')} style={styles.dayPlanUnplannedLink}>
                         <Text variant="bodySmall" style={{ color: PALETTE.secondary }}>
@@ -868,6 +870,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 8,
   },
+  dayPlanScroll: {
+    maxHeight: 240,
+  },
   dayPlanCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -876,6 +881,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
+    marginBottom: 8,
   },
   dayPlanCardText: {
     flex: 1,
