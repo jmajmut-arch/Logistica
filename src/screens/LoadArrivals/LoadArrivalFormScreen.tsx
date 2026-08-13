@@ -598,6 +598,7 @@ export function LoadArrivalFormScreen() {
                     <ScrollView style={styles.dayPlanScroll} nestedScrollEnabled>
                     {itemsForArrivalDay.map((item) => {
                       const isSelected = active !== 'unplanned' && active.id === item.id;
+                      const carrier = item.carrierId !== null ? carriersById.get(item.carrierId) : undefined;
                       return (
                         <Pressable
                           key={item.id}
@@ -620,12 +621,23 @@ export function LoadArrivalFormScreen() {
                             color={isSelected ? PALETTE.primary : PALETTE.textMuted}
                           />
                           <View style={styles.dayPlanCardText}>
-                            <Text variant="titleSmall" style={{ color: PALETTE.text }}>
-                              {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
-                            </Text>
+                            <View style={styles.dayPlanCardHeaderRow}>
+                              <Text variant="titleSmall" style={{ color: PALETTE.text }}>
+                                {item.hasNoSchedule ? 'Sin horario' : format(new Date(item.scheduledAt), 'HH:mm')}
+                              </Text>
+                              <Text variant="bodySmall" style={{ color: PALETTE.textMuted }}>
+                                {OPERATION_TYPE_LABELS[item.operationType]}
+                              </Text>
+                            </View>
                             <Text variant="bodySmall" style={{ color: PALETTE.textMuted }}>
-                              {OPERATION_TYPE_LABELS[item.operationType]}
+                              {carrier ? carrier.name : 'Sin empresa asignada'}
                             </Text>
+                            {item.reference && (
+                              <Text variant="bodySmall" style={{ color: PALETTE.textMuted }}>
+                                Ref: {item.reference}
+                              </Text>
+                            )}
+                            {item.requiresHeavyCrane && <HeavyCraneBadge />}
                           </View>
                         </Pressable>
                       );
@@ -881,7 +893,7 @@ const styles = StyleSheet.create({
   },
   dayPlanCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1.5,
     borderRadius: 12,
@@ -891,7 +903,14 @@ const styles = StyleSheet.create({
   },
   dayPlanCardText: {
     flex: 1,
-    gap: 1,
+    gap: 2,
+    paddingTop: 2,
+  },
+  dayPlanCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   dayPlanEmpty: {
     flexDirection: 'row',
