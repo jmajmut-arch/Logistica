@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   Dialog,
-  FAB,
   IconButton,
   List,
   Portal,
@@ -465,14 +464,6 @@ export function LoadArrivalListScreen() {
           );
         }}
       />
-      <RoleGate permission="registerArrivals">
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          onPress={() => navigation.navigate('LoadArrivalForm')}
-        />
-      </RoleGate>
-
       <Portal>
         <Dialog visible={arrivalToDelete !== null} onDismiss={() => setArrivalToDelete(null)}>
           <Dialog.Title>Eliminar llegada</Dialog.Title>
@@ -514,7 +505,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listContent: {
-    paddingBottom: 88,
+    paddingBottom: 16,
   },
   statsCard: {
     marginHorizontal: 16,
@@ -579,10 +570,5 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
   },
 });
