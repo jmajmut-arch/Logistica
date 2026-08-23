@@ -1,3 +1,11 @@
+-- Limpia por completo el esquema anterior de SUSPEL (registro de sustancias peligrosas):
+-- este proyecto pasó a ser exclusivamente control de planificación de transporte de carga.
+drop table if exists dispatch_issues cascade;
+drop table if exists load_arrivals cascade;
+drop table if exists transport_plan_items cascade;
+drop table if exists carriers cascade;
+drop table if exists sites cascade;
+drop table if exists truck_arrivals cascade;
 drop table if exists field_verification_items cascade;
 drop table if exists field_verifications cascade;
 drop table if exists alerts cascade;
@@ -10,132 +18,162 @@ drop table if exists users cascade;
 create table users (
   id bigint generated always as identity primary key,
   name text not null,
-  role text not null check (role in ('warehouse', 'supervisor'))
+  role text not null check (role in ('operator', 'supervisor', 'admin')),
+  -- Solo se usa para notificar por correo (ej. incidencias de guías de despacho); opcional.
+  email text
 );
 
-create table zones (
+-- Catálogo de patios y bodegas propias: es el "área" que el operador elige al registrar
+-- una llegada, y a la que el supervisor asocia cada item del plan semanal.
+create table sites (
   id bigint generated always as identity primary key,
-  name text not null,
-  code text not null unique
+  name text not null unique,
+  type text not null check (type in ('patio', 'bodega')),
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
-create table zone_class_limits (
+-- Catálogo de empresas de transporte: se selecciona desde acá tanto al planificar como al
+-- registrar un viaje no planificado, en vez de escribir el nombre a mano.
+create table carriers (
   id bigint generated always as identity primary key,
-  zone_id bigint not null references zones (id) on delete cascade,
-  hazard_class text not null check (hazard_class in (
-    'class1_explosives', 'class2_gases', 'class3_flammable_liquids',
-    'class4_flammable_solids', 'class5_oxidizers', 'class6_toxic',
-    'class7_radioactive', 'class8_corrosives', 'class9_misc'
-  )),
-  max_quantity double precision not null,
-  unit text not null check (unit in ('l', 'ml', 'kg', 't')),
-  unique (zone_id, hazard_class)
+  name text not null unique,
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
-create table compatibility_rules (
+-- Reglas de planificación permanente (ej. "todos los lunes 10:00"), hoy usadas solo por
+-- el Administrador para home delivery. Cada regla no se muestra directamente en la
+-- agenda: genera items concretos en transport_plan_items (ver recurrence_rule_id abajo),
+-- que es lo único que el operador ve y contra lo que registra llegadas.
+create table recurring_plan_rules (
   id bigint generated always as identity primary key,
-  class_a text not null check (class_a in (
-    'class1_explosives', 'class2_gases', 'class3_flammable_liquids',
-    'class4_flammable_solids', 'class5_oxidizers', 'class6_toxic',
-    'class7_radioactive', 'class8_corrosives', 'class9_misc'
-  )),
-  class_b text not null check (class_b in (
-    'class1_explosives', 'class2_gases', 'class3_flammable_liquids',
-    'class4_flammable_solids', 'class5_oxidizers', 'class6_toxic',
-    'class7_radioactive', 'class8_corrosives', 'class9_misc'
-  )),
-  status text not null check (status in ('compatible', 'incompatible')),
-  unique (class_a, class_b)
-);
-
-create table substances (
-  id bigint generated always as identity primary key,
-  name text not null,
-  hazard_class text not null check (hazard_class in (
-    'class1_explosives', 'class2_gases', 'class3_flammable_liquids',
-    'class4_flammable_solids', 'class5_oxidizers', 'class6_toxic',
-    'class7_radioactive', 'class8_corrosives', 'class9_misc'
-  )),
-  quantity double precision not null,
-  unit text not null check (unit in ('l', 'ml', 'kg', 't')),
-  zone_id bigint not null references zones (id) on delete restrict,
-  expiration_date text not null,
-  sds_uri text,
-  sds_file_name text,
+  operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
+  site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
+  day_of_week smallint not null check (day_of_week between 0 and 6), -- 0 = lunes ... 6 = domingo
+  block_minutes integer not null check (block_minutes between 0 and 1439),
+  requires_heavy_crane boolean not null default false,
+  reference text,
+  notes text,
+  active boolean not null default true,
   created_by bigint not null references users (id) on delete restrict,
-  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
-  updated_at bigint not null default (extract(epoch from now()) * 1000)::bigint
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
-create index substances_zone_idx on substances (zone_id);
-create index substances_expiration_idx on substances (expiration_date);
 
-create table alerts (
+-- El plan de transporte semanal: cada fila es un viaje concreto (fecha + hora), no una
+-- plantilla recurrente. "Semanal" describe la cadencia con la que el planificador lo carga,
+-- no la forma de guardarlo — así se puede filtrar/agrupar por semana en la UI sin modelar
+-- semanas como entidad aparte. Un item puede venir de una regla permanente
+-- (recurrence_rule_id no nulo); editarlo o eliminarlo solo afecta esa fecha puntual, nunca
+-- a la regla ni a las demás ocurrencias futuras. Eliminar una ocurrencia de una regla la
+-- cancela (cancelled = true) en vez de borrarla, para que la sincronización no la regenere
+-- al ver esa semana "libre"; un item cancelado se excluye de toda la app salvo del propio
+-- chequeo de sincronización.
+create table transport_plan_items (
   id bigint generated always as identity primary key,
-  type text not null check (type in ('expiration', 'limit_exceeded', 'incompatibility', 'verification_overdue')),
-  severity text not null check (severity in ('low', 'medium', 'high', 'critical')),
-  status text not null default 'pending' check (status in ('pending', 'resolved')),
-  related_substance_id bigint references substances (id) on delete cascade,
-  related_zone_id bigint references zones (id) on delete cascade,
-  message text not null,
-  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
-  resolved_at bigint,
-  resolved_by bigint references users (id) on delete set null
+  operation_type text not null check (operation_type in ('carga_subida', 'retiro_carga', 'home_delivery')),
+  site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
+  scheduled_at bigint not null,
+  has_no_schedule boolean not null default false,
+  reference text,
+  notes text,
+  requires_heavy_crane boolean not null default false,
+  recurrence_rule_id bigint references recurring_plan_rules (id) on delete set null,
+  cancelled boolean not null default false,
+  created_by bigint not null references users (id) on delete restrict,
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
-create index alerts_status_idx on alerts (status);
+create index transport_plan_items_scheduled_idx on transport_plan_items (scheduled_at);
+create index transport_plan_items_site_idx on transport_plan_items (site_id);
+create index transport_plan_items_recurrence_idx on transport_plan_items (recurrence_rule_id);
 
-create table field_verifications (
+-- Registro del operador: elige el área (sitio) y, o bien confirma un item del plan de hoy
+-- (a tiempo o con otro horario), o marca un viaje no planificado (con su propia empresa,
+-- ya que no hay un item de plan del que heredarla). El día siempre es hoy.
+create table load_arrivals (
   id bigint generated always as identity primary key,
-  zone_id bigint not null references zones (id) on delete restrict,
-  performed_by bigint not null references users (id) on delete restrict,
-  performed_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
-  notes text
+  site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
+  arrived_at bigint not null,
+  plan_item_id bigint references transport_plan_items (id) on delete set null,
+  registered_by bigint not null references users (id) on delete restrict,
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
-create index field_verifications_zone_idx on field_verifications (zone_id);
-create index field_verifications_performed_at_idx on field_verifications (performed_at);
+create index load_arrivals_arrived_idx on load_arrivals (arrived_at);
+create index load_arrivals_site_idx on load_arrivals (site_id);
+create unique index load_arrivals_plan_item_unique on load_arrivals (plan_item_id) where plan_item_id is not null;
 
-create table field_verification_items (
+-- Incidencias de guías de despacho con problemas (no ingresadas por el operador logístico,
+-- u otro motivo): el supervisor de logística las levanta al detectar el problema y las
+-- cierra una vez regularizadas, dejando notas de cómo se resolvió. guide_file_url apunta al
+-- documento adjunto (PDF o foto de la guía) en el bucket público "dispatch-guides".
+create table dispatch_issues (
   id bigint generated always as identity primary key,
-  verification_id bigint not null references field_verifications (id) on delete cascade,
-  item_key text not null,
-  result text not null check (result in ('cumple', 'no_cumple', 'no_aplica')),
-  observation text
+  guide_number text not null,
+  site_id bigint not null references sites (id) on delete restrict,
+  carrier_id bigint references carriers (id) on delete set null,
+  issue_type text not null check (issue_type in ('no_ingresada', 'otro')),
+  description text not null,
+  guide_file_url text,
+  guide_file_name text,
+  -- Persona a notificar por correo al levantar la incidencia (opcional, ver Edge Function
+  -- send-dispatch-issue-notification).
+  notify_user_id bigint references users (id) on delete set null,
+  status text not null default 'open' check (status in ('open', 'closed')),
+  raised_by bigint not null references users (id) on delete restrict,
+  raised_at bigint not null default (extract(epoch from now()) * 1000)::bigint,
+  closed_by bigint references users (id) on delete set null,
+  closed_at bigint,
+  resolution_notes text
 );
-create index field_verification_items_verification_idx on field_verification_items (verification_id);
+create index dispatch_issues_status_idx on dispatch_issues (status);
+create index dispatch_issues_site_idx on dispatch_issues (site_id);
 
 alter table users disable row level security;
-alter table zones disable row level security;
-alter table zone_class_limits disable row level security;
-alter table compatibility_rules disable row level security;
-alter table substances disable row level security;
-alter table alerts disable row level security;
-alter table field_verifications disable row level security;
-alter table field_verification_items disable row level security;
+alter table sites disable row level security;
+alter table carriers disable row level security;
+alter table recurring_plan_rules disable row level security;
+alter table transport_plan_items disable row level security;
+alter table load_arrivals disable row level security;
+alter table dispatch_issues disable row level security;
 
 grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;
 
+-- Bucket público para las guías de despacho adjuntas a una incidencia (dispatch_issues).
+insert into storage.buckets (id, name, public)
+values ('dispatch-guides', 'dispatch-guides', true)
+on conflict (id) do nothing;
+
+drop policy if exists "dispatch_guides_public_read" on storage.objects;
+drop policy if exists "dispatch_guides_public_insert" on storage.objects;
+drop policy if exists "dispatch_guides_public_update" on storage.objects;
+drop policy if exists "dispatch_guides_public_delete" on storage.objects;
+drop policy if exists "dispatch_guides_bucket_select" on storage.buckets;
+
+create policy "dispatch_guides_public_read" on storage.objects
+  for select using (bucket_id = 'dispatch-guides');
+create policy "dispatch_guides_public_insert" on storage.objects
+  for insert with check (bucket_id = 'dispatch-guides');
+create policy "dispatch_guides_public_update" on storage.objects
+  for update using (bucket_id = 'dispatch-guides');
+create policy "dispatch_guides_public_delete" on storage.objects
+  for delete using (bucket_id = 'dispatch-guides');
+-- storage.buckets también tiene RLS habilitado por defecto: sin esta policy, el rol anon
+-- no puede ver que el bucket existe y la subida falla con 400 antes de llegar a objects.
+create policy "dispatch_guides_bucket_select" on storage.buckets
+  for select using (id = 'dispatch-guides');
+
 insert into users (name, role) values
-  ('Bodega', 'warehouse'),
-  ('Supervisor', 'supervisor');
+  ('Operador', 'operator'),
+  ('Supervisor', 'supervisor'),
+  ('Administrador', 'admin');
 
-insert into zones (name, code) values
-  ('Rack A1', 'A1'),
-  ('Rack A2', 'A2'),
-  ('Rack B1', 'B1');
+insert into sites (name, type) values
+  ('Bodega Central', 'bodega'),
+  ('Patio Norte', 'patio');
 
-insert into zone_class_limits (zone_id, hazard_class, max_quantity, unit)
-select z.id, v.hazard_class, v.max_quantity, v.unit
-from zones z
-cross join (values
-  ('class3_flammable_liquids', 200, 'l'),
-  ('class8_corrosives', 100, 'l')
-) as v(hazard_class, max_quantity, unit);
-
-insert into compatibility_rules (class_a, class_b, status) values
-  ('class3_flammable_liquids', 'class5_oxidizers', 'incompatible'),
-  ('class3_flammable_liquids', 'class8_corrosives', 'incompatible'),
-  ('class4_flammable_solids', 'class5_oxidizers', 'incompatible'),
-  ('class5_oxidizers', 'class6_toxic', 'incompatible'),
-  ('class1_explosives', 'class8_corrosives', 'incompatible'),
-  ('class3_flammable_liquids', 'class9_misc', 'compatible'),
-  ('class8_corrosives', 'class9_misc', 'compatible');
+insert into carriers (name) values
+  ('Empresa Uno'),
+  ('Empresa Dos'),
+  ('Empresa Tres');

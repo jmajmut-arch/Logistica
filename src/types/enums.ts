@@ -1,30 +1,26 @@
-export type Role = 'warehouse' | 'supervisor';
+export type Role = 'operator' | 'supervisor' | 'admin';
 
-export const UNITS = ['l', 'ml', 'kg', 't'] as const;
+export const OPERATION_TYPES = ['carga_subida', 'retiro_carga', 'home_delivery'] as const;
 
-export type Unit = (typeof UNITS)[number];
+export type OperationType = (typeof OPERATION_TYPES)[number];
 
-export const HAZARD_CLASSES = [
-  'class1_explosives',
-  'class2_gases',
-  'class3_flammable_liquids',
-  'class4_flammable_solids',
-  'class5_oxidizers',
-  'class6_toxic',
-  'class7_radioactive',
-  'class8_corrosives',
-  'class9_misc',
-] as const;
+export const SITE_TYPES = ['patio', 'bodega'] as const;
 
-export type HazardClass = (typeof HAZARD_CLASSES)[number];
+export type SiteType = (typeof SITE_TYPES)[number];
 
-export type CompatibilityStatus = 'compatible' | 'incompatible';
+// Lo que el operador elige trabajar al iniciar sesión: agrupa los tipos de operación en
+// dos frentes (el plan de transporte de patios/bodegas vs. home delivery), para acotar
+// qué parte del plan le aparece.
+export const OPERATOR_SCOPES = ['plan_transporte', 'home_delivery'] as const;
 
-export type AlertType =
-  'expiration' | 'limit_exceeded' | 'incompatibility' | 'verification_overdue';
+export type OperatorScope = (typeof OPERATOR_SCOPES)[number];
 
-export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
+// Motivo de una incidencia de guía de despacho: no fue ingresada por el operador
+// logístico, o algún otro problema (descrito en el campo de texto libre).
+export const DISPATCH_ISSUE_TYPES = ['no_ingresada', 'otro'] as const;
 
-export type AlertStatus = 'pending' | 'resolved';
+export type DispatchIssueType = (typeof DISPATCH_ISSUE_TYPES)[number];
 
-export type VerificationResult = 'cumple' | 'no_cumple' | 'no_aplica';
+export const DISPATCH_ISSUE_STATUSES = ['open', 'closed'] as const;
+
+export type DispatchIssueStatus = (typeof DISPATCH_ISSUE_STATUSES)[number];

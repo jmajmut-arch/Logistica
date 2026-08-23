@@ -1,13 +1,26 @@
 import { getPermissions } from '@/utils/permissions';
 
 describe('getPermissions', () => {
-  it('only allows supervisor to configure rules', () => {
-    expect(getPermissions('supervisor').configureRules).toBe(true);
-    expect(getPermissions('warehouse').configureRules).toBe(false);
+  it('only allows admin (planificador) to manage the transport plan', () => {
+    expect(getPermissions('admin').managePlan).toBe(true);
+    expect(getPermissions('supervisor').managePlan).toBe(false);
+    expect(getPermissions('operator').managePlan).toBe(false);
   });
 
-  it('allows warehouse and supervisor to manage substances', () => {
-    expect(getPermissions('warehouse').manageSubstances).toBe(true);
-    expect(getPermissions('supervisor').manageSubstances).toBe(true);
+  it('only allows operator to register arrivals', () => {
+    expect(getPermissions('operator').registerArrivals).toBe(true);
+    expect(getPermissions('supervisor').registerArrivals).toBe(false);
+  });
+
+  it('only allows admin to manage the catalog (personas, sitios, empresas)', () => {
+    expect(getPermissions('admin').manageCatalog).toBe(true);
+    expect(getPermissions('supervisor').manageCatalog).toBe(false);
+    expect(getPermissions('operator').manageCatalog).toBe(false);
+  });
+
+  it('only allows supervisor to manage dispatch issues (guías con problemas)', () => {
+    expect(getPermissions('supervisor').manageDispatchIssues).toBe(true);
+    expect(getPermissions('admin').manageDispatchIssues).toBe(false);
+    expect(getPermissions('operator').manageDispatchIssues).toBe(false);
   });
 });

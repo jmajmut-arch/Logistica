@@ -1,11 +1,13 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
 
 import { LoginScreen } from '@/screens/Login/LoginScreen';
 import { useSessionHydrated, useSessionStore } from '@/store/sessionStore';
-import { navigationTheme, PALETTE } from '@/theme';
+import { useAppPalette } from '@/store/themeStore';
+import { buildNavigationTheme } from '@/theme';
 
 import { AppTabs } from './AppTabs';
 
@@ -19,11 +21,13 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function RootNavigator() {
   const currentUser = useSessionStore((state) => state.currentUser);
   const sessionHydrated = useSessionHydrated();
+  const palette = useAppPalette();
+  const navigationTheme = useMemo(() => buildNavigationTheme(palette), [palette]);
 
   if (!sessionHydrated) {
     return (
-      <View style={[styles.center, { backgroundColor: PALETTE.background }]}>
-        <ActivityIndicator size="large" color={PALETTE.primary} />
+      <View style={[styles.center, { backgroundColor: palette.background }]}>
+        <ActivityIndicator size="large" color={palette.primary} />
       </View>
     );
   }
@@ -31,7 +35,7 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PALETTE.background } }}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }}
       >
         {currentUser ? (
           <Stack.Screen name="App" component={AppTabs} />

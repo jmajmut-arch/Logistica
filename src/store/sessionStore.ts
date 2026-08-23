@@ -4,10 +4,15 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { User } from '@/domain/entities/User';
+import type { OperatorScope } from '@/types/enums';
 
 interface SessionState {
   currentUser: User | null;
-  login: (user: User) => void;
+  currentSiteId: number | null;
+  currentOperatorScope: OperatorScope | null;
+  login: (user: User, siteId?: number | null, operatorScope?: OperatorScope | null) => void;
+  setSite: (siteId: number | null) => void;
+  setOperatorScope: (scope: OperatorScope | null) => void;
   logout: () => void;
 }
 
@@ -15,8 +20,13 @@ export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
       currentUser: null,
-      login: (user) => set({ currentUser: user }),
-      logout: () => set({ currentUser: null }),
+      currentSiteId: null,
+      currentOperatorScope: null,
+      login: (user, siteId = null, operatorScope = null) =>
+        set({ currentUser: user, currentSiteId: siteId, currentOperatorScope: operatorScope }),
+      setSite: (siteId) => set({ currentSiteId: siteId }),
+      setOperatorScope: (scope) => set({ currentOperatorScope: scope }),
+      logout: () => set({ currentUser: null, currentSiteId: null, currentOperatorScope: null }),
     }),
     {
       name: 'suspel-session',

@@ -1,10 +1,43 @@
-import { DarkTheme as NavigationDarkTheme, type Theme as NavigationTheme } from '@react-navigation/native';
-import { MD3DarkTheme, type MD3Theme } from 'react-native-paper';
+import { DarkTheme as NavigationDarkTheme, DefaultTheme as NavigationLightTheme, type Theme as NavigationTheme } from '@react-navigation/native';
+import { MD3DarkTheme, MD3LightTheme, type MD3Theme } from 'react-native-paper';
 
-// Paleta de marca de SUSPEL: fondo azul-noche, acento naranja de riesgo (peligro/DS 43)
-// y acento celeste secundario. Usada en la pantalla de login y en el resto de la app
-// vía PaperProvider / NavigationContainer para mantener una identidad consistente.
-export const PALETTE = {
+export interface Palette {
+  background: string;
+  surface: string;
+  surfaceVariant: string;
+  primary: string;
+  onPrimary: string;
+  secondary: string;
+  onSecondary: string;
+  text: string;
+  textMuted: string;
+  border: string;
+  /** Íconos claros sobre fondo oscuro, u oscuros sobre fondo claro. */
+  statusBarStyle: 'light' | 'dark';
+}
+
+export type ThemeId = 'dark' | 'light' | 'emerald';
+
+/** Aplica transparencia a un color de la paleta (formato `#rrggbb`) — para glows, overlays
+ * y demás variantes translúcidas que antes eran literales `rgba(...)` fijos y por eso no
+ * seguían el tema elegido. */
+export function withAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export const THEME_LABELS: Record<ThemeId, string> = {
+  dark: 'Oscuro',
+  light: 'Claro',
+  emerald: 'Esmeralda',
+};
+
+// Fondo azul-noche, acento naranja y acento celeste secundario. Es la que existía antes de
+// que la app tuviera selector de tema, así que queda como default para no sorprender a
+// nadie que ya la esté usando.
+const DARK: Palette = {
   background: '#0b1120',
   surface: '#132743',
   surfaceVariant: '#1b3355',
@@ -15,46 +48,93 @@ export const PALETTE = {
   text: '#f8fafc',
   textMuted: 'rgba(226,232,240,0.7)',
   border: 'rgba(255,255,255,0.14)',
-} as const;
+  statusBarStyle: 'light',
+};
 
-export const paperTheme: MD3Theme = {
-  ...MD3DarkTheme,
-  colors: {
-    ...MD3DarkTheme.colors,
-    primary: PALETTE.primary,
-    onPrimary: PALETTE.onPrimary,
-    primaryContainer: '#7c3a10',
-    onPrimaryContainer: '#fed7aa',
-    secondary: PALETTE.secondary,
-    onSecondary: PALETTE.onSecondary,
-    background: PALETTE.background,
-    onBackground: PALETTE.text,
-    surface: PALETTE.surface,
-    onSurface: PALETTE.text,
-    surfaceVariant: PALETTE.surfaceVariant,
-    onSurfaceVariant: PALETTE.textMuted,
-    outline: PALETTE.border,
-    outlineVariant: 'rgba(255,255,255,0.08)',
-    elevation: {
-      level0: 'transparent',
-      level1: PALETTE.surface,
-      level2: '#193256',
-      level3: PALETTE.surfaceVariant,
-      level4: '#1e3a63',
-      level5: '#20406b',
+// Misma identidad de marca (naranja + celeste) que la oscura, sobre fondos claros — los
+// acentos se oscurecen un poco respecto a DARK para mantener contraste de texto sobre
+// blanco (el naranja/celeste original quedan muy pálidos ahí).
+const LIGHT: Palette = {
+  background: '#f8fafc',
+  surface: '#ffffff',
+  surfaceVariant: '#eef2f7',
+  primary: '#ea580c',
+  onPrimary: '#fff7ed',
+  secondary: '#0284c7',
+  onSecondary: '#f0f9ff',
+  text: '#0f172a',
+  textMuted: 'rgba(15,23,42,0.65)',
+  border: 'rgba(15,23,42,0.12)',
+  statusBarStyle: 'dark',
+};
+
+// Verde esmeralda profundo con acento dorado — una alternativa oscura distinta a la
+// azul-naranja original, pensada para quien quiera algo más cálido/premium sin pasarse a
+// un tema claro.
+const EMERALD: Palette = {
+  background: '#0a1f1c',
+  surface: '#123531',
+  surfaceVariant: '#1a4a43',
+  primary: '#d4a24e',
+  onPrimary: '#1a1305',
+  secondary: '#5eead4',
+  onSecondary: '#062824',
+  text: '#f0fdfa',
+  textMuted: 'rgba(240,253,250,0.7)',
+  border: 'rgba(255,255,255,0.14)',
+  statusBarStyle: 'light',
+};
+
+export const PALETTES: Record<ThemeId, Palette> = {
+  dark: DARK,
+  light: LIGHT,
+  emerald: EMERALD,
+};
+
+export function buildPaperTheme(palette: Palette): MD3Theme {
+  const base = palette.statusBarStyle === 'dark' ? MD3LightTheme : MD3DarkTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: palette.primary,
+      onPrimary: palette.onPrimary,
+      primaryContainer: palette.surfaceVariant,
+      onPrimaryContainer: palette.text,
+      secondary: palette.secondary,
+      onSecondary: palette.onSecondary,
+      background: palette.background,
+      onBackground: palette.text,
+      surface: palette.surface,
+      onSurface: palette.text,
+      surfaceVariant: palette.surfaceVariant,
+      onSurfaceVariant: palette.textMuted,
+      outline: palette.border,
+      outlineVariant: base.colors.outlineVariant,
+      elevation: {
+        level0: 'transparent',
+        level1: palette.surface,
+        level2: palette.surfaceVariant,
+        level3: palette.surfaceVariant,
+        level4: palette.surfaceVariant,
+        level5: palette.surfaceVariant,
+      },
     },
-  },
-};
+  };
+}
 
-export const navigationTheme: NavigationTheme = {
-  ...NavigationDarkTheme,
-  colors: {
-    ...NavigationDarkTheme.colors,
-    primary: PALETTE.primary,
-    background: PALETTE.background,
-    card: PALETTE.surface,
-    text: PALETTE.text,
-    border: PALETTE.border,
-    notification: PALETTE.primary,
-  },
-};
+export function buildNavigationTheme(palette: Palette): NavigationTheme {
+  const base = palette.statusBarStyle === 'dark' ? NavigationLightTheme : NavigationDarkTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: palette.primary,
+      background: palette.background,
+      card: palette.surface,
+      text: palette.text,
+      border: palette.border,
+      notification: palette.primary,
+    },
+  };
+}
